@@ -1048,5 +1048,7 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="landing.js"></script>
+<!-- Hard fallback: reveal everything after 2 s regardless of what happened above -->
+<script>setTimeout(function(){document.querySelectorAll('.lp-ani,.lp-ani-left,.lp-ani-right').forEach(function(e){e.classList.add('in')})},2000)</script>
 </body>
 </html>

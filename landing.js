@@ -194,16 +194,27 @@ function _initScrollAnimations() {
   const selector = '.lp-ani, .lp-ani-left, .lp-ani-right';
   const els = document.querySelectorAll(selector);
   if (!els.length) return;
+
   if (!window.IntersectionObserver) {
     els.forEach(el => el.classList.add('in'));
     return;
   }
+
+  // Reveal elements already in the viewport immediately (synchronous, same frame → no flash)
+  const vh = window.innerHeight;
+  els.forEach(el => {
+    const top = el.getBoundingClientRect().top;
+    if (top < vh - 20) el.classList.add('in');
+  });
+
+  // Observe the rest as user scrolls
   const io = new IntersectionObserver(entries => {
     entries.forEach(e => {
       if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
     });
   }, { threshold: 0.08, rootMargin: '0px 0px -28px 0px' });
-  els.forEach(el => io.observe(el));
+
+  els.forEach(el => { if (!el.classList.contains('in')) io.observe(el); });
 }
 
 /* ── Number counters ──────────────────────────────────────────── */
