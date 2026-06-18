@@ -1183,10 +1183,11 @@ function restoreVersionSnapshot(index) {
        </p>
        <p style="margin:8px 0 0;font-size:12px;color:var(--down)">Esta acción reemplazará los datos actuales.</p>`,
       () => {
+        closeModal();
         APP = { ...APP, ...entry.data };
         _attachAPPRedaction();
         _saveDataNow();
-        renderSettings();
+        navigateTo('dashboard');
         showToast('Versión restaurada ✓', 'success');
       }
     );
