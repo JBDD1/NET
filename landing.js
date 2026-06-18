@@ -1,7 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
    FINOVA — landing.js
-   Misma Firebase config que src/auth/auth.js. La sesión se
-   comparte automáticamente via IndexedDB (mismo origen).
 ═══════════════════════════════════════════════════════════════ */
 'use strict';
 
@@ -38,6 +36,7 @@ let _lpMode = 'signin';
   _initScrollAnimations();
   _initScrollProgress();
   _initSmoothScroll();
+  _initCounters();
 })();
 
 function _updateHeaderForAuth(user) {
@@ -153,17 +152,17 @@ function lpSendReset() {
 
 function _lpErrMsg(code) {
   return ({
-    'auth/user-not-found':           'No existe ninguna cuenta con ese correo.',
-    'auth/wrong-password':           'Contraseña incorrecta.',
-    'auth/invalid-email':            'El correo no tiene un formato válido.',
-    'auth/email-already-in-use':     'Ya existe una cuenta con ese correo. Inicia sesión.',
-    'auth/weak-password':            'Contraseña demasiado débil (mínimo 6 caracteres).',
-    'auth/too-many-requests':        'Demasiados intentos fallidos. Espera unos minutos.',
-    'auth/network-request-failed':   'Error de red. Comprueba tu conexión.',
-    'auth/popup-blocked':            'El navegador bloqueó el popup. Permite los popups para esta página.',
-    'auth/invalid-credential':       'Correo o contraseña incorrectos.',
-    'auth/invalid-login-credentials':'Correo o contraseña incorrectos.',
-    'auth/unauthorized-domain':      `Dominio no autorizado (${location.hostname}). Añádelo en Firebase Console → Authentication → Authorized domains.`,
+    'auth/user-not-found':            'No existe ninguna cuenta con ese correo.',
+    'auth/wrong-password':            'Contraseña incorrecta.',
+    'auth/invalid-email':             'El correo no tiene un formato válido.',
+    'auth/email-already-in-use':      'Ya existe una cuenta con ese correo. Inicia sesión.',
+    'auth/weak-password':             'Contraseña demasiado débil (mínimo 6 caracteres).',
+    'auth/too-many-requests':         'Demasiados intentos fallidos. Espera unos minutos.',
+    'auth/network-request-failed':    'Error de red. Comprueba tu conexión.',
+    'auth/popup-blocked':             'El navegador bloqueó el popup. Permite los popups para esta página.',
+    'auth/invalid-credential':        'Correo o contraseña incorrectos.',
+    'auth/invalid-login-credentials': 'Correo o contraseña incorrectos.',
+    'auth/unauthorized-domain':       `Dominio no autorizado (${location.hostname}). Añádelo en Firebase Console → Authentication → Authorized domains.`,
   })[code] || `Error (${code || 'desconocido'}).`;
 }
 
@@ -175,19 +174,59 @@ function lpSetTheme(variant, theme, cardEl) {
   if (cardEl) cardEl.classList.add('active');
 }
 
+/* ── FAQ accordion ────────────────────────────────────────────── */
+function lpFaqToggle(btn) {
+  const item   = btn.closest('.lp-faq-item');
+  const isOpen = item.classList.contains('open');
+  document.querySelectorAll('.lp-faq-item.open').forEach(el => el.classList.remove('open'));
+  if (!isOpen) item.classList.add('open');
+}
+
 /* ── Scroll animations ────────────────────────────────────────── */
 function _initScrollAnimations() {
-  const els = document.querySelectorAll('.lp-animate');
-  if (!els.length || !window.IntersectionObserver) {
-    els.forEach(el => el.classList.add('visible'));
+  const selector = '.lp-ani, .lp-ani-left, .lp-ani-right';
+  const els = document.querySelectorAll(selector);
+  if (!els.length) return;
+  if (!window.IntersectionObserver) {
+    els.forEach(el => el.classList.add('in'));
     return;
   }
   const io = new IntersectionObserver(entries => {
-    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
-  }, { threshold: 0.1, rootMargin: '0px 0px -32px 0px' });
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -28px 0px' });
   els.forEach(el => io.observe(el));
 }
 
+/* ── Number counters ──────────────────────────────────────────── */
+function _initCounters() {
+  const els = document.querySelectorAll('[data-count]');
+  if (!els.length || !window.IntersectionObserver) return;
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      io.unobserve(e.target);
+      const el      = e.target;
+      const target  = +el.dataset.count;
+      const suffix  = el.dataset.suffix  || '';
+      const prefix  = el.dataset.prefix  || '';
+      const dur     = 1200;
+      const start   = performance.now();
+      (function tick(now) {
+        const p = Math.min((now - start) / dur, 1);
+        const v = Math.round(_ease(p) * target);
+        el.textContent = prefix + v + suffix;
+        if (p < 1) requestAnimationFrame(tick);
+      })(start);
+    });
+  }, { threshold: 0.5 });
+  els.forEach(el => io.observe(el));
+}
+
+function _ease(t) { return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
+
+/* ── Scroll progress ──────────────────────────────────────────── */
 function _initScrollProgress() {
   const bar = document.getElementById('scrollLine');
   if (!bar) return;
@@ -197,6 +236,7 @@ function _initScrollProgress() {
   }, { passive: true });
 }
 
+/* ── Smooth scroll ────────────────────────────────────────────── */
 function _initSmoothScroll() {
   document.querySelectorAll('a[href^="#"]').forEach(a => {
     a.addEventListener('click', e => {

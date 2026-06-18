@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es" data-variant="obsidian-brass" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidad — Finova</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600&display=swap" /></noscript>
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+<style>
+:root {
+  --font-serif:'Playfair Display',Georgia,serif;
+  --font-sans:'Inter',system-ui,sans-serif;
+  --r-sm:8px; --r-md:12px; --r-lg:16px;
+}
+:root,[data-variant="obsidian-brass"][data-theme="dark"] {
+  --bg-base:#0d0c0a; --bg-surface:#171410; --bg-elevated:#1f1b15;
+  --border-subtle:rgba(212,176,120,.13); --border-faint:rgba(212,176,120,.06);
+  --text-primary:#ece2cb; --text-secondary:#968a72; --text-muted:#5a5246;
+  --accent:#d4a960; --accent-soft:rgba(212,169,96,.12); --accent-ink:#15110c;
+  --shadow-md:0 6px 20px rgba(0,0,0,.50);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg-base);color:var(--text-primary);font-family:var(--font-sans);font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* header */
+.lp-header{
+  position:sticky;top:0;z-index:100;
+  height:58px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 clamp(16px,4vw,72px);
+  background:color-mix(in srgb,var(--bg-base) 88%,transparent);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border-faint);
+}
+.lp-logo{display:flex;align-items:center;gap:8px;text-decoration:none}
+.lp-logo-icon{font-size:18px;color:var(--accent)}
+.lp-logo-text{font-family:var(--font-serif);font-size:17px;font-weight:600;color:var(--text-primary)}
+.back-link{font-size:13px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;gap:5px;transition:color .15s}
+.back-link:hover{color:var(--text-primary);text-decoration:none}
+
+/* layout */
+.doc-wrap{max-width:720px;margin:0 auto;padding:56px clamp(16px,4vw,32px) 96px}
+.doc-eyebrow{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+.doc-title{font-family:var(--font-serif);font-size:clamp(28px,4vw,40px);font-weight:600;color:var(--text-primary);line-height:1.15;margin-bottom:8px}
+.doc-meta{font-size:12px;color:var(--text-muted);margin-bottom:48px;padding-bottom:24px;border-bottom:1px solid var(--border-subtle)}
+.doc-section{margin-bottom:36px}
+.doc-section h2{font-family:var(--font-serif);font-size:19px;font-weight:600;color:var(--text-primary);margin-bottom:12px;padding-top:8px}
+.doc-section h3{font-size:14px;font-weight:600;color:var(--text-secondary);margin:16px 0 6px}
+.doc-section p{font-size:14px;color:var(--text-secondary);line-height:1.75;margin-bottom:12px}
+.doc-section ul{padding-left:20px;margin-bottom:12px}
+.doc-section ul li{font-size:14px;color:var(--text-secondary);line-height:1.75;margin-bottom:5px}
+.doc-highlight{
+  padding:16px 20px;border-radius:var(--r-md);
+  background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
+  font-size:13.5px;color:var(--text-primary);line-height:1.7;margin-bottom:20px;
+}
+.doc-hr{height:1px;background:var(--border-subtle);margin:36px 0}
+
+/* footer */
+.doc-footer{padding:24px clamp(16px,4vw,72px);border-top:1px solid var(--border-subtle);text-align:center}
+.doc-footer a{font-size:12px;color:var(--text-muted);margin:0 10px;transition:color .15s}
+.doc-footer a:hover{color:var(--text-secondary);text-decoration:none}
+</style>
+</head>
+<body>
+
+<header class="lp-header">
+  <a href="landing.html" class="lp-logo">
+    <span class="lp-logo-icon">◈</span>
+    <span class="lp-logo-text">Finova</span>
+  </a>
+  <a href="landing.html" class="back-link">← Volver</a>
+</header>
+
+<div class="doc-wrap">
+  <div class="doc-eyebrow">◈ Legal</div>
+  <h1 class="doc-title">Política de Privacidad</h1>
+  <div class="doc-meta">Última actualización: junio de 2025 &nbsp;·&nbsp; Aplicación web Finova</div>
+
+  <div class="doc-highlight">
+    <strong>Resumen en una frase:</strong> tus datos financieros viven en tu cuenta de usuario. No los vendemos, no los compartimos con terceros y no los usamos para publicidad.
+  </div>
+
+  <div class="doc-section">
+    <h2>1. Responsable del tratamiento</h2>
+    <p>El responsable del tratamiento de los datos personales recogidos a través de la aplicación web Finova es el operador del servicio, contactable en <a href="mailto:verdpo@gmail.com">verdpo@gmail.com</a>.</p>
+    <p>A efectos de la normativa aplicable (RGPD y LOPDGDD), el servicio se presta desde España y está sujeto a la legislación española y europea en materia de protección de datos.</p>
+  </div>
+
+  <div class="doc-section">
+    <h2>2. Datos que recopilamos</h2>
+    <h3>2.1 Datos de cuenta (Firebase Auth)</h3>
+    <ul>
+      <li><strong>Correo electrónico</strong> — necesario para crear y acceder a tu cuenta.</li>
+      <li><strong>Nombre de usuario</strong> (opcional) — si lo introduces al registrarte o si usas Google Sign-In.</li>
+      <li><strong>Foto de perfil</strong> — únicamente si inicias sesión con Google y tu cuenta de Google tiene foto.</li>
+      <li><strong>UID de usuario</strong> — identificador único generado por Firebase, nunca visible externamente.</li>
+    </ul>
+    <h3>2.2 Datos financieros</h3>
+    <p>Todos los datos financieros que introduces en la app (transacciones, patrimonio, inversiones, objetivos, notas) son introducidos voluntariamente por ti. Se almacenan en:</p>
+    <ul>
+      <li><strong>localStorage de tu navegador</strong> — para acceso rápido sin conexión.</li>
+      <li><strong>Servidor de la aplicación</strong> — para sincronización entre dispositivos, vinculados exclusivamente a tu UID.</li>
+    </ul>
+    <h3>2.3 Datos que NO recopilamos</h3>
+    <ul>
+      <li>No recopilamos credenciales bancarias de ningún tipo.</li>
+      <li>No instalamos cookies de seguimiento ni de publicidad.</li>
+      <li>No usamos herramientas de analítica de terceros (Google Analytics, etc.).</li>
+      <li>No recopilamos datos de comportamiento o navegación más allá de los necesarios para el funcionamiento del servicio.</li>
+    </ul>
+  </div>
+
+  <div class="doc-section">
+    <h2>3. Finalidad del tratamiento</h2>
+    <ul>
+      <li><strong>Prestación del servicio</strong> — permitir el acceso a tu cuenta y la sincronización de datos entre dispositivos.</li>
+      <li><strong>Autenticación segura</strong> — verificar tu identidad al iniciar sesión.</li>
+      <li><strong>Soporte técnico</strong> — responder a consultas enviadas por correo electrónico.</li>
+    </ul>
+    <p>No utilizamos tus datos para ninguna finalidad distinta a las indicadas anteriormente.</p>
+  </div>
+
+  <div class="doc-section">
+    <h2>4. Terceros que intervienen</h2>
+    <p>Finova utiliza exclusivamente los siguientes servicios de terceros:</p>
+    <ul>
+      <li><strong>Firebase Authentication (Google Ireland Limited)</strong> — gestión de cuentas de usuario y autenticación. Tus credenciales son gestionadas íntegramente por Google. Consulta la <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">política de privacidad de Firebase</a>.</li>
+      <li><strong>Google Fonts</strong> — carga de tipografías web. Solo transmite la IP para descargar los archivos de fuentes.</li>
+    </ul>
+    <p>No compartimos tus datos con ningún otro tercero, anunciante, red publicitaria ni servicio de análisis.</p>
+  </div>
+
+  <div class="doc-section">
+    <h2>5. Transferencias internacionales</h2>
+    <p>Firebase (Google) puede procesar datos en servidores ubicados fuera del Espacio Económico Europeo. Google está adherido a las garantías del RGPD y a las cláusulas contractuales tipo aprobadas por la Comisión Europea para transferencias internacionales.</p>
+  </div>
+
+  <div class="doc-section">
+    <h2>6. Plazos de conservación</h2>
+    <p>Tus datos se conservan mientras tu cuenta esté activa. Puedes eliminar tu cuenta en cualquier momento desde la configuración de la app, lo que eliminará tu información del servidor. Los datos en localStorage permanecen en tu dispositivo hasta que los borres manualmente o elimines el almacenamiento del navegador.</p>
+  </div>
+
+  <div class="doc-section">
+    <h2>7. Tus derechos (RGPD)</h2>
+    <p>De conformidad con el Reglamento General de Protección de Datos (RGPD), tienes derecho a:</p>
+    <ul>
+      <li><strong>Acceso</strong> — solicitar qué datos tenemos sobre ti.</li>
+      <li><strong>Rectificación</strong> — corregir datos inexactos o incompletos.</li>
+      <li><strong>Supresión</strong> — solicitar el borrado de tus datos ("derecho al olvido").</li>
+      <li><strong>Portabilidad</strong> — recibir tus datos en un formato estructurado y legible por máquina.</li>
+      <li><strong>Limitación del tratamiento</strong> — solicitar que restrinjamos el uso de tus datos.</li>
+      <li><strong>Oposición</strong> — oponerte al tratamiento de tus datos.</li>
+    </ul>
+    <p>Para ejercer cualquiera de estos derechos, escribe a <a href="mailto:verdpo@gmail.com">verdpo@gmail.com</a>. Responderemos en un plazo máximo de 30 días.</p>
+    <p>Si consideras que el tratamiento no es conforme a la normativa, puedes presentar una reclamación ante la <a href="https://www.aepd.es" target="_blank" rel="noopener">Agencia Española de Protección de Datos (AEPD)</a>.</p>
+  </div>
+
+  <div class="doc-section">
+    <h2>8. Seguridad</h2>
+    <p>Aplicamos medidas técnicas y organizativas razonables para proteger tus datos, incluyendo el uso de HTTPS para todas las comunicaciones, autenticación basada en tokens gestionados por Firebase y acceso restringido a los datos del servidor.</p>
+    <p>A pesar de estas medidas, ningún sistema es infalible. Si detectamos una brecha de seguridad que afecte a tus datos, te notificaremos en el plazo que establece la normativa.</p>
+  </div>
+
+  <div class="doc-section">
+    <h2>9. Menores de edad</h2>
+    <p>Finova no está dirigida a menores de 16 años. No recopilamos conscientemente datos de menores. Si crees que un menor ha creado una cuenta, contáctanos y la eliminaremos.</p>
+  </div>
+
+  <div class="doc-section">
+    <h2>10. Cambios en esta política</h2>
+    <p>Podemos actualizar esta Política de Privacidad ocasionalmente. Cuando lo hagamos, actualizaremos la fecha en la parte superior del documento. Para cambios sustanciales, notificaremos a los usuarios registrados por correo electrónico.</p>
+  </div>
+
+  <div class="doc-hr"></div>
+
+  <div class="doc-section">
+    <p style="font-size:13px;color:var(--text-muted)">¿Tienes preguntas sobre esta política? Escribe a <a href="mailto:verdpo@gmail.com">verdpo@gmail.com</a>.</p>
+  </div>
+</div>
+
+<footer class="doc-footer">
+  <a href="landing.html">Inicio</a>
+  <a href="privacy.html">Privacidad</a>
+  <a href="terms.html">Términos</a>
+  <a href="index.html">Ir a la app →</a>
+</footer>
+
+</body>
+</html>
