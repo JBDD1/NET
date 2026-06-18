@@ -558,13 +558,16 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 .lp-forgot-btn { background:none; border:none; font-size:11px; color:var(--text-muted); cursor:pointer; transition:color .15s; }
 .lp-forgot-btn:hover { color:var(--accent); }
 
-/* ══ SCROLL ANIMATIONS ══════════════════════════════════════════ */
-.lp-ani       { opacity:0; transform:translateY(24px); }
-.lp-ani-left  { opacity:0; transform:translateX(-28px); }
-.lp-ani-right { opacity:0; transform:translateX(28px); }
-.lp-ani.in       { animation:lp-up    .65s cubic-bezier(.16,1,.3,1) forwards; }
-.lp-ani-left.in  { animation:lp-left  .65s cubic-bezier(.16,1,.3,1) forwards; }
-.lp-ani-right.in { animation:lp-right .65s cubic-bezier(.16,1,.3,1) forwards; }
+/* ══ SCROLL ANIMATIONS ══════════════════════════════════════════
+   Only hide elements when JS is confirmed loaded (.js on <html>).
+   This prevents a blank page if the script fails or loads late.
+═══════════════════════════════════════════════════════════════ */
+.js .lp-ani       { opacity:0; transform:translateY(24px); }
+.js .lp-ani-left  { opacity:0; transform:translateX(-28px); }
+.js .lp-ani-right { opacity:0; transform:translateX(28px); }
+.lp-ani.in       { animation:lp-up    .65s cubic-bezier(.16,1,.3,1) forwards !important; opacity:1 !important; }
+.lp-ani-left.in  { animation:lp-left  .65s cubic-bezier(.16,1,.3,1) forwards !important; opacity:1 !important; }
+.lp-ani-right.in { animation:lp-right .65s cubic-bezier(.16,1,.3,1) forwards !important; opacity:1 !important; }
 
 /* ══ RESPONSIVE ═════════════════════════════════════════════════ */
 @media (max-width:1024px) {
@@ -631,6 +634,8 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 </style>
 </head>
 <body>
+<!-- Mark JS as available immediately — prevents opacity:0 blank page if scripts fail -->
+<script>document.documentElement.classList.add('js')</script>
 
 <div id="scrollLine"></div>
 

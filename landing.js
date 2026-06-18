@@ -37,6 +37,13 @@ let _lpMode = 'signin';
   _initScrollProgress();
   _initSmoothScroll();
   _initCounters();
+
+  // Safety: reveal all still-hidden elements after 1.5 s
+  // (fallback if IntersectionObserver never fires — e.g. hidden iframe, print)
+  setTimeout(() => {
+    document.querySelectorAll('.lp-ani:not(.in),.lp-ani-left:not(.in),.lp-ani-right:not(.in)')
+      .forEach(el => el.classList.add('in'));
+  }, 1500);
 })();
 
 function _updateHeaderForAuth(user) {
