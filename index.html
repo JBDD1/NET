@@ -1,0 +1,2314 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finova — Gestión Financiera Personal</title>
+  <meta name="description" content="Finova — Gestión financiera personal. Controla tu patrimonio, inversiones, transacciones y objetivos en un solo lugar." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" /></noscript>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#a8803e" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <script>
+    /* Aplicar tema ANTES del primer paint para evitar parpadeo */
+    try {
+      var _lu   = localStorage.getItem('finova_last_uid');
+      var _bk   = _lu ? ('finova_' + _lu + '_data_v1') : 'finova_data_v1';
+      var _boot = JSON.parse(localStorage.getItem(_bk) || localStorage.getItem('finova_data_v1') || '{}');
+      if (_boot.theme) document.documentElement.setAttribute('data-theme', _boot.theme);
+      var _v = _boot.variant || 'obsidian-brass';
+      document.documentElement.setAttribute('data-variant', _v);
+    } catch(e) {
+      document.documentElement.setAttribute('data-variant', 'obsidian-brass');
+    }
+  </script>
+
+</head>
+<body>
+
+  <a href="#mainContent" class="skip-link">Saltar al contenido principal</a>
+
+  <!-- ═══════════════ PANTALLA DE LOGIN ═══════════════════════════ -->
+  <div id="login-screen" class="login-screen" style="display:none" role="main" aria-label="Pantalla de inicio de sesión">
+    <div class="login-card">
+
+      <div class="login-logo">
+        <span class="login-logo-icon">◈</span>
+        <span class="login-logo-text">Finova</span>
+      </div>
+      <p class="login-tagline">Tu asistente financiero personal</p>
+
+      <div class="login-tabs" role="tablist">
+        <button type="button" class="login-tab active" id="login-tab-signin" role="tab"
+          onclick="_renderLoginForm('signin');document.querySelectorAll('.login-tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">
+          Iniciar sesión
+        </button>
+        <button type="button" class="login-tab" id="login-tab-signup" role="tab"
+          onclick="_renderLoginForm('signup');document.querySelectorAll('.login-tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">
+          Registrarse
+        </button>
+      </div>
+
+      <div id="login-form-container" class="login-form-container"></div>
+
+      <div class="login-divider"><span>o continúa con</span></div>
+
+      <button type="button" class="login-btn-google" onclick="signInGoogle()">
+        <svg class="login-google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Continuar con Google
+      </button>
+
+    </div>
+  </div>
+
+  <!-- Pantalla de carga inicial -->
+  <div id="app-loading" aria-hidden="true">
+    <div class="app-loading-inner">
+      <div class="app-loading-logo">
+        <span class="logo-icon" style="font-size:2.4rem">◈</span>
+        <span class="logo-text" style="font-size:1.6rem;letter-spacing:.04em">Finova</span>
+      </div>
+      <div class="app-loading-spinner"></div>
+    </div>
+  </div>
+
+  <aside class="sidebar" id="sidebar" aria-label="Panel lateral">
+    <div class="sidebar-header">
+      <div class="logo-wrap">
+        <div class="logo">
+          <span class="logo-icon">◈</span>
+          <span class="logo-text">Finova</span>
+        </div>
+        <span class="logo-f" aria-hidden="true">F</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle"><span>‹</span></button>
+    </div>
+
+    <nav class="sidebar-nav" aria-label="Navegación principal">
+
+      <!-- Ítem simple -->
+      <button class="nav-item active" data-section="dashboard" aria-keyshortcuts="g" title="Dashboard (G)">
+        <span class="nav-icon">▤</span>
+        <span class="nav-label">Dashboard</span>
+      </button>
+
+      <!-- GRUPO: Ingresos & Gastos (con sub-items) -->
+      <div class="nav-group" id="nav-group-transacciones">
+        <button class="nav-item nav-group-header" id="nav-group-toggle-transacciones">
+          <span class="nav-icon">⇄</span>
+          <span class="nav-label">Ingresos & Gastos</span>
+          <span class="nav-arrow nav-label">›</span>
+        </button>
+        <div class="nav-sub" id="nav-sub-transacciones">
+          <button class="nav-item nav-sub-item" data-section="transactions">
+            <span class="nav-icon">▸</span>
+            <span class="nav-label">Transacciones</span>
+          </button>
+          <button class="nav-item nav-sub-item" data-section="bizums">
+            <span class="nav-icon">▸</span>
+            <span class="nav-label">Bizums</span>
+          </button>
+          <button class="nav-item nav-sub-item" data-section="recurring">
+            <span class="nav-icon">▸</span>
+            <span class="nav-label">Recurrentes</span>
+            <span class="nav-badge" id="nav-badge-recurring" style="display:none"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- GRUPO: Inversiones (con sub-items) -->
+      <div class="nav-group" id="nav-group-inversiones">
+        <button class="nav-item nav-group-header" id="nav-group-toggle-inversiones">
+          <span class="nav-icon">◈</span>
+          <span class="nav-label">Inversiones</span>
+          <span class="nav-arrow nav-label">›</span>
+        </button>
+        <div class="nav-sub" id="nav-sub-inversiones">
+          <button class="nav-item nav-sub-item" data-section="portfolio">
+            <span class="nav-icon">▸</span>
+            <span class="nav-label">Cartera</span>
+          </button>
+          <button class="nav-item nav-sub-item" data-section="watchlist">
+            <span class="nav-icon">▸</span>
+            <span class="nav-label">Watchlist</span>
+          </button>
+          <button class="nav-item nav-sub-item" data-section="dividends">
+            <span class="nav-icon">▸</span>
+            <span class="nav-label">Dividendos</span>
+          </button>
+        </div>
+      </div>
+
+      <button class="nav-item" data-section="networth">
+        <span class="nav-icon">◐</span>
+        <span class="nav-label">Patrimonio Neto</span>
+      </button>
+
+      <button class="nav-item" data-section="pasivos">
+        <span class="nav-icon">⊖</span>
+        <span class="nav-label">Pasivos</span>
+      </button>
+
+      <button class="nav-item" data-section="alternatives">
+        <span class="nav-icon">◇</span>
+        <span class="nav-label">Activos Alt.</span>
+      </button>
+
+<button class="nav-item" data-section="goals">
+        <span class="nav-icon">◎</span>
+        <span class="nav-label">Objetivos</span>
+      </button>
+
+      <button class="nav-item" data-section="simulator">
+        <span class="nav-icon">∿</span>
+        <span class="nav-label">Simulador</span>
+      </button>
+
+      <button class="nav-item" data-section="fiscalidad">
+        <span class="nav-icon">§</span>
+        <span class="nav-label">Fiscalidad</span>
+      </button>
+
+      <button class="nav-item" data-section="ai">
+        <span class="nav-icon">✦</span>
+        <span class="nav-label">Asesor IA</span>
+      </button>
+
+      <button class="nav-item" data-section="admin" id="nav-admin" style="display:none">
+        <span class="nav-icon">👑</span>
+        <span class="nav-label">Admin</span>
+      </button>
+
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="nav-item" data-section="settings">
+        <span class="nav-icon">⚙</span>
+        <span class="nav-label">Ajustes</span>
+      </button>
+
+      <div id="sidebar-profile-wrap" style="position:relative">
+
+        <!-- Desplegable de perfil -->
+        <div class="profile-dropdown" id="profile-dropdown" style="display:none">
+          <div class="profile-dropdown-header">
+            <div class="avatar-change-wrap" onclick="_openPhotoModal();event.stopPropagation()" title="Cambiar foto de perfil">
+              <div class="profile-dropdown-avatar" id="dd-avatar">U</div>
+              <div class="avatar-change-overlay">
+                <span style="font-size:16px">📷</span>
+                <span class="avatar-change-label">Cambiar foto</span>
+              </div>
+            </div>
+            <div class="profile-dropdown-name" id="dd-username">Usuario</div>
+            <div class="profile-dropdown-sub" id="dd-user-email">Finova</div>
+          </div>
+          <div class="profile-dropdown-divider"></div>
+          <div class="profile-dropdown-item profile-name-row">
+            <span class="profile-dd-icon">✏</span>
+            <input type="text" id="profile-name-input" class="text-input"
+              placeholder="Tu nombre" maxlength="30"
+              style="height:28px;font-size:12.5px;flex:1;min-width:0"
+              onkeydown="if(event.key==='Enter')saveProfileName()" />
+            <button type="button" class="btn-primary" style="padding:4px 10px;font-size:11px;flex-shrink:0" data-action="save-profile-name">✓</button>
+          </div>
+          <div class="profile-dropdown-divider"></div>
+          <button type="button" class="profile-dropdown-item" data-action="toggle-theme-dropdown">
+            <span class="profile-dd-icon" id="dd-theme-icon">☀</span>
+            <span id="dd-theme-label">Modo claro</span>
+          </button>
+          <button type="button" class="profile-dropdown-item" data-action="toggle-privacy-dropdown">
+            <span class="profile-dd-icon" id="dd-privacy-icon">👁</span>
+            <span id="dd-privacy-label">Activar privacidad</span>
+          </button>
+          <div class="profile-dd-variant-row">
+            <span class="profile-dd-icon">◑</span>
+            <span class="profile-dd-variant-label">Tema visual</span>
+            <div class="dd-variant-swatches" id="dd-variant-swatches">
+              <button class="dd-variant-dot" data-variant="obsidian-brass"    title="Obsidian Brass"    style="background:linear-gradient(135deg,#15110c 50%,#a8803e 50%)"></button>
+              <button class="dd-variant-dot" data-variant="linen-editorial"   title="Linen Editorial"   style="background:linear-gradient(135deg,#ebe5d6 50%,#7a2b2b 50%)"></button>
+              <button class="dd-variant-dot" data-variant="midnight-emerald"  title="Midnight Emerald"  style="background:linear-gradient(135deg,#0c1f1a 50%,#b8924a 50%)"></button>
+              <button class="dd-variant-dot" data-variant="soft-mono"         title="Soft Mono"         style="background:linear-gradient(135deg,#f3f3f0 50%,#ff5530 50%)"></button>
+              <button class="dd-variant-dot" data-variant="terracotta-warmth" title="Terracotta Warmth" style="background:linear-gradient(135deg,#efe7d8 50%,#b8593a 50%)"></button>
+            </div>
+          </div>
+          <div class="profile-dropdown-divider"></div>
+          <button type="button" class="profile-dropdown-item" data-action="open-milestones-dropdown">
+            <span class="profile-dd-icon">★</span>
+            <span>Mis insignias</span>
+            <span id="dd-milestone-count" style="margin-left:auto;font-size:11px;color:var(--text-muted)"></span>
+          </button>
+          <div class="profile-dropdown-divider"></div>
+          <button type="button" class="profile-dropdown-item" data-action="download-backup-dropdown">
+            <span class="profile-dd-icon">↓</span>
+            <span>Exportar backup</span>
+          </button>
+          <label class="profile-dropdown-item" style="cursor:pointer">
+            <span class="profile-dd-icon">↑</span>
+            <span>Importar backup</span>
+            <input type="file" accept=".json" style="display:none" aria-label="Importar backup desde archivo JSON" onchange="handleRestore(this);closeProfileDropdown()" />
+          </label>
+        </div>
+
+        <!-- Perfil (trigger) -->
+        <div class="sidebar-profile" id="sidebar-profile" data-action="toggle-profile-dropdown" title="Abrir perfil" style="cursor:pointer">
+          <div class="sidebar-profile-avatar" id="sidebar-avatar">U</div>
+          <div class="sidebar-profile-info nav-label">
+            <div class="sidebar-profile-name" id="sidebar-username">Usuario</div>
+            <div class="sidebar-profile-actions">
+              <button type="button" class="sidebar-profile-btn" id="themeToggle" data-action="toggle-theme-btn" title="Cambiar tema"><span id="themeIcon">☀</span></button>
+              <button type="button" class="sidebar-profile-btn" id="btnBackup" data-action="download-backup-btn" title="Exportar backup">↓</button>
+            </div>
+          </div>
+        </div>
+        <div id="sidebar-milestone-bar" class="nav-label"></div>
+
+      </div>
+    </div>
+  </aside>
+
+  <!-- Overlay para cerrar sidebar en móvil -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <main class="main-content" id="mainContent">
+
+    <header class="topbar">
+      <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+      <div class="topbar-title" id="topbarTitle">Dashboard</div>
+      <span id="autosave-indicator" class="autosave-indicator" aria-live="polite" aria-atomic="true" style="display:none">✓ Guardado</span>
+      <button type="button" class="topbar-search-btn" data-action="open-search" title="Búsqueda global (Ctrl+K)">
+        <span>⌕</span>
+        <span class="topbar-search-label">Buscar</span>
+        <kbd class="topbar-kbd">Ctrl K</kbd>
+      </button>
+      <button type="button" class="topbar-privacy-btn" id="btnPrivacy" data-action="toggle-privacy" aria-keyshortcuts="p" title="Ocultar valores (P)">
+        <span id="privacyIcon">👁</span>
+        <span class="topbar-search-label" id="privacyLabel">Privacidad</span>
+      </button>
+      <button type="button" class="topbar-kbd-hint" data-action="show-keyboard-help" title="Atajos de teclado (?)">?</button>
+      <button type="button" class="topbar-devmode-btn" id="btnDevMode" style="display:none"
+        title="Dev mode" onclick="toggleDevMode()">DEV</button>
+      <span class="current-date" id="currentDate"></span>
+    </header>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         HEADER MÓVIL — visible solo en ≤768px
+    ═══════════════════════════════════════════════════════════ -->
+    <div class="mobile-header" id="mobileHeader" aria-hidden="true">
+
+      <!-- ZONA TOP: fondo claro, saludo + número + tabs -->
+      <div class="mh-top">
+        <div class="mh-top-row">
+          <div class="mh-top-left">
+            <div class="mh-greeting" id="mh-greeting">Hola</div>
+            <div class="mh-networth" id="mh-networth">€0</div>
+            <div class="mh-change" id="mh-change">—</div>
+          </div>
+          <div class="mh-avatar" id="mh-avatar" data-action="toggle-profile-dropdown">U</div>
+        </div>
+        <nav class="mh-tabs" id="mhTabs" aria-label="Navegación principal móvil">
+          <button class="mh-tab active" data-section="dashboard">Inicio</button>
+          <button class="mh-tab" data-section="transactions">Gastos</button>
+          <button class="mh-tab" data-section="portfolio">Cartera</button>
+          <button class="mh-tab" data-section="fiscalidad">Fiscal</button>
+          <button class="mh-tab" data-section="goals">Objetivos</button>
+          <button class="mh-tab" data-section="networth">Patrimonio</button>
+          <button class="mh-tab" data-section="ai">IA</button>
+          <button class="mh-tab" data-section="settings">Ajustes</button>
+        </nav>
+      </div>
+
+      <!-- ZONA BOTTOM: fondo oscuro (sidebar-bg), gráfico + KPIs — solo en dashboard -->
+      <div class="mh-bottom" id="mhBottom">
+        <div class="mh-chart-card">
+          <div class="mh-chart-header">
+            <span class="mh-chart-label">Evolución patrimonial</span>
+            <div class="mh-scale-btns">
+              <button class="mh-scale-btn active" data-scale="6m">6M</button>
+              <button class="mh-scale-btn" data-scale="1y">1A</button>
+              <button class="mh-scale-btn" data-scale="all">Todo</button>
+            </div>
+          </div>
+          <div class="mh-chart-wrap">
+            <canvas id="mh-sparkline-chart" aria-label="Gráfico de evolución patrimonial móvil"></canvas>
+          </div>
+        </div>
+        <div class="mh-kpis">
+          <div class="mh-kpi">
+            <div class="mh-kpi-label">Cartera</div>
+            <div class="mh-kpi-value" id="mh-kpi-portfolio">€0</div>
+            <div class="mh-kpi-change" id="mh-kpi-portfolio-change">—</div>
+          </div>
+          <div class="mh-kpi">
+            <div class="mh-kpi-label">Ahorro mes</div>
+            <div class="mh-kpi-value" id="mh-kpi-savings">€0</div>
+            <div class="mh-kpi-change" id="mh-kpi-savings-change">—</div>
+          </div>
+          <div class="mh-kpi mh-kpi-fire">
+            <div class="mh-kpi-label">FIRE</div>
+            <div class="mh-kpi-value" id="mh-kpi-fire">0%</div>
+            <div class="mh-kpi-bar"><div class="mh-kpi-bar-fill" id="mh-kpi-fire-fill"></div></div>
+          </div>
+        </div>
+        <div class="mh-recent-card">
+          <div class="mh-recent-label">Reciente</div>
+          <div id="mh-recent-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── DASHBOARD ─────────────────────────────────────────── -->
+    <section class="section active" id="section-dashboard">
+      <div class="section-header">
+        <h1 id="dash-greeting">Dashboard</h1>
+        <div class="btn-row">
+          <button type="button" class="btn-ghost" onclick="openDashboardEditor()" style="font-size:12px;padding:6px 14px" title="Personalizar bloques del dashboard">⚙ Editar</button>
+          <button type="button" class="btn-ghost" data-action="export-monthly-pdf" style="font-size:12px;padding:6px 14px" title="Exportar resumen del mes actual en PDF">📄 PDF</button>
+          <button type="button" class="btn-primary" data-action="quick-add-nav" style="font-size:12px;padding:6px 14px">+ Transacción</button>
+        </div>
+      </div>
+
+      <!-- Resumen mensual automático -->
+      <div id="dash-monthly-recap" style="display:none"></div>
+
+      <!-- Insight inteligente -->
+      <div id="dash-insight-banner" class="dash-insight-banner" style="display:none"></div>
+
+      <!-- Alertas activas -->
+      <div id="dash-alerts-container"></div>
+
+      <!-- Bloques personalizables del dashboard -->
+      <div id="dash-blocks-container" class="dash-blocks-container">
+
+        <div id="dash-block-kpis" class="dash-block dash-block-full">
+          <div class="kpi-grid">
+            <div class="kpi-card kpi-hero" id="dash-kpi-networth" data-action="navigate" data-section="networth" style="cursor:pointer" title="Ver Patrimonio Neto">
+              <div class="kpi-label">Patrimonio Neto Total</div>
+              <div class="kpi-value" id="dash-networth" aria-label="Patrimonio neto total">€0</div>
+              <div class="kpi-change" id="dash-networth-change">—</div>
+              <div class="kpi-narrative" id="dash-networth-narrative"></div>
+              <canvas class="kpi-sparkline" id="spark-networth" role="img" aria-label="Sparkline del patrimonio neto"></canvas>
+            </div>
+            <div class="kpi-card" id="dash-kpi-balance" data-action="navigate" data-section="transactions" style="cursor:pointer" title="Ver Ingresos &amp; Gastos">
+              <div class="kpi-label">Balance del mes</div>
+              <div class="kpi-value" id="dash-monthly-balance" aria-label="Balance del mes actual (ingresos menos gastos)">€0</div>
+              <div class="kpi-change" id="dash-monthly-sub">Ingresos − Gastos</div>
+              <div class="kpi-narrative" id="dash-balance-narrative"></div>
+              <canvas class="kpi-sparkline" id="spark-balance" role="img" aria-label="Sparkline del balance mensual"></canvas>
+            </div>
+            <div class="kpi-card" id="dash-kpi-portfolio" data-action="navigate" data-section="portfolio" style="cursor:pointer" title="Ver Cartera">
+              <div class="kpi-label">Cartera de inversión</div>
+              <div class="kpi-value" id="dash-portfolio-value" aria-label="Valor total de la cartera de inversión">€0</div>
+              <div class="kpi-change" id="dash-portfolio-change">—</div>
+              <div class="kpi-narrative" id="dash-portfolio-narrative"></div>
+              <canvas class="kpi-sparkline" id="spark-portfolio" role="img" aria-label="Sparkline de la cartera de inversión"></canvas>
+            </div>
+            <div class="kpi-card" id="dash-kpi-cash" data-action="navigate" data-section="networth" style="cursor:pointer" title="Ver cuentas de efectivo">
+              <div class="kpi-label">Efectivo disponible</div>
+              <div class="kpi-value" id="dash-cash" aria-label="Efectivo disponible en cuentas">€0</div>
+              <div class="kpi-change" id="dash-cash-sub">Saldo en cuenta</div>
+              <div class="kpi-narrative" id="dash-cash-narrative"></div>
+              <canvas class="kpi-sparkline" id="spark-cash" role="img" aria-label="Sparkline del efectivo disponible"></canvas>
+            </div>
+            <div class="kpi-card" id="dash-kpi-savings" data-action="navigate" data-section="transactions" style="cursor:pointer" title="Ver Ingresos &amp; Gastos">
+              <div class="kpi-label">Tasa de ahorro</div>
+              <div class="kpi-value" id="dash-savings-rate" aria-label="Tasa de ahorro mensual como porcentaje de los ingresos">—</div>
+              <div class="kpi-change" id="dash-savings-sub">Del ingreso mensual</div>
+              <div class="kpi-narrative" id="dash-savings-narrative"></div>
+              <canvas class="kpi-sparkline" id="spark-savings" role="img" aria-label="Sparkline de la tasa de ahorro"></canvas>
+            </div>
+            <div class="kpi-card" id="dash-kpi-dividends" data-action="navigate" data-section="dividends" style="cursor:pointer" title="Ver Dividendos">
+              <div class="kpi-label">Dividendos anuales</div>
+              <div class="kpi-value" id="dash-dividends" aria-label="Proyección de dividendos anuales">€0</div>
+              <div class="kpi-change" id="dash-dividends-sub">Proyección anual</div>
+              <div class="kpi-narrative" id="dash-dividends-narrative"></div>
+              <canvas class="kpi-sparkline" id="spark-dividends" role="img" aria-label="Sparkline de dividendos anuales"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div id="dash-block-chart-networth" class="dash-block dash-block-full">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Evolución del patrimonio</h3>
+              <div class="chart-scale-btns">
+                <button class="scale-btn" data-scale="1m">1M</button>
+                <button class="scale-btn" data-scale="3m">3M</button>
+                <button class="scale-btn active" data-scale="6m">6M</button>
+                <button class="scale-btn" data-scale="1y">1A</button>
+                <button class="scale-btn" data-scale="all">Todo</button>
+              </div>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="chart-networth-history" role="img" aria-label="Gráfico de evolución del patrimonio neto"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div id="dash-block-chart-dist" class="dash-block">
+          <div class="chart-card" style="height:100%">
+            <div class="chart-header"><h3>Distribución del patrimonio</h3></div>
+            <div class="chart-wrapper chart-donut-wrapper">
+              <canvas id="chart-distribution" role="img" aria-label="Gráfico de distribución del patrimonio por tipo de activo"></canvas>
+            </div>
+            <div class="chart-legend" id="dist-legend"></div>
+          </div>
+        </div>
+
+        <div id="dash-block-investments" class="dash-block">
+          <div class="card" style="height:100%">
+            <h3 class="card-title">Top Inversiones</h3>
+            <div id="top-investments-list" class="ranked-list"></div>
+          </div>
+        </div>
+
+        <div id="dash-block-activity" class="dash-block">
+          <div class="card" style="height:100%">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-4)">
+              <h3 class="card-title" style="margin-bottom:0">Actividad reciente</h3>
+              <button class="btn-ghost-sm" data-action="add-transaction" title="Añadir transacción (N)" style="font-size:12px">+ Añadir</button>
+            </div>
+            <div id="recent-transactions" class="activity-list"></div>
+          </div>
+        </div>
+
+        <div id="dash-block-goals" class="dash-block">
+          <div class="card" style="height:100%">
+            <div class="card-title-row">
+              <h3 class="card-title">Objetivos financieros</h3>
+              <button type="button" class="btn-ghost-sm" data-action="navigate" data-section="goals">Ver todos →</button>
+            </div>
+            <div id="dash-goals-list"></div>
+          </div>
+        </div>
+
+        <div id="dash-block-expcats" class="dash-block">
+          <div class="card" style="height:100%">
+            <div class="card-title-row">
+              <h3 class="card-title">Gastos por categoría</h3>
+              <span class="card-title-sub" id="dash-expense-month"></span>
+            </div>
+            <div id="dash-expense-cats"></div>
+          </div>
+        </div>
+
+        <div id="dash-block-rule5030" class="dash-block">
+          <div class="card rule5030-card" style="height:100%">
+            <div class="card-title-row">
+              <h3 class="card-title">Regla 50/30/20</h3>
+              <button type="button" class="btn-ghost-sm" data-action="rule5030-settings">Configurar</button>
+            </div>
+            <div id="rule5030-content"></div>
+          </div>
+        </div>
+
+        <div id="dash-block-wealth-score" class="dash-block">
+          <div class="card" style="height:100%">
+            <div class="card-title-row">
+              <h3 class="card-title">Wealth Score</h3>
+              <span class="card-title-sub">Salud financiera global</span>
+            </div>
+            <div id="wealth-score-content"></div>
+          </div>
+        </div>
+
+        <div id="dash-block-timeline" class="dash-block dash-block-full">
+          <div class="card" style="overflow:hidden">
+            <div class="card-title-row">
+              <h3 class="card-title">Timeline financiero</h3>
+              <span class="card-title-sub">Diario cronológico de eventos</span>
+            </div>
+            <div id="timeline-content"></div>
+          </div>
+        </div>
+
+        <div id="dash-block-heatmap" class="dash-block dash-block-full">
+          <div class="card" style="overflow:hidden">
+            <div class="card-title-row">
+              <h3 class="card-title">Heatmap de gastos</h3>
+              <span class="card-title-sub">Intensidad de gasto diaria</span>
+            </div>
+            <div id="heatmap-content"></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ─── INGRESOS & GASTOS ─────────────────────────────────── -->
+    <section class="section" id="section-transactions">
+      <div class="section-header">
+        <h1>Ingresos &amp; Gastos</h1>
+        <div class="btn-row">
+          <div class="io-dropdown" id="io-dropdown-wrap">
+            <button type="button" class="btn-secondary" data-action="toggle-io-dropdown" title="Importar / Exportar transacciones" style="font-size:15px;padding:6px 12px">⇅</button>
+            <div class="io-dropdown-menu" id="io-dropdown-menu">
+              <button type="button" data-action="export-csv">↓ Exportar CSV</button>
+              <button type="button" data-action="import-csv">↑ Importar CSV</button>
+              <button type="button" data-action="import-ofx">↑ Importar OFX</button>
+            </div>
+          </div>
+          <input type="file" id="csv-import-input" accept=".csv,.txt" style="display:none" onchange="handleCSVImportFile(this)" />
+          <input type="file" id="ofx-import-input" accept=".ofx,.qfx,.ofc" style="display:none" onchange="handleOFXImportFile(this)" />
+          <button type="button" class="btn-primary" id="btnAddTransaction" data-action="add-transaction" aria-keyshortcuts="n" title="Añadir transacción (N)">+ Añadir</button>
+          <button type="button" class="btn-secondary" id="btnManageCategories" data-action="manage-categories">Categorías</button>
+        </div>
+      </div>
+
+      <!-- Quick-add transacción -->
+      <div class="card quick-add-card" id="tx-widget-quickadd">
+        <div class="quick-add-row">
+          <input type="text" id="quick-add-input" class="text-input"
+            placeholder="Ej: Mercadona 47€  ·  Nómina 2400  ·  Netflix 12.99€"
+            autocomplete="off"
+            oninput="onQuickAddInput()"
+            onkeydown="if(event.key==='Enter')quickAddSubmit()" />
+          <span id="quick-add-type-badge" style="display:none;flex-shrink:0"></span>
+          <span id="quick-add-cat-badge" class="cat-ai-badge" style="display:none;flex-shrink:0"></span>
+          <button type="button" class="btn-primary" id="quick-add-btn" data-action="quick-add-submit" disabled>+ Añadir</button>
+        </div>
+        <div id="quick-add-hint" class="quick-add-hint" style="display:none"></div>
+      </div>
+
+      <!-- KPIs transacciones -->
+      <div class="kpi-grid kpi-grid-3" id="tx-widget-kpis">
+        <div class="kpi-card">
+          <div class="kpi-label">Ingresos del mes</div>
+          <div class="kpi-value positive" id="tx-total-income">€0</div>
+          <div class="kpi-change" id="tx-income-sub"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Gastos del mes</div>
+          <div class="kpi-value negative" id="tx-total-expense">€0</div>
+          <div class="kpi-change" id="tx-expense-sub"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Balance del mes</div>
+          <div class="kpi-value" id="tx-balance">€0</div>
+          <div class="kpi-change" id="tx-balance-sub"></div>
+        </div>
+      </div>
+
+      <!-- Tabla transacciones — primero, es el 80% del uso -->
+      <div class="card" id="tx-widget-txlist">
+        <div class="table-toolbar">
+          <div class="filter-group">
+            <select id="tx-filter-type" class="select-input">
+              <option value="all">Todos</option>
+              <option value="income">Ingresos</option>
+              <option value="expense">Gastos</option>
+            </select>
+            <select id="tx-filter-category" class="select-input">
+              <option value="all">Todas las categorías</option>
+            </select>
+            <div class="month-nav-group">
+              <button type="button" class="btn-ghost-sm month-nav-btn" data-action="tx-prev-month" title="Mes anterior">‹</button>
+              <div class="month-nav-center">
+                <span id="tx-month-label" class="tx-month-label"></span>
+                <input type="month" id="tx-filter-month" class="text-input" />
+              </div>
+              <button type="button" class="btn-ghost-sm month-nav-btn" data-action="tx-next-month" title="Mes siguiente">›</button>
+            </div>
+            <div class="tx-period-presets">
+              <button type="button" class="btn-ghost-sm" data-action="tx-period-current" title="Este mes">Este mes</button>
+              <button type="button" class="btn-ghost-sm" data-action="tx-period-prev" title="Mes anterior">Mes ant.</button>
+              <button type="button" class="btn-ghost-sm" data-action="tx-period-all" title="Todos los meses">Todo</button>
+            </div>
+            <input type="search" id="tx-filter-search" class="text-input tx-search-input" placeholder="Buscar…" autocomplete="off" />
+          </div>
+          <span id="tx-result-count" class="tx-result-count" style="display:none"></span>
+          <button type="button" id="btn-tx-clear-filters" class="btn-ghost-sm" data-action="clear-tx-filters" title="Limpiar filtros" style="display:none">× Limpiar</button>
+          <button type="button" id="btn-tx-favs" class="btn-secondary btn-sm" data-action="toggle-tx-favorites" title="Mostrar solo favoritos">★ Favoritos</button>
+          <button type="button" class="btn-secondary btn-sm" data-action="export-tx-csv" title="Exportar a CSV">↓ CSV</button>
+        </div>
+        <div class="table-wrapper tx-virtual-wrap" id="tx-virtual-scroll">
+          <table class="data-table">
+            <caption class="sr-only">Lista de transacciones: fecha, descripción, categoría, tipo e importe</caption>
+            <thead>
+              <tr>
+                <th class="sortable-th" data-sort="date" title="Ordenar por fecha">Fecha <span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-sort="description" title="Ordenar por descripción">Descripción <span class="sort-arrow"></span></th>
+                <th class="sortable-th" data-sort="category" title="Ordenar por categoría">Categoría <span class="sort-arrow"></span></th>
+                <th>Tipo</th>
+                <th class="text-right sortable-th" data-sort="amount" title="Ordenar por importe">Importe <span class="sort-arrow"></span></th>
+                <th class="text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="transactions-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Gráficos -->
+      <div class="charts-grid" id="tx-widget-charts">
+        <div class="chart-card">
+          <div class="chart-header"><h3>Ingresos vs Gastos (mensual)</h3></div>
+          <div class="chart-wrapper"><canvas id="chart-income-expense" role="img" aria-label="Gráfico de ingresos versus gastos por mes"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header"><h3>Gastos por categoría</h3></div>
+          <div class="chart-wrapper chart-donut-wrapper"><canvas id="chart-expense-category" role="img" aria-label="Gráfico de distribución de gastos por categoría"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Presupuestos — colapsable -->
+      <details class="card tx-budgets-details" id="tx-budgets-section">
+        <summary class="card-header-row" style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between">
+          <h3 class="card-title-sm" style="margin:0">Presupuestos del mes</h3>
+          <button type="button" class="btn-secondary btn-sm" data-action="manage-budgets">Gestionar</button>
+        </summary>
+        <div id="tx-budgets-list" class="mt-3"></div>
+      </details>
+
+    </section>
+
+    <!-- ─── RECURRENTES ─────────────────────────────────────────── -->
+    <section class="section" id="section-recurring">
+      <div class="section-header">
+        <h1>Recurrentes</h1>
+        <button type="button" class="btn-primary" data-action="add-recurring">+ Añadir</button>
+      </div>
+      <p class="section-sub">Plantillas de ingresos y gastos periódicos. Pulsa "Registrar" para crear la transacción en el mes actual.</p>
+      <div id="recurring-list"></div>
+    </section>
+
+    <!-- ─── BIZUMS ──────────────────────────────────────────────── -->
+    <section class="section" id="section-bizums">
+      <div class="section-header">
+        <h1>Bizums</h1>
+        <button type="button" class="btn-primary" id="btnAddBizum" data-action="add-bizum">+ Añadir bizum</button>
+      </div>
+
+      <div class="kpi-grid kpi-grid-3">
+        <div class="kpi-card">
+          <div class="kpi-label">Saldo neto</div>
+          <div class="kpi-value" id="biz-balance">€0</div>
+          <div class="kpi-change" id="biz-balance-sub">Te deben − Debes</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Te deben (pendiente)</div>
+          <div class="kpi-value positive" id="biz-pending-in">€0</div>
+          <div class="kpi-change" id="biz-pending-in-count">0 bizums</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Debes tú (pendiente)</div>
+          <div class="kpi-value negative" id="biz-pending-out">€0</div>
+          <div class="kpi-change" id="biz-pending-out-count">0 bizums</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-toolbar">
+          <div class="filter-group">
+            <select id="biz-filter-dir" class="select-input">
+              <option value="all">Todos</option>
+              <option value="in">Me deben</option>
+              <option value="out">Debo yo</option>
+            </select>
+            <select id="biz-filter-status" class="select-input">
+              <option value="all">Todos los estados</option>
+              <option value="pending">Pendiente</option>
+              <option value="done">Cobrado / Pagado</option>
+            </select>
+            <select id="biz-filter-person" class="select-input">
+              <option value="all">Todas las personas</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <caption class="sr-only">Lista de bizums: fecha, persona, concepto, dirección, importe y estado</caption>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Persona</th>
+                <th>Concepto</th>
+                <th>Dirección</th>
+                <th class="text-right">Importe</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="bizums-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Balance por persona</h3>
+        <div id="biz-by-person"></div>
+      </div>
+
+    </section>
+
+    <!-- ─── CARTERA ───────────────────────────────────────────── -->
+    <section class="section" id="section-portfolio">
+      <div class="section-header">
+        <h1>Cartera</h1>
+        <div class="btn-row">
+          <button type="button" class="btn-secondary" data-action="export-excel" title="Exportar a Excel (4 hojas: Resumen, Cartera, Dividendos, Watchlist)">↓ Excel</button>
+          <button type="button" class="btn-secondary btn-refresh-prices" data-action="refresh-prices">⟳ Precios</button>
+          <button type="button" class="btn-secondary" data-action="refresh-fx" title="Actualizar tipos de cambio desde el BCE">⇄ Divisas</button>
+          <button type="button" class="btn-primary" id="btnAddAsset" data-action="add-asset" aria-keyshortcuts="i" title="Añadir activo (I)">+ Añadir activo</button>
+        </div>
+      </div>
+
+      <div id="port-fx-warning" style="display:none;margin-bottom:12px;padding:10px 14px;background:var(--down-soft);border:1px solid var(--down);border-radius:var(--r-sm);font-size:13px;color:var(--text-primary)"></div>
+
+      <div class="kpi-grid kpi-grid-4" id="port-widget-kpis">
+        <div class="kpi-card">
+          <div class="kpi-label">Valor total cartera</div>
+          <div class="kpi-value" id="port-total-value" aria-label="Valor total de la cartera al precio actual">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Coste total</div>
+          <div class="kpi-value" id="port-total-cost" aria-label="Coste total de compra de todos los activos">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Ganancia / Pérdida</div>
+          <div class="kpi-value" id="port-total-gain" aria-label="Ganancia o pérdida latente total de la cartera">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Rentabilidad</div>
+          <div class="kpi-value" id="port-total-pct" aria-label="Rentabilidad total de la cartera en porcentaje">0%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">CAGR cartera</div>
+          <div class="kpi-value" id="port-total-cagr" aria-label="Rentabilidad anual compuesta de la cartera (CAGR)">—</div>
+          <div class="kpi-change" id="port-cagr-sub" style="font-size:11px">Rentabilidad anual compuesta</div>
+        </div>
+      </div>
+
+      <div class="highlights-row" id="port-widget-highlights">
+        <div class="highlight-card highlight-best">
+          <div class="highlight-label">🏆 Mejor inversión</div>
+          <div class="highlight-name" id="best-investment-name">—</div>
+          <div class="highlight-value" id="best-investment-val">—</div>
+        </div>
+        <div class="highlight-card highlight-worst">
+          <div class="highlight-label">⚠ Peor inversión</div>
+          <div class="highlight-name" id="worst-investment-name">—</div>
+          <div class="highlight-value" id="worst-investment-val">—</div>
+        </div>
+      </div>
+
+      <p class="section-note">ℹ El P&amp;L mostrado es bruto — no incluye comisiones de compra/venta ni el impacto fiscal. El rendimiento real neto puede ser inferior.</p>
+
+      <div class="card" id="port-widget-table">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <caption class="sr-only">Cartera de inversión: activo, ticker, país, precio de compra, precio actual, cantidad, valor, rentabilidad y CAGR</caption>
+            <thead>
+              <tr id="portfolio-thead-row">
+                <th class="sortable" data-col="name" data-action="portfolio-sort">Activo<span class="sort-arrow">⇅</span></th>
+                <th class="sortable" data-col="ticker" data-action="portfolio-sort">Ticker<span class="sort-arrow">⇅</span></th>
+                <th class="sortable" data-col="country" data-action="portfolio-sort">País<span class="sort-arrow">⇅</span></th>
+                <th class="sortable text-right" data-col="buyPrice" data-action="portfolio-sort">P. Compra<span class="sort-arrow">⇅</span></th>
+                <th class="text-right">P. Actual</th>
+                <th class="sortable text-right" data-col="quantity" data-action="portfolio-sort">Cantidad<span class="sort-arrow">⇅</span></th>
+                <th class="sortable text-right" data-col="cost" data-action="portfolio-sort">Coste<span class="sort-arrow">⇅</span></th>
+                <th class="sortable text-right" data-col="value" data-action="portfolio-sort">Valor actual<span class="sort-arrow">⇅</span></th>
+                <th class="sortable text-right" data-col="gain" data-action="portfolio-sort">G/P (€)<span class="sort-arrow">⇅</span></th>
+                <th class="sortable text-right" data-col="gainPct" data-action="portfolio-sort">G/P (%)<span class="sort-arrow">⇅</span></th>
+                <th class="sortable text-right" data-col="concPct" data-action="portfolio-sort">% Cartera<span class="sort-arrow">⇅</span></th>
+                <th class="sortable text-right" data-col="days" data-action="portfolio-sort">Tiempo<span class="sort-arrow">⇅</span></th>
+                <th class="text-right" title="Rentabilidad Anual Compuesta (CAGR)">CAGR</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="portfolio-tbody"></tbody>
+            <tfoot id="portfolio-tfoot" style="display:none"></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Alertas y análisis -->
+      <div id="portfolio-alerts"></div>
+
+      <!-- Análisis de concentración -->
+      <div class="card" id="port-widget-analysis">
+        <div class="card-title-row">
+          <h3 class="card-title">⚖ Concentración por posición</h3>
+          <div class="btn-row">
+            <span style="font-size:12px;color:var(--text-muted)">Límite de alerta:</span>
+            <input type="number" id="concentration-limit" class="text-input" value="20" min="1" max="100" style="width:70px;padding:5px 8px" />
+            <span style="font-size:12px;color:var(--text-muted)">%</span>
+          </div>
+        </div>
+        <div id="concentration-bars"></div>
+      </div>
+
+      <!-- Correlación entre activos -->
+      <div class="card" id="port-widget-correlation">
+        <h3 class="card-title">🔗 Análisis de correlación</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Activos del mismo tipo o sector que pueden estar correlacionados</p>
+        <div id="correlation-analysis"></div>
+      </div>
+
+      <div class="charts-grid" id="port-widget-charts">
+        <div class="chart-card">
+          <div class="chart-header"><h3>Distribución por activo</h3></div>
+          <div class="chart-wrapper chart-donut-wrapper"><canvas id="chart-portfolio-dist" role="img" aria-label="Gráfico de distribución de cartera por activo"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header"><h3>Distribución por país</h3></div>
+          <div class="chart-wrapper chart-donut-wrapper" id="chart-country-wrap"><canvas id="chart-portfolio-country" role="img" aria-label="Gráfico de distribución de cartera por país"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header"><h3>Distribución por sector</h3></div>
+          <div class="chart-wrapper chart-donut-wrapper" id="chart-sector-wrap"><canvas id="chart-portfolio-sector" role="img" aria-label="Gráfico de distribución de cartera por sector"></canvas></div>
+        </div>
+        <div class="chart-card chart-wide">
+          <div class="chart-header"><h3>Rentabilidad por activo</h3></div>
+          <div class="chart-wrapper"><canvas id="chart-portfolio-perf" role="img" aria-label="Gráfico de rentabilidad por activo"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── WATCHLIST ─────────────────────────────────────────── -->
+    <section class="section" id="section-watchlist">
+      <div class="section-header">
+        <h1>Watchlist</h1>
+        <div class="btn-row">
+          <button type="button" class="btn-secondary btn-refresh-prices" data-action="refresh-prices">⟳ Precios</button>
+          <button type="button" class="btn-primary" id="btnAddWatchlist" data-action="add-watchlist">+ Añadir</button>
+        </div>
+      </div>
+      <p class="section-sub">Activos que sigues pero aún no tienes en cartera</p>
+      <div class="watchlist-grid" id="watchlist-grid"></div>
+    </section>
+
+    <!-- ─── DIVIDENDOS ────────────────────────────────────────── -->
+    <section class="section" id="section-dividends">
+      <div class="section-header">
+        <h1>Dividendos</h1>
+        <button type="button" class="btn-primary" id="btnAddDividend" data-action="add-dividend">+ Registrar</button>
+      </div>
+
+      <div class="kpi-grid kpi-grid-4">
+        <div class="kpi-card">
+          <div class="kpi-label">Ingresos pasivos anuales</div>
+          <div class="kpi-value positive" id="div-annual">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Ingresos pasivos mensuales</div>
+          <div class="kpi-value positive" id="div-monthly">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Yield medio cartera</div>
+          <div class="kpi-value" id="div-yield">0%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Ingresos / día</div>
+          <div class="kpi-value positive" id="div-daily">€0</div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card chart-wide">
+          <div class="chart-header"><h3>Dividendos por mes</h3></div>
+          <div class="chart-wrapper"><canvas id="chart-dividends" role="img" aria-label="Gráfico de dividendos estimados por mes"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">📅 Próximos cobros</h3>
+        <div id="div-calendar"></div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <caption class="sr-only">Dividendos: activo, ticker, dividendo por acción, frecuencia, número de acciones, ingreso anual estimado y yield sobre coste</caption>
+            <thead>
+              <tr>
+                <th>Activo</th>
+                <th>Ticker</th>
+                <th class="text-right">Div/acción (€)</th>
+                <th class="text-right">Frecuencia</th>
+                <th class="text-right">Nº acc.</th>
+                <th class="text-right">Anual (€)</th>
+                <th class="text-right" title="Yield sobre precio de compra">YoC</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="dividends-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── PATRIMONIO NETO ───────────────────────────────────── -->
+    <section class="section" id="section-networth">
+      <div class="section-header">
+        <h1>Patrimonio Neto</h1>
+        <button type="button" class="btn-ghost" data-action="open-milestones" style="font-size:12px;padding:6px 14px" title="Ver hitos del patrimonio">★ Hitos</button>
+      </div>
+
+      <div class="kpi-grid kpi-grid-5" id="nw-widget-kpis">
+        <div class="kpi-card kpi-hero">
+          <div class="kpi-label">Patrimonio Neto Total</div>
+          <div class="kpi-value" id="nw-total">€0</div>
+          <div class="kpi-change" id="nw-liabilities-hint" style="color:var(--danger)"></div>
+          <div class="kpi-change" id="nw-mom-change" style="display:none"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Efectivo & Cuentas</div>
+          <div class="kpi-value" id="nw-cash">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Inversiones</div>
+          <div class="kpi-value" id="nw-investments">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">🏠 Inmuebles</div>
+          <div class="kpi-value" id="nw-real-estate">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Activos Alternativos</div>
+          <div class="kpi-value" id="nw-alternatives">€0</div>
+        </div>
+      </div>
+      <div class="kpi-grid kpi-grid-3" style="margin-top:var(--gap)">
+        <div class="kpi-card" style="border-top:2px solid var(--danger)">
+          <div class="kpi-label">⊖ Total Deuda</div>
+          <div class="kpi-value negative" id="nw-liabilities">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Activos</div>
+          <div class="kpi-value" id="nw-total-assets">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Ratio Deuda / Activos</div>
+          <div class="kpi-value" id="nw-debt-ratio">0%</div>
+        </div>
+      </div>
+
+      <div class="card" id="nw-widget-cash">
+        <h3 class="card-title">Efectivo & Cuentas bancarias</h3>
+        <div class="cash-entries" id="cash-entries-list"></div>
+        <button type="button" class="btn-secondary mt-12" id="btnAddCash" data-action="add-cash">+ Añadir cuenta</button>
+      </div>
+
+      <div class="card" id="nw-widget-properties">
+        <div class="card-title-row">
+          <h3 class="card-title">🏠 Inmuebles</h3>
+          <button type="button" class="btn-ghost-sm" data-action="add-property">+ Añadir inmueble</button>
+        </div>
+        <div id="properties-list"></div>
+      </div>
+
+      <div class="card" id="nw-widget-breakdown">
+        <h3 class="card-title">Distribución del patrimonio</h3>
+        <div id="nw-breakdown-bars"></div>
+      </div>
+    </section>
+
+    <!-- ─── PASIVOS & DEUDAS ─────────────────────────────────── -->
+    <section class="section" id="section-pasivos">
+      <div class="section-header">
+        <h1>Pasivos &amp; Deudas</h1>
+        <button type="button" class="btn-primary" data-action="add-liability">+ Añadir deuda</button>
+      </div>
+      <p class="section-sub">Hipotecas, préstamos y deudas que reducen tu patrimonio neto</p>
+
+      <div class="kpi-grid kpi-grid-3">
+        <div class="kpi-card kpi-hero" style="border-top-color:var(--danger)">
+          <div class="kpi-label">Deuda Total</div>
+          <div class="kpi-value negative" id="liab-total">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Cuota mensual total</div>
+          <div class="kpi-value" id="liab-monthly">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Ratio deuda / activos</div>
+          <div class="kpi-value" id="liab-ratio">0%</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-container">
+          <table class="data-table">
+            <caption class="sr-only">Pasivos y deudas: nombre, tipo, importe original, saldo pendiente, cuota mensual, interés anual y porcentaje amortizado</caption>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th class="text-right">Importe original</th>
+                <th class="text-right">Saldo pendiente</th>
+                <th class="text-right">Cuota/mes</th>
+                <th class="text-right">Interés anual</th>
+                <th>Amortizado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="liabilities-tbody">
+              <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-muted)">Sin pasivos registrados</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── ACTIVOS ALTERNATIVOS ──────────────────────────────── -->
+    <section class="section" id="section-alternatives">
+      <div class="section-header">
+        <h1>Activos Alternativos</h1>
+        <button type="button" class="btn-primary" id="btnAddAlternative" data-action="add-alternative">+ Añadir activo</button>
+      </div>
+      <p class="section-sub">Relojes, arte, inmuebles, coleccionables y otros activos tangibles</p>
+
+      <div class="kpi-grid kpi-grid-3">
+        <div class="kpi-card">
+          <div class="kpi-label">Valor actual total</div>
+          <div class="kpi-value" id="alt-total-current">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Coste total</div>
+          <div class="kpi-value" id="alt-total-cost">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Revalorización</div>
+          <div class="kpi-value" id="alt-total-gain">€0</div>
+        </div>
+      </div>
+
+      <div id="alt-charts-wrap" style="display:none">
+        <div class="charts-grid mb-5">
+          <div class="chart-card">
+            <div class="chart-header"><h3>Distribución por categoría</h3></div>
+            <div class="chart-wrapper"><canvas id="chart-alt-category" role="img" aria-label="Gráfico de distribución de activos alternativos por categoría"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header"><h3>Valor vs Coste por activo</h3></div>
+            <div class="chart-wrapper"><canvas id="chart-alt-assets" role="img" aria-label="Gráfico de valor actual versus coste por activo alternativo"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="alternatives-grid" id="alternatives-grid"></div>
+    </section>
+
+
+    <!-- ─── OBJETIVOS ─────────────────────────────────────────── -->
+    <section class="section" id="section-goals">
+      <div class="section-header">
+        <h1>Objetivos</h1>
+        <button type="button" class="btn-primary" id="btnAddGoal" data-action="add-goal">+ Nuevo objetivo</button>
+      </div>
+      <div class="table-toolbar mb-4" id="goals-toolbar" style="display:none">
+        <div class="filter-group">
+          <select id="goals-sort-select" class="select-input" onchange="renderGoals()" style="font-size:12px">
+            <option value="completion-desc">Mayor % completado</option>
+            <option value="completion-asc">Menor % completado</option>
+            <option value="name">Nombre</option>
+            <option value="deadline">Fecha límite</option>
+            <option value="remaining">Mayor importe restante</option>
+          </select>
+        </div>
+      </div>
+      <div class="goals-grid" id="goals-grid"></div>
+    </section>
+
+    <!-- ─── SIMULADOR ─────────────────────────────────────────── -->
+    <section class="section" id="section-simulator">
+      <div class="section-header">
+        <h1>Simulador</h1>
+        <p class="section-sub">Calcula el poder del interés compuesto a largo plazo</p>
+      </div>
+
+      <div class="simulator-layout">
+        <div class="card simulator-controls">
+          <h3 class="card-title">Parámetros</h3>
+          <div class="form-group">
+            <label class="form-label">Capital inicial (€)</label>
+            <input type="number" id="sim-initial" class="text-input" value="10000" min="0" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Aportación mensual (€)</label>
+            <input type="number" id="sim-monthly" class="text-input" value="500" min="0" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Rentabilidad anual esperada (%)</label>
+            <input type="number" id="sim-rate" class="text-input" value="8" min="0" max="100" step="0.1" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Horizonte temporal (años)</label>
+            <input type="number" id="sim-years" class="text-input" value="20" min="1" max="50" />
+          </div>
+          <button type="button" class="btn-primary full-width mt-12" id="btnSimulate" data-action="run-simulator">Calcular</button>
+
+          <div class="sim-results" id="sim-results" style="display:none">
+            <div class="sim-result-item">
+              <span>Capital aportado</span>
+              <strong id="sim-res-invested">—</strong>
+            </div>
+            <div class="sim-result-item">
+              <span>Intereses generados</span>
+              <strong class="positive" id="sim-res-interest">—</strong>
+            </div>
+            <div class="sim-result-item sim-result-total">
+              <span>Valor final</span>
+              <strong id="sim-res-total">—</strong>
+            </div>
+            <button type="button" class="btn-secondary full-width mt-12" id="btn-save-scenario"
+              data-action="save-scenario" style="display:none">
+              ✦ Guardar escenario
+            </button>
+          </div>
+        </div>
+
+        <div class="chart-card simulator-chart">
+          <div class="chart-header"><h3>Proyección del capital</h3></div>
+          <div class="chart-wrapper" style="height:380px">
+            <canvas id="chart-simulator" role="img" aria-label="Gráfico de proyección del capital con interés compuesto"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt-24" id="sim-scenarios-card" style="display:none">
+        <div class="card-header btn-row" style="justify-content:space-between;margin-bottom:16px">
+          <h3 class="card-title" style="margin:0">Escenarios guardados</h3>
+        </div>
+        <div id="sim-scenarios-list"></div>
+      </div>
+    </section>
+
+    <!-- ─── FISCALIDAD ─────────────────────────────────────────── -->
+    <section class="section" id="section-fiscalidad">
+      <div class="section-header">
+        <h1>Fiscalidad</h1>
+        <div class="btn-row">
+          <div class="nav-tabs-wrap"><div class="nav-tabs" id="fiscal-year-tabs"></div></div>
+          <button type="button" class="btn-ghost" data-action="export-fiscal-pdf" style="font-size:12px;padding:6px 14px" title="Exportar desglose fiscal en PDF">📄 PDF Fiscal</button>
+          <button type="button" class="btn-primary" id="btnAddSale" data-action="add-sale">+ Registrar venta</button>
+        </div>
+      </div>
+      <p class="section-sub">Gestiona tu declaración de la renta y optimiza tu fiscalidad</p>
+      <p class="section-note">⚠ Los cálculos son una aproximación orientativa. No tienen en cuenta todas las deducciones, reducciones ni situaciones personales. Consulta a un asesor fiscal para tu declaración real.</p>
+
+      <!-- KPIs fiscales -->
+      <div class="kpi-grid kpi-grid-4" id="fisc-widget-kpis">
+        <div class="kpi-card kpi-hero">
+          <div class="kpi-label">Base imponible del ahorro</div>
+          <div class="kpi-value" id="fisc-base">€0</div>
+          <div class="kpi-change" id="fisc-base-sub">Ganancias − Pérdidas</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Impuesto estimado</div>
+          <div class="kpi-value negative" id="fisc-tax">€0</div>
+          <div class="kpi-change" id="fisc-tax-sub">A pagar a Hacienda</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Retenciones ya pagadas</div>
+          <div class="kpi-value" id="fisc-retention">€0</div>
+          <div class="kpi-change">Dividendos + intereses</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Resultado final</div>
+          <div class="kpi-value" id="fisc-result">€0</div>
+          <div class="kpi-change" id="fisc-result-sub">A pagar / devolver</div>
+        </div>
+      </div>
+
+      <!-- Tramos IRPF del ahorro -->
+      <div class="card">
+        <h3 class="card-title">📊 Tramos IRPF — Base del ahorro 2024</h3>
+        <div id="fisc-tramos"></div>
+      </div>
+
+      <!-- Plusvalías y minusvalías -->
+      <div class="card">
+        <div class="card-title-row">
+          <h3 class="card-title">📈 Plusvalías & Minusvalías realizadas</h3>
+          <div class="btn-row">
+            <div class="fisc-pill positive" id="fisc-gains-total">Ganancias: €0</div>
+            <div class="fisc-pill negative" id="fisc-losses-total">Pérdidas: €0</div>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <caption class="sr-only">Ventas realizadas: activo, ticker, fechas de compra y venta, precios, cantidad, resultado y tipo (acciones o cripto)</caption>
+            <thead>
+              <tr>
+                <th>Activo</th>
+                <th>Ticker</th>
+                <th class="text-right">Fecha compra</th>
+                <th class="text-right">Fecha venta</th>
+                <th class="text-right">P. Compra</th>
+                <th class="text-right">P. Venta</th>
+                <th class="text-right">Cantidad</th>
+                <th class="text-right">Resultado</th>
+                <th class="text-right">Tipo</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="sales-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Compensación de pérdidas -->
+      <div class="card">
+        <h3 class="card-title">⚖ Compensación de pérdidas — Tax Loss Harvesting</h3>
+        <div id="fisc-compensation"></div>
+      </div>
+
+      <!-- Dividendos fiscales -->
+      <div class="card">
+        <h3 class="card-title">💰 Dividendos recibidos (año fiscal)</h3>
+        <div id="fisc-dividends"></div>
+      </div>
+
+      <!-- Regla 2 meses -->
+      <div class="card">
+        <h3 class="card-title">⏱ Regla de los 2 meses</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">
+          Hacienda no permite deducir pérdidas si recompras el mismo activo en los 2 meses anteriores o posteriores a la venta
+        </p>
+        <div id="fisc-two-months"></div>
+      </div>
+
+      <!-- Simulador de venta -->
+      <div class="card">
+        <h3 class="card-title">🔮 Simulador de impacto fiscal de una venta</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:18px">Calcula cuánto pagarías si vendes un activo hoy</p>
+        <div class="simulator-layout" style="grid-template-columns:280px 1fr">
+          <div>
+            <div class="form-group">
+              <label class="form-label">Activo de la cartera</label>
+              <select id="sim-fisc-asset" class="select-input"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Precio de venta (€)</label>
+              <input type="number" id="sim-fisc-price" class="text-input" placeholder="0.00" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Cantidad a vender</label>
+              <input type="number" id="sim-fisc-qty" class="text-input" placeholder="0" step="any" />
+            </div>
+            <button type="button" class="btn-primary full-width" id="btnSimFisc" data-action="run-fiscal-sim">Calcular impacto</button>
+          </div>
+          <div id="sim-fisc-result" class="fisc-sim-result" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- Plan de optimización -->
+      <div class="card">
+        <h3 class="card-title">💡 Plan de optimización fiscal</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Sugerencias automáticas para reducir tu factura fiscal</p>
+        <div id="fisc-optimization"></div>
+      </div>
+
+      <!-- Criptomonedas -->
+      <div class="card">
+        <h3 class="card-title">₿ Criptomonedas — Resumen fiscal</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">
+          Las criptos tributan como ganancia patrimonial. Hacienda exige declarar aunque no retires a fiat.
+        </p>
+        <div id="fisc-crypto"></div>
+        <button type="button" class="btn-secondary mt-12" id="btnAddCryptoSale" data-action="add-crypto-sale">+ Registrar venta de crypto</button>
+      </div>
+
+      <!-- ── RENDIMIENTOS DEL TRABAJO ──────────────────────────── -->
+      <div class="section-divider">
+        <h2 class="section-divider-title">Rendimientos del <em>Trabajo</em></h2>
+        <button type="button" class="btn-secondary" id="btnEditTrabajo" data-action="edit-trabajo">✎ Editar datos</button>
+      </div>
+
+      <div class="kpi-grid kpi-grid-4">
+        <div class="kpi-card">
+          <div class="kpi-label">Salario bruto</div>
+          <div class="kpi-value" id="trab-bruto">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Retención IRPF empresa</div>
+          <div class="kpi-value negative" id="trab-retencion">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Cotiz. Seg. Social</div>
+          <div class="kpi-value negative" id="trab-ss">€0</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Rendimiento neto trabajo</div>
+          <div class="kpi-value" id="trab-neto">€0</div>
+          <div class="kpi-change">Bruto − SS − Reducciones</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">💼 Detalle rendimientos del trabajo</h3>
+        <div id="fisc-trabajo-detail"></div>
+      </div>
+
+      <!-- ── MÍNIMOS PERSONALES Y FAMILIARES ───────────────────── -->
+      <div class="section-divider">
+        <h2 class="section-divider-title">Mínimos <em>Personales y Familiares</em></h2>
+        <button type="button" class="btn-secondary" id="btnEditMinimos" data-action="edit-minimos">✎ Editar</button>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">👤 Configuración personal y familiar</h3>
+        <div id="fisc-minimos-detail"></div>
+      </div>
+
+      <!-- ── RESUMEN CONSOLIDADO IRPF ──────────────────────────── -->
+      <div class="section-divider">
+        <h2 class="section-divider-title">Resumen <em>IRPF Completo</em></h2>
+      </div>
+
+      <div class="kpi-grid kpi-grid-4">
+        <div class="kpi-card">
+          <div class="kpi-label">Base general</div>
+          <div class="kpi-value" id="res-base-general">€0</div>
+          <div class="kpi-change">Trabajo + otros</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Base del ahorro</div>
+          <div class="kpi-value" id="res-base-ahorro">€0</div>
+          <div class="kpi-change">Inversiones + dividendos</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total retenciones</div>
+          <div class="kpi-value" id="res-retenciones">€0</div>
+          <div class="kpi-change">Empresa + dividendos</div>
+        </div>
+        <div class="kpi-card kpi-hero">
+          <div class="kpi-label">Resultado declaración</div>
+          <div class="kpi-value" id="res-resultado">€0</div>
+          <div class="kpi-change" id="res-resultado-sub">A pagar / devolver</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">📋 Desglose completo para la declaración</h3>
+        <div id="fisc-resumen-completo"></div>
+      </div>
+
+    </section>
+
+    <!-- ─── ASESOR IA ──────────────────────────────────────────── -->
+    <section class="section" id="section-ai">
+      <div class="section-header">
+        <div>
+          <h1>Asesor IA</h1>
+          <p class="section-sub" style="margin-top:6px;margin-bottom:0">Análisis financiero personalizado con inteligencia artificial</p>
+        </div>
+        <button type="button" class="btn-secondary" data-action="ai-clear">Limpiar conversación</button>
+      </div>
+
+      <!-- Selector de proveedor -->
+      <div class="ai-provider-bar">
+        <button type="button" class="ai-provider-btn active" data-provider="claude" data-action="set-ai-provider">
+          <span class="ai-provider-icon">✦</span> Claude
+        </button>
+        <button type="button" class="ai-provider-btn" data-provider="openai" data-action="set-ai-provider">
+          <span class="ai-provider-icon">⊕</span> ChatGPT
+        </button>
+        <button type="button" class="ai-provider-btn" data-provider="gemini" data-action="set-ai-provider">
+          <span class="ai-provider-icon">◆</span> Gemini
+        </button>
+        <button type="button" class="ai-provider-btn" data-provider="groq" data-action="set-ai-provider">
+          <span class="ai-provider-icon">⚡</span> Groq
+        </button>
+      </div>
+
+      <div class="card ai-nokey-card" id="ai-nokey-card" style="display:none">
+        <div id="ai-nokey-content"></div>
+      </div>
+
+      <div class="card ai-chat-card" id="ai-chat-card">
+        <div class="ai-messages" id="ai-messages">
+          <div class="ai-welcome">
+            <div class="ai-welcome-icon">✦</div>
+            <h3 class="ai-welcome-title">Bienvenido al Asesor IA</h3>
+            <p class="ai-welcome-desc">Pregúntame sobre tus finanzas. Tengo acceso completo a todos tus datos de Finova y puedo darte análisis personalizados.</p>
+          </div>
+        </div>
+
+        <div class="ai-suggestions" id="ai-suggestions">
+          <button type="button" class="ai-suggestion-btn" data-action="ai-suggest" data-prompt="Dame un resumen completo de mi situación financiera actual">Resumen financiero</button>
+          <button type="button" class="ai-suggestion-btn" data-action="ai-suggest" data-prompt="¿Cuáles son mis mayores gastos y cómo podría reducirlos?">Analizar gastos</button>
+          <button type="button" class="ai-suggestion-btn" data-action="ai-suggest" data-prompt="Analiza mi cartera de inversión y dame tu opinión sobre su composición">Revisar cartera</button>
+          <button type="button" class="ai-suggestion-btn" data-action="ai-suggest" data-prompt="¿Estoy en buen camino para cumplir mis objetivos financieros?">Ver objetivos</button>
+          <button type="button" class="ai-suggestion-btn" data-action="ai-suggest" data-prompt="¿Cómo puedo optimizar mi fiscalidad y reducir lo que pago a Hacienda?">Optimizar impuestos</button>
+          <button type="button" class="ai-suggestion-btn" data-action="ai-habits">Análisis de hábitos</button>
+        </div>
+
+        <div id="ai-ctx-banner" style="display:none;padding:7px 12px;margin-bottom:4px;background:var(--bg-elevated);border-radius:var(--r-sm);font-size:12px;color:var(--text-muted);border:1px solid var(--border-subtle)">
+          🔒 Modo anónimo — no se envían datos financieros a la IA
+        </div>
+        <div class="ai-input-row">
+          <textarea id="ai-input" class="ai-textarea" placeholder="Pregunta sobre tus finanzas..." rows="1"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+          <button type="button" id="ai-ctx-btn" data-action="ai-toggle-ctx" title="Tus datos financieros se envían a la IA — pulsa para desactivar" style="font-size:11px;padding:4px 8px;border-radius:var(--r-xs);background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border-subtle);cursor:pointer;white-space:nowrap;flex-shrink:0">📊 Con datos</button>
+          <button type="button" class="ai-send-btn" id="ai-send-btn" data-action="ai-send">↑</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── AJUSTES ──────────────────────────────────────────── -->
+    <!-- ═══════════════════════════════ ADMIN ═══════════════════ -->
+    <section class="section" id="section-admin">
+      <div class="section-header">
+        <h1>👑 Panel de administrador</h1>
+      </div>
+
+      <!-- Dev Info (solo visible con devMode activo) -->
+      <div class="card" id="admin-dev-card" style="display:none;margin-bottom:20px;border-color:#7c3aed">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <h3 class="card-title" style="margin:0;color:#a78bfa">🛠 Dev Info</h3>
+          <button type="button" class="btn-ghost-sm" onclick="_refreshDevCard()" style="color:#a78bfa">↻ Actualizar</button>
+        </div>
+        <div id="dev-info-grid" class="admin-health-grid"></div>
+      </div>
+
+      <!-- KPIs rápidos -->
+      <div class="admin-kpi-row" id="admin-kpis">
+        <div class="admin-kpi-card"><div class="admin-kpi-value" id="akpi-users">—</div><div class="admin-kpi-label">Usuarios</div></div>
+        <div class="admin-kpi-card"><div class="admin-kpi-value" id="akpi-active7">—</div><div class="admin-kpi-label">Activos 7d</div></div>
+        <div class="admin-kpi-card"><div class="admin-kpi-value" id="akpi-active30">—</div><div class="admin-kpi-label">Activos 30d</div></div>
+        <div class="admin-kpi-card"><div class="admin-kpi-value" id="akpi-sessions">—</div><div class="admin-kpi-label">Sesiones totales</div></div>
+        <div class="admin-kpi-card"><div class="admin-kpi-value" id="akpi-mem">—</div><div class="admin-kpi-label">RAM servidor</div></div>
+        <div class="admin-kpi-card"><div class="admin-kpi-value" id="akpi-uptime">—</div><div class="admin-kpi-label">Uptime</div></div>
+      </div>
+
+      <!-- Secciones más visitadas -->
+      <div class="card" style="margin-bottom:20px">
+        <h3 class="card-title">📊 Secciones más visitadas</h3>
+        <div id="admin-top-sections" class="admin-sections-chart"></div>
+      </div>
+
+      <!-- Lista de usuarios -->
+      <div class="card" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <h3 class="card-title" style="margin:0">👥 Usuarios registrados</h3>
+          <button type="button" class="btn-secondary" onclick="adminRefreshUsers()">↻ Actualizar</button>
+        </div>
+        <div id="admin-users-table"></div>
+      </div>
+
+      <!-- Datos de ejemplo -->
+      <div class="card" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <h3 class="card-title" style="margin:0">🎭 Datos de ejemplo</h3>
+          <button type="button" class="btn-primary" onclick="_adminLoadDemoData()">Cargar datos de ejemplo</button>
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0">Rellena la app con transacciones, cartera, objetivos y patrimonio ficticios para probar todas las funciones. <strong style="color:var(--danger)">Sobrescribe todos tus datos actuales.</strong></p>
+      </div>
+
+      <!-- Health check -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <h3 class="card-title" style="margin:0">🩺 Health check</h3>
+          <button type="button" class="btn-primary" onclick="adminHealthCheck()">Verificar servidor</button>
+        </div>
+        <div id="admin-health-result" class="admin-health-result"></div>
+      </div>
+    </section>
+
+    <section class="section" id="section-settings">
+      <div class="section-header">
+        <h1>Ajustes</h1>
+      </div>
+      <p class="section-sub">Activa o desactiva secciones y personaliza tu experiencia</p>
+
+      <!-- Welcome banner — shown only after finishing onboarding -->
+      <div id="ob-welcome-banner" class="ob-welcome-banner" style="display:none">
+        <div class="ob-welcome-left">
+          <span class="ob-welcome-icon">◈</span>
+          <div>
+            <div class="ob-welcome-title">¡Configuración completada!</div>
+            <div class="ob-welcome-sub">Tus datos están guardados. Ya puedes tomar el control de tus finanzas.</div>
+          </div>
+        </div>
+        <button type="button" class="ob-welcome-cta" data-action="ob-welcome-done">Ahora controla tus finanzas →</button>
+      </div>
+
+      <!-- Personalizar -->
+      <div class="card">
+        <h3 class="card-title">📐 Personalizar</h3>
+
+        <div class="settings-section-label">Dashboard</div>
+        <div class="settings-row">
+          <div class="settings-info">
+            <div class="settings-name">Editor de bloques del Dashboard</div>
+            <div class="settings-desc">Reordena, oculta o muestra gráficos e indicadores del Dashboard. Los datos nunca se borran.</div>
+          </div>
+          <button type="button" class="btn-primary" data-action="open-dashboard-editor">Editar</button>
+        </div>
+
+        <div class="settings-section-label" style="margin-top:20px">Menú lateral</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:6px 0 12px">Activa, desactiva o arrastra ≡ para reordenar las secciones</p>
+        <div id="section-visibility-list"></div>
+      </div>
+
+      <!-- Notificaciones -->
+      <div class="card">
+        <h3 class="card-title">🔔 Notificaciones y alertas</h3>
+        <div class="settings-row">
+          <div class="settings-info">
+            <div class="settings-name">Gestionar alertas in-app</div>
+            <div class="settings-desc">Revisa, descarta o restaura alertas financieras. Configura umbrales de concentración de cartera.</div>
+          </div>
+          <button type="button" class="btn-primary" onclick="openNotificationsManager()">Gestionar</button>
+        </div>
+      </div>
+
+      <!-- Asesor IA -->
+      <div class="card">
+        <h3 class="card-title">✦ Asesor IA — API Keys</h3>
+        <div id="settings-server-ai-banner" style="display:none;font-size:12px;border-radius:var(--r-sm);padding:8px 12px;margin-bottom:16px"></div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:20px">Las claves se guardan solo en tu dispositivo. Configura los proveedores que quieras usar.</p>
+
+        <div class="settings-ai-key-row">
+          <div class="settings-ai-key-label">
+            <span style="color:#c8a96e;font-weight:700">✦ Claude</span>
+            <span class="settings-desc" style="display:block;margin-top:2px"><a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a> → API Keys</span>
+          </div>
+          <div>
+            <input type="password" id="settings-claude-key" class="text-input" placeholder="sk-ant-api03-..." autocomplete="off" style="flex:1" />
+            <button class="btn-primary" id="btnSaveClaudeKey" style="white-space:nowrap">Guardar</button>
+            <button type="button" class="ai-key-help-btn" data-action="toggle-settings-disclaimer" title="¿Qué clave usar?">?</button>
+          </div>
+        </div>
+        <div class="ai-key-disclaimer" style="display:none;margin:8px 0 16px;padding:10px 14px;background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:var(--r-sm);font-size:12.5px;color:var(--text-secondary);line-height:1.6">
+          Puedes usar la API Key de cualquier proveedor, pero <strong>recomendamos Claude</strong>: es el modelo con el que está optimizado Finova, responde en español de forma natural y tiene un nivel gratuito generoso en <em><a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a></em>.
+        </div>
+
+        <div class="settings-ai-key-row" style="margin-top:12px">
+          <div class="settings-ai-key-label">
+            <span style="color:#10a37f;font-weight:700">⊕ ChatGPT</span>
+            <span class="settings-desc" style="display:block;margin-top:2px"><a href="https://platform.openai.com" target="_blank" rel="noopener noreferrer">platform.openai.com</a> → API Keys</span>
+          </div>
+          <div>
+            <input type="password" id="settings-openai-key" class="text-input" placeholder="sk-proj-..." autocomplete="off" style="flex:1" />
+            <button class="btn-primary" id="btnSaveOpenAIKey" style="white-space:nowrap">Guardar</button>
+          </div>
+        </div>
+
+        <div class="settings-ai-key-row" style="margin-top:12px">
+          <div class="settings-ai-key-label">
+            <span style="color:#4285f4;font-weight:700">◆ Gemini</span>
+            <span class="settings-desc" style="display:block;margin-top:2px"><a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer">aistudio.google.com</a> → Get API Key</span>
+          </div>
+          <div>
+            <input type="password" id="settings-gemini-key" class="text-input" placeholder="AIza..." autocomplete="off" style="flex:1" />
+            <button class="btn-primary" id="btnSaveGeminiKey" style="white-space:nowrap">Guardar</button>
+          </div>
+        </div>
+
+        <div class="settings-ai-key-row" style="margin-top:12px">
+          <div class="settings-ai-key-label">
+            <span style="color:#f55036;font-weight:700">⚡ Groq</span>
+            <span class="settings-desc" style="display:block;margin-top:2px"><a href="https://console.groq.com" target="_blank" rel="noopener noreferrer">console.groq.com</a> → API Keys <strong>(gratis)</strong></span>
+          </div>
+          <div>
+            <input type="password" id="settings-groq-key" class="text-input" placeholder="gsk_..." autocomplete="off" style="flex:1" />
+            <button class="btn-primary" id="btnSaveGroqKey" style="white-space:nowrap">Guardar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Backup -->
+      <div class="card">
+        <h3 class="card-title">💾 Copia de seguridad</h3>
+        <div id="backup-reminder" style="display:none;font-size:12px;color:var(--down);background:rgba(var(--down-rgb),.08);border:1px solid rgba(var(--down-rgb),.2);border-radius:var(--r-sm);padding:8px 12px;margin-bottom:12px"></div>
+        <div class="settings-row">
+          <div class="settings-info">
+            <div class="settings-name">Descargar backup</div>
+            <div class="settings-desc">Exporta todos tus datos en formato JSON</div>
+          </div>
+          <button type="button" class="btn-primary" id="btnBackupSettings" data-action="download-backup">↓ Descargar backup</button>
+        </div>
+        <div class="settings-row" style="margin-top:12px">
+          <div class="settings-info">
+            <div class="settings-name">Restaurar backup</div>
+            <div class="settings-desc">Importa un backup guardado anteriormente</div>
+          </div>
+          <label class="btn-secondary" style="cursor:pointer">
+            ↑ Importar
+            <input type="file" id="fileRestore" accept=".json" style="display:none" aria-label="Importar backup desde archivo JSON" onchange="handleRestore(this)" />
+          </label>
+        </div>
+      </div>
+
+      <!-- Historial de versiones local -->
+      <div class="card">
+        <h3 class="card-title">🕑 Historial de versiones</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">
+          Los últimos 5 estados de tu app guardados automáticamente. Puedes restaurar cualquiera.
+        </p>
+        <div id="version-history-list"></div>
+      </div>
+
+      <!-- Conexión bancaria PSD2 -->
+      <div class="card">
+        <h3 class="card-title">🏦 Conexión bancaria</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">
+          Importa transacciones y saldos directamente desde tu banco vía Open Banking (PSD2).
+          Solo lectura — Finova nunca puede mover dinero. Requiere configurar GoCardless en el servidor.
+        </p>
+        <div id="bank-connect-section"></div>
+      </div>
+
+      <!-- Sincronización entre dispositivos (solo visible sin autenticación) -->
+      <div class="card" id="sync-device-card">
+        <h3 class="card-title">🔄 Sincronización entre dispositivos</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Disponible en modo sin cuenta. Con sesión iniciada, tus datos se sincronizan automáticamente entre dispositivos.</p>
+        <div class="settings-row">
+          <div class="settings-info">
+            <div class="settings-name">Tu código de sync</div>
+            <div class="settings-desc">Genera un código secreto y úsalo en el otro dispositivo</div>
+            <code id="sync-code-display" style="display:none;font-size:15px;letter-spacing:3px;font-weight:700;color:var(--accent);margin-top:6px"></code>
+          </div>
+          <div class="btn-row btn-row--col">
+            <button type="button" class="btn-secondary" data-action="sync-generate">Generar código</button>
+            <button type="button" class="btn-primary" id="btn-sync-upload" data-action="sync-upload" disabled>↑ Subir datos</button>
+          </div>
+        </div>
+        <div class="settings-row" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-subtle)">
+          <div class="settings-info">
+            <div class="settings-name">Restaurar en este dispositivo</div>
+            <div class="settings-desc">Introduce el código que generaste en el otro dispositivo</div>
+          </div>
+          <div class="btn-row btn-row--wrap">
+            <input type="text" id="sync-code-input" class="text-input" placeholder="ej: a3f7b2e1" maxlength="16" style="width:140px;font-family:monospace;letter-spacing:2px" />
+            <button type="button" class="btn-secondary" id="btn-sync-download" data-action="sync-download">↓ Restaurar</button>
+          </div>
+        </div>
+      </div>
+
+
+
+      <!-- Atajos de teclado -->
+      <div class="card">
+        <h3 class="card-title">⌨️ Atajos de teclado</h3>
+        <div class="kbd-help-grid" style="margin-top:8px">
+          <div>
+            <div class="kbd-help-section-title">Navegación</div>
+            <div class="kbd-help-row"><kbd>⌘K</kbd><span>Búsqueda global</span></div>
+            <div class="kbd-help-row"><kbd>G</kbd><span>Ir al dashboard</span></div>
+            <div class="kbd-help-row"><kbd>Esc</kbd><span>Cerrar / cancelar</span></div>
+            <div class="kbd-help-row"><kbd>⌘↵</kbd><span>Confirmar formulario</span></div>
+          </div>
+          <div>
+            <div class="kbd-help-section-title">Crear</div>
+            <div class="kbd-help-row"><kbd>N</kbd><span>Nueva transacción</span></div>
+            <div class="kbd-help-row"><kbd>I</kbd><span>Nueva inversión</span></div>
+          </div>
+          <div>
+            <div class="kbd-help-section-title">Vista</div>
+            <div class="kbd-help-row"><kbd>T</kbd><span>Cambiar tema claro/oscuro</span></div>
+            <div class="kbd-help-row"><kbd>P</kbd><span>Activar / desactivar privacidad</span></div>
+            <div class="kbd-help-row"><kbd>/</kbd><span>Buscar transacciones</span></div>
+            <div class="kbd-help-row"><kbd>?</kbd><span>Mostrar atajos de teclado</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel de administrador (solo visible para admins) -->
+      <div class="card" id="admin-panel-card" style="display:none">
+        <h3 class="card-title">👑 Administrador</h3>
+        <div class="settings-row">
+          <div class="settings-info">
+            <div class="settings-name">Cargar datos de ejemplo</div>
+            <div class="settings-desc">Rellena la app con transacciones, inversiones y objetivos de muestra para ver todas las funcionalidades.</div>
+          </div>
+          <button type="button" class="btn-primary" onclick="_adminLoadDemoData()">Cargar demo</button>
+        </div>
+      </div>
+
+      <!-- Webhook -->
+      <div class="card">
+        <h3 class="card-title">⇢ Exportar vía Webhook</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">
+          Envía tus datos financieros a cualquier endpoint HTTP (Make, Zapier, n8n, Notion, Google Sheets via Apps Script…).
+          El payload es JSON con transacciones, cartera, objetivos y resumen del mes.
+        </p>
+        <div class="btn-row mb-3">
+          <input type="url" id="settings-webhook-url" class="text-input" style="flex:1"
+            placeholder="https://hook.make.com/…  o  https://script.google.com/…"
+            oninput="document.getElementById('btnTestWebhook').disabled=!this.value.trim()" />
+          <button type="button" class="btn-primary" style="white-space:nowrap" data-action="save-webhook">Guardar</button>
+        </div>
+        <div class="btn-row btn-row--wrap">
+          <button type="button" class="btn-secondary" id="btnTestWebhook" disabled data-action="test-webhook">Probar conexión</button>
+          <button type="button" class="btn-secondary" data-action="webhook-export-full">↑ Enviar todo</button>
+          <button type="button" class="btn-secondary" data-action="webhook-export-month">↑ Solo este mes</button>
+        </div>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:10px">
+          El endpoint debe aceptar POST con <code>Content-Type: application/json</code> y devolver CORS permisivo.
+        </p>
+      </div>
+
+      <!-- Datos -->
+      <div class="card">
+        <h3 class="card-title">🗂 Datos</h3>
+        <div class="settings-row">
+          <div class="settings-info">
+            <div class="settings-name">Repetir configuración inicial</div>
+            <div class="settings-desc">Vuelve a pasar por el asistente de bienvenida para añadir cuentas, inversiones y objetivos</div>
+          </div>
+          <button type="button" class="btn-secondary" data-action="show-onboarding">Abrir</button>
+        </div>
+        <div class="settings-row" style="margin-top:8px">
+          <div class="settings-info">
+            <div class="settings-name">Tour guiado de la app</div>
+            <div class="settings-desc">Recorre todas las secciones con explicaciones de cada funcionalidad</div>
+          </div>
+          <button type="button" class="btn-secondary" data-action="start-tour">Iniciar tour</button>
+        </div>
+        <div class="settings-row" style="margin-top:8px">
+          <div class="settings-info">
+            <div class="settings-name">🧪 Tests de verificación</div>
+            <div class="settings-desc">Comprueba que los cálculos de patrimonio, cartera e IRPF son correctos</div>
+          </div>
+          <button type="button" class="btn-secondary" data-action="run-tests">Ejecutar tests</button>
+        </div>
+        <div id="photo-loss-banner" style="display:none;font-size:12px;color:var(--down);background:rgba(var(--down-rgb),.08);border:1px solid rgba(var(--down-rgb),.2);border-radius:var(--r-sm);padding:8px 12px;margin-top:12px"></div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-default)">
+          <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Almacenamiento local</div>
+          <div id="storage-usage-bar"></div>
+          <div id="photo-backup-row" style="display:none;margin-top:10px;align-items:center;gap:10px;flex-wrap:wrap">
+            <span id="photo-backup-label" style="font-size:12px;color:var(--text-muted);flex:1"></span>
+            <button type="button" class="btn-secondary" style="font-size:12px" data-action="clear-photo-backups">Liberar espacio de fotos</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preferencias -->
+      <div class="card">
+        <h3 class="card-title">🎨 Apariencia</h3>
+        <div class="settings-row">
+          <div class="settings-info">
+            <div class="settings-name">Tema oscuro</div>
+            <div class="settings-desc">Alterna entre modo oscuro y claro</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="settings-theme-toggle" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="appearance-divider"></div>
+
+        <div class="appearance-section">
+          <div class="appearance-header">
+            <div class="appearance-title">Variante de diseño</div>
+            <div class="appearance-desc">Cambia toda la paleta de colores y la tipografía de la aplicación</div>
+          </div>
+
+          <div class="variant-grid" id="variantGrid">
+            <button type="button" class="variant-card" data-variant="obsidian-brass">
+              <div class="variant-swatches">
+                <span style="background:#15110c"></span>
+                <span style="background:#a8803e"></span>
+                <span style="background:#f4efe6"></span>
+                <span style="background:#9c3a2c"></span>
+                <span style="background:#3a7d4f"></span>
+              </div>
+              <div class="variant-meta">
+                <div class="variant-name">Obsidian <em>&amp; Brass</em></div>
+                <div class="variant-desc">Obsidiana profunda · latón cálido</div>
+                <div class="variant-fonts">Playfair Display · Inter</div>
+              </div>
+              <div class="variant-check" aria-hidden="true">✓</div>
+            </button>
+
+            <button type="button" class="variant-card" data-variant="linen-editorial">
+              <div class="variant-swatches">
+                <span style="background:#1c1814"></span>
+                <span style="background:#7a2b2b"></span>
+                <span style="background:#ebe5d6"></span>
+                <span style="background:#f6f1e3"></span>
+                <span style="background:#3e6a3a"></span>
+              </div>
+              <div class="variant-meta">
+                <div class="variant-name">Linen <em>Editorial</em></div>
+                <div class="variant-desc">Lino crema · tinta · granate</div>
+                <div class="variant-fonts">Playfair Display · Inter</div>
+              </div>
+              <div class="variant-check" aria-hidden="true">✓</div>
+            </button>
+
+            <button type="button" class="variant-card" data-variant="midnight-emerald">
+              <div class="variant-swatches">
+                <span style="background:#0c1f1a"></span>
+                <span style="background:#b8924a"></span>
+                <span style="background:#ede8db"></span>
+                <span style="background:#f8f4e8"></span>
+                <span style="background:#2d6e58"></span>
+              </div>
+              <div class="variant-meta">
+                <div class="variant-name">Midnight <em>Emerald</em></div>
+                <div class="variant-desc">Verde bosque · crema · dorado</div>
+                <div class="variant-fonts">Playfair Display · Inter</div>
+              </div>
+              <div class="variant-check" aria-hidden="true">✓</div>
+            </button>
+
+            <button type="button" class="variant-card" data-variant="soft-mono">
+              <div class="variant-swatches">
+                <span style="background:#0a0a0a"></span>
+                <span style="background:#ff5530"></span>
+                <span style="background:#ffffff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)"></span>
+                <span style="background:#f3f3f0"></span>
+                <span style="background:#1f7a4d"></span>
+              </div>
+              <div class="variant-meta">
+                <div class="variant-name">Soft <em>Mono</em></div>
+                <div class="variant-desc">Negro absoluto · coral eléctrico</div>
+                <div class="variant-fonts">Playfair Display · Inter</div>
+              </div>
+              <div class="variant-check" aria-hidden="true">✓</div>
+            </button>
+
+            <button type="button" class="variant-card" data-variant="terracotta-warmth">
+              <div class="variant-swatches">
+                <span style="background:#231711"></span>
+                <span style="background:#b8593a"></span>
+                <span style="background:#efe7d8"></span>
+                <span style="background:#f9f3e6"></span>
+                <span style="background:#5a7a3a"></span>
+              </div>
+              <div class="variant-meta">
+                <div class="variant-name">Terracotta <em>Warmth</em></div>
+                <div class="variant-desc">Avena · espresso · terracota</div>
+                <div class="variant-fonts">Playfair Display · Inter</div>
+              </div>
+              <div class="variant-check" aria-hidden="true">✓</div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Zona de peligro -->
+      <div class="card" style="border-top:2px solid var(--danger)">
+        <h3 class="card-title" style="color:var(--danger)">⚠ Zona de peligro</h3>
+        <div class="settings-row">
+          <div class="settings-info">
+            <div class="settings-name">Eliminar todos los datos permanentemente</div>
+            <div class="settings-desc">Borra transacciones, cartera, objetivos, API keys y toda la configuración. <strong>No se puede deshacer.</strong></div>
+          </div>
+          <button type="button" class="btn-danger" data-action="reset-dialog">Eliminar todo</button>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Modal genérico -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalTitle">Título</h2>
+        <button type="button" class="modal-close" id="modalClose" data-action="close-modal">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" id="modalCancel" data-action="close-modal">Cancelar</button>
+        <button type="button" class="btn-primary" id="modalConfirm" data-action="modal-confirm">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer" role="status" aria-live="polite" aria-atomic="false"></div>
+
+  <button type="button" id="btn-back-to-top" class="btn-back-to-top" aria-label="Volver arriba" style="display:none" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+
+  <div id="pwa-install-banner" class="pwa-install-banner" style="display:none" role="alert">
+    <span class="pwa-install-icon">📲</span>
+    <span class="pwa-install-text">Instala Finova en tu dispositivo para acceso rápido sin navegador</span>
+    <button class="btn-primary btn-sm" onclick="installPWA()">Instalar</button>
+    <button class="pwa-install-close" onclick="this.closest('.pwa-install-banner').style.display='none'" aria-label="Cerrar">✕</button>
+  </div>
+
+  <!-- ─── BÚSQUEDA GLOBAL (Ctrl+K) ──────────────────────────── -->
+  <div class="search-overlay" id="searchOverlay" data-action="search-overlay-close">
+    <div class="search-modal">
+      <div class="search-input-row">
+        <span class="search-icon">⌕</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="Buscar transacciones, activos, objetivos..." autocomplete="off" spellcheck="false" />
+        <kbd class="search-esc-kbd" data-action="close-search" style="cursor:pointer">Esc</kbd>
+      </div>
+      <div class="search-results" id="searchResults">
+        <div class="search-hint">Escribe para buscar en todos tus datos financieros</div>
+      </div>
+      <div class="search-footer">
+        <span><kbd>↑</kbd><kbd>↓</kbd> navegar</span>
+        <span><kbd>↵</kbd> abrir</span>
+        <span><kbd>Esc</kbd> cerrar</span>
+        <span class="search-footer-sep">·</span>
+        <span><kbd>N</kbd> transacción &nbsp;<kbd>I</kbd> inversión &nbsp;<kbd>G</kbd> dashboard &nbsp;<kbd>P</kbd> privacidad &nbsp;<kbd>?</kbd> atajos</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navegación inferior móvil -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <button class="mobile-nav-btn active" data-section="dashboard">
+      <span class="mobile-nav-icon">⬡</span>
+      <span class="mobile-nav-label">Inicio</span>
+    </button>
+    <button class="mobile-nav-btn" data-section="transactions">
+      <span class="mobile-nav-icon">⇄</span>
+      <span class="mobile-nav-label">Gastos</span>
+    </button>
+    <button class="mobile-nav-btn" data-section="portfolio">
+      <span class="mobile-nav-icon">◈</span>
+      <span class="mobile-nav-label">Cartera</span>
+    </button>
+    <button class="mobile-nav-btn" data-section="settings">
+      <span class="mobile-nav-icon">⚙</span>
+      <span class="mobile-nav-label">Ajustes</span>
+    </button>
+    <button class="mobile-nav-btn" id="mobileNavMenuBtn" aria-label="Abrir menú">
+      <span class="mobile-nav-icon mobile-menu-icon-bars">
+        <svg width="22" height="16" viewBox="0 0 22 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="22" height="2" rx="1" fill="currentColor"/>
+          <rect x="0" y="7" width="22" height="2" rx="1" fill="currentColor"/>
+          <rect x="0" y="14" width="22" height="2" rx="1" fill="currentColor"/>
+        </svg>
+      </span>
+      <span class="mobile-nav-label">Menú</span>
+    </button>
+  </nav>
+
+  <!-- Mobile full-screen menu drawer -->
+  <div class="mobile-menu-backdrop" id="mobileMenuBackdrop"></div>
+  <div class="mobile-menu-drawer" id="mobileMenuDrawer" aria-hidden="true">
+    <div class="mobile-menu-handle"></div>
+    <div class="mobile-menu-header">
+      <span class="mobile-menu-title">Finova</span>
+      <button class="mobile-menu-close" id="mobileMenuClose" aria-label="Cerrar menú">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="1" y1="1" x2="13" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="13" y1="1" x2="1" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="mobile-menu-list">
+
+      <button class="mobile-menu-item" data-section="dashboard">
+        <span class="mmi-icon">▤</span><span class="mmi-label">Dashboard</span>
+      </button>
+
+      <div class="mobile-menu-group">
+        <button class="mobile-menu-group-hdr" data-group="mmg-transacciones">
+          <span class="mmi-icon">⇄</span>
+          <span class="mmi-label">Ingresos &amp; Gastos</span>
+          <span class="mmi-arrow">›</span>
+        </button>
+        <div class="mobile-menu-subitems" id="mmg-transacciones"><div>
+          <button class="mobile-menu-item mobile-menu-subitem" data-section="transactions"><span class="mmi-icon">▸</span><span class="mmi-label">Transacciones</span></button>
+          <button class="mobile-menu-item mobile-menu-subitem" data-section="bizums"><span class="mmi-icon">▸</span><span class="mmi-label">Bizums</span></button>
+          <button class="mobile-menu-item mobile-menu-subitem" data-section="recurring"><span class="mmi-icon">▸</span><span class="mmi-label">Recurrentes</span></button>
+        </div></div>
+      </div>
+
+      <div class="mobile-menu-group">
+        <button class="mobile-menu-group-hdr" data-group="mmg-inversiones">
+          <span class="mmi-icon">◈</span>
+          <span class="mmi-label">Inversiones</span>
+          <span class="mmi-arrow">›</span>
+        </button>
+        <div class="mobile-menu-subitems" id="mmg-inversiones"><div>
+          <button class="mobile-menu-item mobile-menu-subitem" data-section="portfolio"><span class="mmi-icon">▸</span><span class="mmi-label">Cartera</span></button>
+          <button class="mobile-menu-item mobile-menu-subitem" data-section="watchlist"><span class="mmi-icon">▸</span><span class="mmi-label">Watchlist</span></button>
+          <button class="mobile-menu-item mobile-menu-subitem" data-section="dividends"><span class="mmi-icon">▸</span><span class="mmi-label">Dividendos</span></button>
+        </div></div>
+      </div>
+
+      <button class="mobile-menu-item" data-section="networth"><span class="mmi-icon">◐</span><span class="mmi-label">Patrimonio Neto</span></button>
+      <button class="mobile-menu-item" data-section="pasivos"><span class="mmi-icon">⊖</span><span class="mmi-label">Pasivos</span></button>
+      <button class="mobile-menu-item" data-section="alternatives"><span class="mmi-icon">◇</span><span class="mmi-label">Activos Alt.</span></button>
+      <button class="mobile-menu-item" data-section="goals"><span class="mmi-icon">◎</span><span class="mmi-label">Objetivos</span></button>
+      <button class="mobile-menu-item" data-section="simulator"><span class="mmi-icon">∿</span><span class="mmi-label">Simulador</span></button>
+      <button class="mobile-menu-item" data-section="fiscalidad"><span class="mmi-icon">§</span><span class="mmi-label">Fiscalidad</span></button>
+      <button class="mobile-menu-item" data-section="ai"><span class="mmi-icon">✦</span><span class="mmi-label">Asesor IA</span></button>
+      <button class="mobile-menu-item" data-section="settings"><span class="mmi-icon">⚙</span><span class="mmi-label">Ajustes</span></button>
+
+    </div>
+  </div>
+
+  <!-- ─── ONBOARDING ──────────────────────────────────────── -->
+  <div id="onboarding-overlay" class="ob-overlay" style="display:none" role="dialog" aria-modal="true" aria-label="Configuración inicial de Finova">
+    <div class="ob-container">
+      <div class="ob-content" id="ob-content"></div>
+      <div class="ob-dots" id="ob-dots" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <!-- ─── TOUR GUIADO ──────────────────────────────────────── -->
+  <div id="ob-tour-overlay" class="ob-tour-overlay" style="display:none" aria-hidden="true"></div>
+  <div id="ob-tour-card" class="ob-tour-card" style="display:none" role="dialog" aria-label="Tour de Finova">
+    <div class="ob-tour-header">
+      <div class="ob-tour-dots-row" id="ob-tour-dots"></div>
+      <button type="button" class="ob-tour-skip-btn" data-action="ob-tour-skip">✕ Saltar</button>
+    </div>
+    <div class="ob-tour-body">
+      <div class="ob-tour-icon-wrap" id="ob-tour-icon"></div>
+      <div class="ob-tour-text">
+        <div class="ob-tour-step-label" id="ob-tour-step-label"></div>
+        <div class="ob-tour-title" id="ob-tour-title"></div>
+        <div class="ob-tour-desc" id="ob-tour-desc"></div>
+      </div>
+    </div>
+    <div class="ob-tour-footer">
+      <button type="button" class="ob-tour-prev-btn" id="ob-tour-prev" data-action="ob-tour-prev">← Anterior</button>
+      <button type="button" class="ob-tour-next-btn" id="ob-tour-next" data-action="ob-tour-next">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════ MODAL TEMPLATES ═══════════════════════ -->
+
+  <template id="tpl-add-transaction">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Tipo</label>
+        <select id="f-tx-type" class="select-input">
+          <option value="expense">Gasto</option>
+          <option value="income">Ingreso</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Fecha</label>
+        <input type="date" id="f-tx-date" class="text-input" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Descripción</label>
+      <input type="text" id="f-tx-desc" class="text-input" placeholder="Ej: Nómina enero" list="tx-desc-datalist" autocomplete="off" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="btn-row" style="justify-content:space-between;margin-bottom:7px">
+          <label class="form-label" style="margin-bottom:0">Categoría</label>
+          <span id="cat-ai-badge" class="cat-ai-badge" style="display:none"></span>
+        </div>
+        <select id="f-tx-category" class="select-input"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Importe (€)</label>
+        <input type="number" id="f-tx-amount" class="text-input" placeholder="0.00" min="0" step="0.01" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nota</label>
+      <textarea id="f-tx-note" class="text-input" rows="2" placeholder="Detalles adicionales..."></textarea>
+    </div>
+    <div class="tx-photo-upload-row">
+      <label class="form-label">Foto / Ticket</label>
+      <div class="tx-photo-area">
+        <label for="f-tx-photo" class="tx-photo-btn">
+          <span>📷 Adjuntar foto</span>
+          <input type="file" id="f-tx-photo" accept="image/*" style="display:none" />
+        </label>
+        <div id="tx-photo-preview" class="tx-photo-preview"></div>
+      </div>
+    </div>
+    <div class="tx-fav-row">
+      <label class="tx-fav-label">
+        <input type="checkbox" id="f-tx-fav" />
+        <span class="tx-fav-heart">♥</span> Marcar como favorita
+      </label>
+    </div>
+  </template>
+
+  <template id="tpl-budget-row">
+    <div class="budget-edit-row">
+      <label class="budget-edit-label"></label>
+      <input type="number" class="text-input budget-edit-input" placeholder="sin límite" min="0" step="1" />
+    </div>
+  </template>
+
+  <template id="tpl-add-watchlist">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nombre</label>
+        <input type="text" id="f-w-name" class="text-input" placeholder="Ej: Tesla Inc." />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ticker <span id="f-w-ticker-badge" style="font-size:11px;color:var(--accent);display:none"></span></label>
+        <input type="text" id="f-w-ticker" class="text-input" placeholder="TSLA" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Precio actual (€)</label>
+        <input type="number" id="f-w-price" class="text-input" placeholder="0.00" step="0.01" min="0" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Precio alerta (€) — opcional</label>
+        <input type="number" id="f-w-target" class="text-input" placeholder="0.00" step="0.01" min="0" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Dirección de la alerta</label>
+      <div class="watch-alert-toggle">
+        <label class="watch-alert-opt">
+          <input type="radio" name="f-w-alert-type" value="above" />
+          <span>↑ Por encima del precio</span>
+        </label>
+        <label class="watch-alert-opt">
+          <input type="radio" name="f-w-alert-type" value="below" />
+          <span>↓ Por debajo del precio</span>
+        </label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notas</label>
+      <input type="text" id="f-w-notes" class="text-input" placeholder="Motivo de seguimiento..." />
+    </div>
+  </template>
+
+  <template id="tpl-add-asset">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Ticker / Símbolo</label>
+        <div class="btn-row">
+          <input type="text" id="f-a-ticker" class="text-input" placeholder="Ej: AAPL" style="text-transform:uppercase;flex:1" />
+          <span id="f-a-ticker-badge" style="font-size:11px;color:var(--accent);white-space:nowrap;display:none">✓ auto</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nombre del activo</label>
+        <input type="text" id="f-a-name" class="text-input" placeholder="Ej: Apple Inc." />
+      </div>
+    </div>
+    <div class="form-row-3 form-row">
+      <div class="form-group">
+        <label class="form-label">Precio de compra (€)</label>
+        <input type="number" id="f-a-buy" class="text-input" placeholder="0.00" step="0.001" min="0" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Precio actual (€)</label>
+        <input type="number" id="f-a-current" class="text-input" placeholder="0.00" step="0.001" min="0" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Cantidad</label>
+        <input type="number" id="f-a-qty" class="text-input" placeholder="0" step="any" min="0" />
+      </div>
+    </div>
+    <div class="form-row-3 form-row">
+      <div class="form-group">
+        <label class="form-label">Fecha de compra</label>
+        <input type="date" id="f-a-buydate" class="text-input" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">País / Mercado</label>
+        <select id="f-a-country" class="select-input">
+          <option value="">— Sin especificar —</option>
+          <option value="🇺🇸 EEUU">🇺🇸 EEUU</option>
+          <option value="🇪🇸 España">🇪🇸 España</option>
+          <option value="🇩🇪 Alemania">🇩🇪 Alemania</option>
+          <option value="🇫🇷 Francia">🇫🇷 Francia</option>
+          <option value="🇬🇧 Reino Unido">🇬🇧 Reino Unido</option>
+          <option value="🇳🇱 Países Bajos">🇳🇱 Países Bajos</option>
+          <option value="🇨🇭 Suiza">🇨🇭 Suiza</option>
+          <option value="🇮🇹 Italia">🇮🇹 Italia</option>
+          <option value="🇸🇪 Suecia">🇸🇪 Suecia</option>
+          <option value="🇩🇰 Dinamarca">🇩🇰 Dinamarca</option>
+          <option value="🇨🇳 China">🇨🇳 China</option>
+          <option value="🇯🇵 Japón">🇯🇵 Japón</option>
+          <option value="🇮🇳 India">🇮🇳 India</option>
+          <option value="🇧🇷 Brasil">🇧🇷 Brasil</option>
+          <option value="🇨🇦 Canadá">🇨🇦 Canadá</option>
+          <option value="🌍 Europa (ETF)">🌍 Europa (ETF)</option>
+          <option value="🌎 Global (ETF)">🌎 Global (ETF)</option>
+          <option value="₿ Crypto">₿ Crypto</option>
+          <option value="🏗 Otro">🏗 Otro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sector</label>
+        <select id="f-a-sector" class="select-input">
+          <option value="">— Sin especificar —</option>
+          <option value="Tecnología">Tecnología</option>
+          <option value="Financiero">Financiero</option>
+          <option value="Salud">Salud</option>
+          <option value="Consumo Discrecional">Consumo Discrecional</option>
+          <option value="Consumo Básico">Consumo Básico</option>
+          <option value="Energía">Energía</option>
+          <option value="Industrial">Industrial</option>
+          <option value="Comunicación">Comunicación</option>
+          <option value="Utilities">Utilities</option>
+          <option value="Inmobiliario">Inmobiliario</option>
+          <option value="Materiales">Materiales</option>
+          <option value="Materias Primas">Materias Primas</option>
+          <option value="Crypto">Crypto</option>
+          <option value="ETF">ETF</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Divisa del activo</label>
+        <select id="f-a-currency" class="select-input">
+          <option value="EUR">EUR</option>
+          <option value="USD">USD</option>
+          <option value="GBP">GBP</option>
+          <option value="CHF">CHF</option>
+          <option value="JPY">JPY</option>
+          <option value="SEK">SEK</option>
+          <option value="NOK">NOK</option>
+          <option value="DKK">DKK</option>
+          <option value="CAD">CAD</option>
+          <option value="AUD">AUD</option>
+          <option value="HKD">HKD</option>
+          <option value="SGD">SGD</option>
+          <option value="MXN">MXN</option>
+          <option value="BRL">BRL</option>
+        </select>
+      </div>
+      <div class="form-group" id="f-a-exrate-group">
+        <label class="form-label" id="f-a-exrate-label">Tipo de cambio</label>
+        <input type="number" id="f-a-exrate" class="text-input" placeholder="Ej: 0.92" step="0.0001" min="0.0001" />
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Usa el botón ⇄ Divisas para actualizar automáticamente</div>
+      </div>
+    </div>
+    <div id="two-months-buy-warn" style="display:none"></div>
+  </template>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+
+  <!-- Firebase Auth SDK (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
+  <script src="src/utils/premium.js"></script>
+  <script src="src/core/script.js"></script>
+  <script src="src/sections/transactions.js"></script>
+  <script src="src/sections/recurring.js"></script>
+  <script src="src/sections/goals.js"></script>
+  <!-- simulator.js loaded on-demand by _lazyLoad when user navigates to the section -->
+  <script src="src/sections/bizums.js"></script>
+  <script src="src/sections/networth.js"></script>
+  <script src="src/sections/dashboard.js"></script>
+  <script src="src/sections/portfolio.js"></script>
+  <script src="src/core/ai.js"></script>
+  <!-- fiscal.js loaded on-demand by _lazyLoad when user navigates to the section -->
+  <script src="src/utils/pdf.js"></script>
+  <script src="src/sections/admin.js"></script>
+  <script src="src/auth/auth.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
