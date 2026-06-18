@@ -263,3 +263,117 @@ function _initSmoothScroll() {
     });
   });
 }
+
+/* ── Feature detail modals ────────────────────────────────────── */
+function lpOpenFeat(id) {
+  const f = _LP_FEAT_DATA[id];
+  if (!f) return;
+  document.getElementById('featIc').textContent    = f.ic;
+  document.getElementById('featTitle').textContent = f.title;
+  document.getElementById('featTag').textContent   = f.tag;
+  document.getElementById('featMock').innerHTML    = f.mock();
+  document.getElementById('featPts').innerHTML     =
+    f.pts.map(p => `<div class="feat-pt"><span class="feat-check">✓</span>${p}</div>`).join('');
+  document.getElementById('featOverlay').classList.add('open');
+  document.addEventListener('keydown', _featEsc);
+}
+function lpCloseFeat() {
+  document.getElementById('featOverlay')?.classList.remove('open');
+  document.removeEventListener('keydown', _featEsc);
+}
+function _featEsc(e) { if (e.key === 'Escape') lpCloseFeat(); }
+
+function _mockDashboard() {
+  const bars = [38,52,55,60,58,68,72,70,80,85,90,100]
+    .map((h,i) => `<div class="fm-bar${i===11?' active':''}" style="height:${h}%"></div>`).join('');
+  return `<div class="fm-screen">
+    <div class="fm-kpis">
+      <div class="fm-kpi"><div class="fm-kpi-l">Patrimonio neto</div><div class="fm-kpi-v">84.200 €</div><div class="fm-kpi-d up">↑ +3,4 % este mes</div></div>
+      <div class="fm-kpi"><div class="fm-kpi-l">Ingresos / mes</div><div class="fm-kpi-v">3.200 €</div><div class="fm-kpi-d">Nómina + freelance</div></div>
+      <div class="fm-kpi"><div class="fm-kpi-l">Gastos / mes</div><div class="fm-kpi-v">1.960 €</div><div class="fm-kpi-d down">↑ +120 € vs anterior</div></div>
+    </div>
+    <div class="fm-chart-label">Evolución patrimonial — últimos 12 meses</div>
+    <div class="fm-chart">${bars}</div>
+  </div>`;
+}
+
+function _mockPortfolio() {
+  const rows = [
+    {ic:'🌍',n:'MSCI World ETF',s:'Vanguard',v:'18.240 €',r:'+14,2 %',c:'up'},
+    {ic:'🍎',n:'Apple Inc.',s:'NASDAQ',v:'9.100 €',r:'+8,7 %',c:'up'},
+    {ic:'🏦',n:'Santander',s:'BME',v:'4.300 €',r:'−2,1 %',c:'down'},
+    {ic:'📄',n:'Renta Fija EU',s:'iShares',v:'11.160 €',r:'+3,4 %',c:'up'},
+  ].map(p=>`<div class="fm-row"><div class="fm-row-ic">${p.ic}</div><div class="fm-row-info"><div class="fm-row-name">${p.n}</div><div class="fm-row-sub">${p.s}</div></div><div class="fm-row-right"><div class="fm-row-v">${p.v}</div><div class="fm-row-r ${p.c}">${p.r}</div></div></div>`).join('');
+  return `<div class="fm-screen">
+    <div class="fm-port-head">
+      <div><div class="fm-kpi-l">Valor total cartera</div><div class="fm-kpi-v">42.800 €</div></div>
+      <div class="fm-badge up">+12,4 % rentabilidad total</div>
+    </div>
+    <div class="fm-positions">${rows}</div>
+  </div>`;
+}
+
+function _mockTax() {
+  return `<div class="fm-screen">
+    <div class="fm-tax-head">Resumen Fiscal 2024 — IRPF</div>
+    <div class="fm-tax-rows">
+      <div class="fm-tax-row"><span>Ganancias realizadas</span><span class="up">+6.840 €</span></div>
+      <div class="fm-tax-row"><span>Pérdidas realizadas</span><span class="down">−1.120 €</span></div>
+      <div class="fm-tax-row fm-tax-total"><span>Base imponible del ahorro</span><span>5.720 €</span></div>
+      <div class="fm-tax-row"><span>Tramo hasta 6.000 € (19 %)</span><span>1.140 €</span></div>
+      <div class="fm-tax-row"><span>Tramo 6.000–50.000 € (21 %)</span><span>151 €</span></div>
+      <div class="fm-tax-row fm-tax-total accent"><span>Cuota estimada</span><span>1.291 €</span></div>
+    </div>
+    <div class="fm-tax-note">Cálculo orientativo. Consulta siempre a un asesor fiscal cualificado.</div>
+  </div>`;
+}
+
+function _mockAI() {
+  return `<div class="fm-screen">
+    <div class="fm-chat">
+      <div class="fm-msg user">¿Cómo está mi situación fiscal este año?</div>
+      <div class="fm-msg ai">Tu base imponible del ahorro es de <strong>5.720 €</strong>, principalmente por la venta de tu ETF MSCI World en mayo. Estás en el primer tramo (19 %), así que la cuota estimada es <strong>1.291 €</strong>. Si tienes pérdidas pendientes de años anteriores, podrías reducirla. ¿Quieres que lo revise?</div>
+      <div class="fm-msg user">¿Qué ETFs me recomiendas para diversificar?</div>
+      <div class="fm-msg ai">Tu cartera tiene un 42 % en renta variable global y un 26 % en renta fija. Para equilibrar el riesgo, considera un ETF de bonos de corta duración o ampliar exposición a mercados emergentes si tu horizonte es largo.</div>
+    </div>
+  </div>`;
+}
+
+function _mockGoals() {
+  const goals = [
+    {ic:'🏖️',n:'Fondo vacaciones',t:'3.000',c:'2.100',p:70},
+    {ic:'🏠',n:'Entrada piso',t:'40.000',c:'18.400',p:46},
+    {ic:'🛡️',n:'Fondo emergencia',t:'12.000',c:'12.000',p:100},
+  ].map(g=>`<div class="fm-goal">
+    <div class="fm-goal-head">
+      <span class="fm-goal-ic">${g.ic}</span>
+      <div class="fm-goal-info"><div class="fm-goal-name">${g.n}</div><div class="fm-goal-sub">${g.c} € / ${g.t} €</div></div>
+      <div class="fm-goal-pct${g.p===100?' done':''}">${g.p} %</div>
+    </div>
+    <div class="fm-goal-bar"><div class="fm-goal-fill${g.p===100?' done':''}" style="width:${g.p}%"></div></div>
+  </div>`).join('');
+  return `<div class="fm-screen"><div class="fm-goals">${goals}</div></div>`;
+}
+
+function _mockTransactions() {
+  const txs = [
+    {ic:'💰',n:'Nómina diciembre',cat:'Ingresos',a:'+3.200 €',c:'up'},
+    {ic:'🛒',n:'Mercadona',cat:'Alimentación',a:'−89 €',c:'down'},
+    {ic:'📈',n:'MSCI World ETF',cat:'Inversión',a:'+1.840 €',c:'up'},
+    {ic:'🏠',n:'Alquiler',cat:'Vivienda',a:'−950 €',c:'down'},
+    {ic:'⚡',n:'Factura luz',cat:'Suministros',a:'−78 €',c:'down'},
+  ].map(t=>`<div class="fm-tx"><div class="fm-tx-ic">${t.ic}</div><div class="fm-tx-info"><div class="fm-tx-name">${t.n}</div><div class="fm-tx-cat">${t.cat}</div></div><div class="fm-tx-a ${t.c}">${t.a}</div></div>`).join('');
+  return `<div class="fm-screen">
+    <div class="fm-tx-head"><div class="fm-tx-search">🔍  Buscar transacciones…</div></div>
+    <div class="fm-txs">${txs}</div>
+  </div>`;
+}
+
+const _LP_FEAT_DATA = {
+  dashboard:    { ic:'📊', title:'Dashboard',             tag:'Tu situación financiera de un vistazo',     mock:_mockDashboard,    pts:['Patrimonio neto actualizado en tiempo real','Balance de ingresos vs gastos mensual','Evolución histórica con gráficos interactivos','Resumen de todas tus cuentas en un solo lugar'] },
+  portfolio:    { ic:'📈', title:'Cartera de inversión',  tag:'Seguimiento profesional de tus activos',    mock:_mockPortfolio,    pts:['Cotizaciones en tiempo real de acciones y ETFs','Rentabilidad total y anualizada por posición','Diversificación por activo, sector y geografía','Historial completo de compras y ventas'] },
+  tax:          { ic:'🧾', title:'Fiscalidad IRPF',       tag:'Sin sorpresas en tu declaración de la renta',mock:_mockTax,         pts:['Cálculo automático de plusvalías y pérdidas patrimoniales','Base imponible del ahorro desglosada por activo','Compensación inteligente de ganancias y pérdidas','Resumen listo para incluir en tu declaración'] },
+  ai:           { ic:'🤖', title:'Asesor con IA',         tag:'Tu asesor financiero personal, 24/7',       mock:_mockAI,           pts:['Consultas en lenguaje natural sobre tus finanzas','Análisis de tu situación patrimonial actual','Sugerencias de optimización fiscal personalizadas','Estrategias de ahorro e inversión adaptadas a ti'] },
+  goals:        { ic:'🎯', title:'Objetivos financieros', tag:'Convierte tus metas en planes concretos',   mock:_mockGoals,        pts:['Define objetivos con cantidad objetivo y fecha límite','Seguimiento del progreso en tiempo real','Proyecciones basadas en tu capacidad de ahorro actual','Alertas al alcanzar hitos importantes'] },
+  transactions: { ic:'💳', title:'Transacciones',         tag:'Control total de cada euro que entra y sale',mock:_mockTransactions, pts:['Importa CSV desde cualquier banco español en segundos','Categorización automática por tipo de gasto','Búsqueda y filtrado avanzado por fecha o categoría','Exporta en PDF, Excel o CSV cuando quieras'] },
+};

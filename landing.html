@@ -558,6 +558,119 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 .lp-forgot-btn { background:none; border:none; font-size:11px; color:var(--text-muted); cursor:pointer; transition:color .15s; }
 .lp-forgot-btn:hover { color:var(--accent); }
 
+/* ══ FEATURE DETAIL MODAL ══════════════════════════════════════ */
+.lp-feat { cursor:pointer; }
+.lp-feat-more {
+  font-size:12px; color:var(--accent); margin-top:14px; font-weight:500;
+  display:flex; align-items:center; gap:4px; opacity:.7; transition:opacity .2s;
+}
+.lp-feat:hover .lp-feat-more { opacity:1; }
+
+.feat-overlay {
+  position:fixed; inset:0; z-index:900;
+  background:var(--bg-overlay); backdrop-filter:blur(8px);
+  display:none; align-items:center; justify-content:center; padding:20px;
+}
+.feat-overlay.open { display:flex; }
+.feat-modal {
+  background:var(--bg-surface); border-radius:20px;
+  border:1px solid var(--border-subtle);
+  width:100%; max-width:640px; max-height:90vh;
+  box-shadow:var(--shadow-lg); position:relative;
+  display:flex; flex-direction:column; overflow:hidden;
+  animation:lp-up .3s cubic-bezier(.16,1,.3,1);
+}
+.feat-modal-x {
+  position:absolute; top:13px; right:13px; z-index:10;
+  width:30px; height:30px; border-radius:50%;
+  background:var(--bg-elevated); border:1px solid var(--border-subtle);
+  color:var(--text-muted); font-size:12px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:color .15s,border-color .15s;
+}
+.feat-modal-x:hover { color:var(--text-primary); border-color:var(--border-default); }
+.feat-modal-head {
+  padding:24px 24px 20px; border-bottom:1px solid var(--border-faint);
+  display:flex; align-items:center; gap:14px; flex-shrink:0;
+}
+.feat-modal-ic {
+  width:48px; height:48px; border-radius:var(--r-md);
+  background:var(--accent-soft); border:1px solid color-mix(in srgb,var(--accent) 20%,transparent);
+  display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;
+}
+.feat-modal-meta { flex:1; }
+.feat-modal-title { font-family:var(--font-serif); font-size:19px; font-weight:600; color:var(--text-primary); margin-bottom:3px; }
+.feat-modal-tag   { font-size:13px; color:var(--text-secondary); }
+.feat-mock-wrap   { flex:1; overflow:auto; padding:20px; background:var(--bg-elevated); border-bottom:1px solid var(--border-faint); min-height:200px; }
+.feat-pts         { padding:18px 24px; display:flex; flex-direction:column; gap:10px; flex-shrink:0; }
+.feat-pt          { display:flex; align-items:flex-start; gap:10px; font-size:13.5px; color:var(--text-secondary); line-height:1.5; }
+.feat-check       { color:var(--accent); font-weight:700; flex-shrink:0; margin-top:1px; }
+
+/* Feature mockup shared styles */
+.fm-screen        { background:var(--bg-surface); border-radius:10px; border:1px solid var(--border-subtle); padding:14px; }
+.fm-kpis          { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px; }
+.fm-kpi           { background:var(--bg-elevated); border-radius:8px; padding:10px 12px; border:1px solid var(--border-faint); }
+.fm-kpi-l         { font-size:9px; color:var(--text-muted); letter-spacing:.06em; text-transform:uppercase; margin-bottom:3px; }
+.fm-kpi-v         { font-family:var(--font-serif); font-size:16px; font-weight:600; color:var(--text-primary); }
+.fm-kpi-d         { font-size:9px; color:var(--text-muted); margin-top:2px; }
+.fm-kpi-d.up      { color:var(--up); } .fm-kpi-d.down { color:var(--down); }
+.fm-chart-label   { font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+.fm-chart         { height:64px; background:var(--bg-elevated); border-radius:8px; border:1px solid var(--border-faint); display:flex; align-items:flex-end; padding:8px 8px 0; gap:3px; }
+.fm-bar           { flex:1; border-radius:2px 2px 0 0; background:var(--border-default); }
+.fm-bar.active    { background:var(--accent); }
+.fm-port-head     { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.fm-badge         { font-size:11px; font-weight:600; padding:5px 10px; border-radius:99px; }
+.fm-badge.up      { background:color-mix(in srgb,var(--up) 12%,transparent); color:var(--up); border:1px solid color-mix(in srgb,var(--up) 22%,transparent); }
+.fm-positions     { display:flex; flex-direction:column; gap:6px; }
+.fm-row           { display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:8px; background:var(--bg-elevated); border:1px solid var(--border-faint); }
+.fm-row-ic        { font-size:14px; flex-shrink:0; }
+.fm-row-info      { flex:1; min-width:0; }
+.fm-row-name      { font-size:12px; font-weight:600; color:var(--text-primary); }
+.fm-row-sub       { font-size:10px; color:var(--text-muted); }
+.fm-row-right     { text-align:right; flex-shrink:0; }
+.fm-row-v         { font-size:12px; font-weight:600; color:var(--text-primary); }
+.fm-row-r         { font-size:10px; font-weight:600; }
+.fm-row-r.up      { color:var(--up); } .fm-row-r.down { color:var(--down); }
+.fm-tax-head      { font-family:var(--font-serif); font-size:14px; font-weight:600; color:var(--text-primary); margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--border-faint); }
+.fm-tax-rows      { display:flex; flex-direction:column; gap:0; }
+.fm-tax-row       { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-faint); font-size:12px; color:var(--text-secondary); }
+.fm-tax-row.fm-tax-total { font-weight:600; color:var(--text-primary); }
+.fm-tax-row.accent span:last-child { color:var(--accent); }
+.fm-tax-note      { font-size:10px; color:var(--text-muted); margin-top:10px; font-style:italic; }
+.up               { color:var(--up); } .down { color:var(--down); }
+.fm-chat          { display:flex; flex-direction:column; gap:10px; }
+.fm-msg           { padding:10px 14px; border-radius:10px; font-size:12.5px; line-height:1.55; max-width:88%; }
+.fm-msg.user      { background:var(--accent-soft); border:1px solid color-mix(in srgb,var(--accent) 18%,transparent); color:var(--text-primary); align-self:flex-end; border-radius:10px 10px 2px 10px; }
+.fm-msg.ai        { background:var(--bg-elevated); border:1px solid var(--border-subtle); color:var(--text-secondary); align-self:flex-start; border-radius:10px 10px 10px 2px; }
+.fm-goals         { display:flex; flex-direction:column; gap:12px; }
+.fm-goal          { background:var(--bg-elevated); border-radius:8px; padding:12px; border:1px solid var(--border-faint); }
+.fm-goal-head     { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.fm-goal-ic       { font-size:18px; flex-shrink:0; }
+.fm-goal-info     { flex:1; }
+.fm-goal-name     { font-size:13px; font-weight:600; color:var(--text-primary); }
+.fm-goal-sub      { font-size:11px; color:var(--text-muted); }
+.fm-goal-pct      { font-size:13px; font-weight:700; color:var(--accent); flex-shrink:0; }
+.fm-goal-pct.done { color:var(--up); }
+.fm-goal-bar      { height:6px; background:var(--bg-surface); border-radius:99px; overflow:hidden; }
+.fm-goal-fill     { height:100%; background:var(--accent); border-radius:99px; transition:width .4s; }
+.fm-goal-fill.done{ background:var(--up); }
+.fm-tx-head       { margin-bottom:10px; }
+.fm-tx-search     { font-size:12px; color:var(--text-muted); background:var(--bg-elevated); border:1px solid var(--border-default); border-radius:8px; padding:8px 12px; }
+.fm-txs           { display:flex; flex-direction:column; gap:5px; }
+.fm-tx            { display:flex; align-items:center; gap:9px; padding:9px 10px; border-radius:8px; background:var(--bg-elevated); border:1px solid var(--border-faint); }
+.fm-tx-ic         { font-size:15px; flex-shrink:0; }
+.fm-tx-info       { flex:1; min-width:0; }
+.fm-tx-name       { font-size:12px; font-weight:600; color:var(--text-primary); }
+.fm-tx-cat        { font-size:10px; color:var(--text-muted); }
+.fm-tx-a          { font-size:12px; font-weight:700; flex-shrink:0; }
+
+@media (max-width:480px) {
+  .feat-modal { border-radius:20px 20px 0 0; position:fixed; bottom:0; left:0; right:0; max-width:100%; max-height:88vh; }
+  .feat-overlay { align-items:flex-end; padding:0; }
+  .fm-kpis { grid-template-columns:1fr 1fr; }
+  .fm-kpis .fm-kpi:last-child { display:none; }
+}
+
 /* ══ SCROLL ANIMATIONS ══════════════════════════════════════════
    Only hide elements when JS is confirmed loaded (.js on <html>).
    This prevents a blank page if the script fails or loads late.
@@ -712,7 +825,7 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
         </div>
         <div>
           <div class="lp-stat-n" data-count="0" data-suffix=" €">0 €</div>
-          <div class="lp-stat-l">Precio para siempre</div>
+          <div class="lp-stat-l">Precio</div>
         </div>
       </div>
     </div>
@@ -755,29 +868,35 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
     <h2 class="lp-h2 lp-ani" style="animation-delay:.06s">Todo lo que necesitas para<br><em>gestionar tu dinero</em></h2>
     <p class="lp-lead lp-ani" style="animation-delay:.12s">Desde el día a día hasta la estrategia a largo plazo. Finova cubre el ciclo completo de tus finanzas.</p>
     <div class="lp-feats">
-      <div class="lp-feat lp-ani">
+      <div class="lp-feat lp-ani" onclick="lpOpenFeat('dashboard')">
         <div class="lp-feat-ic">📊</div><h3>Dashboard</h3>
         <p>Visión completa de tu situación financiera en tiempo real. Patrimonio neto, balance mensual y evolución histórica.</p>
+        <div class="lp-feat-more">Ver detalles →</div>
       </div>
-      <div class="lp-feat lp-ani" style="animation-delay:.05s">
+      <div class="lp-feat lp-ani" style="animation-delay:.05s" onclick="lpOpenFeat('portfolio')">
         <div class="lp-feat-ic">📈</div><h3>Cartera de inversión</h3>
         <p>Seguimiento de acciones, ETFs y fondos con cotizaciones en tiempo real. Análisis de rentabilidad y diversificación.</p>
+        <div class="lp-feat-more">Ver detalles →</div>
       </div>
-      <div class="lp-feat lp-ani" style="animation-delay:.10s">
+      <div class="lp-feat lp-ani" style="animation-delay:.10s" onclick="lpOpenFeat('tax')">
         <div class="lp-feat-ic">🧾</div><h3>Fiscalidad IRPF</h3>
         <p>Cálculo automático de plusvalías y base imponible. Prepara tu declaración de la renta sin sorpresas.</p>
+        <div class="lp-feat-more">Ver detalles →</div>
       </div>
-      <div class="lp-feat lp-ani" style="animation-delay:.15s">
+      <div class="lp-feat lp-ani" style="animation-delay:.15s" onclick="lpOpenFeat('ai')">
         <div class="lp-feat-ic">🤖</div><h3>Asesor con IA</h3>
         <p>Consulta sobre tus finanzas, optimización fiscal y estrategias de inversión en lenguaje natural.</p>
+        <div class="lp-feat-more">Ver detalles →</div>
       </div>
-      <div class="lp-feat lp-ani" style="animation-delay:.20s">
+      <div class="lp-feat lp-ani" style="animation-delay:.20s" onclick="lpOpenFeat('goals')">
         <div class="lp-feat-ic">🎯</div><h3>Objetivos financieros</h3>
         <p>Define metas —fondo de emergencia, viaje, retiro— y sigue su progreso con proyecciones realistas.</p>
+        <div class="lp-feat-more">Ver detalles →</div>
       </div>
-      <div class="lp-feat lp-ani" style="animation-delay:.25s">
+      <div class="lp-feat lp-ani" style="animation-delay:.25s" onclick="lpOpenFeat('transactions')">
         <div class="lp-feat-ic">💳</div><h3>Transacciones</h3>
-        <p>Categorización inteligente que aprende de tus hábitos. Importa CSV o conecta vía Open Banking.</p>
+        <p>Categorización inteligente de tus gastos e ingresos. Importa fácilmente desde CSV. En el futuro podrás conectar tu banco directamente para que todo sea automático y más cómodo.</p>
+        <div class="lp-feat-more">Ver detalles →</div>
       </div>
     </div>
   </div>
@@ -977,7 +1096,6 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
     <p class="lp-ani" style="animation-delay:.12s">Sin publicidad. Sin vender tus datos.<br>Tu información vive en tu cuenta, no en servidores de terceros.</p>
     <div class="lp-cta-row lp-ani" style="animation-delay:.18s">
       <button class="btn-cta" onclick="lpOpenModal('signup')">Crear cuenta gratis →</button>
-      <a href="index.html" class="btn-outline">Ver la app sin registro</a>
     </div>
   </div>
 </section>
@@ -992,12 +1110,28 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
     <div class="lp-footer-links">
       <a href="privacy.html">Política de privacidad</a>
       <a href="terms.html">Términos de uso</a>
-      <a href="mailto:verdpo@gmail.com">Contacto</a>
+      <a href="mailto:MyFinova1@gmail.com">Contacto</a>
       <a href="index.html">Ir a la app →</a>
     </div>
     <div class="lp-footer-copy">© 2025 Finova</div>
   </div>
 </footer>
+
+<!-- FEATURE DETAIL MODAL -->
+<div class="feat-overlay" id="featOverlay" onclick="if(event.target===this)lpCloseFeat()">
+  <div class="feat-modal" role="dialog" aria-modal="true">
+    <button class="feat-modal-x" onclick="lpCloseFeat()" aria-label="Cerrar">✕</button>
+    <div class="feat-modal-head">
+      <div class="feat-modal-ic" id="featIc"></div>
+      <div class="feat-modal-meta">
+        <div class="feat-modal-title" id="featTitle"></div>
+        <div class="feat-modal-tag"   id="featTag"></div>
+      </div>
+    </div>
+    <div class="feat-mock-wrap" id="featMock"></div>
+    <div class="feat-pts" id="featPts"></div>
+  </div>
+</div>
 
 <!-- AUTH MODAL -->
 <div class="lp-overlay" id="lpModalOverlay" onclick="if(event.target===this)lpCloseModal()">
