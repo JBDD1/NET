@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /data/
+Disallow: /src/
+Sitemap: https://jbdd1.github.io/NET/sitemap.xml

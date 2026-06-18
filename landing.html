@@ -13,6 +13,37 @@
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" /></noscript>
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <meta name="theme-color" content="#d4a960" />
+  <link rel="canonical" href="https://jbdd1.github.io/NET/landing.html" />
+  <meta name="robots" content="index, follow" />
+  <meta name="keywords" content="app finanzas personales España, calculadora IRPF acciones, tracker cartera inversión, gestión patrimonio, declaración renta inversiones, calculadora FIRE España, app gastos e inversiones" />
+  <!-- Open Graph -->
+  <meta property="og:title"       content="Finova — Tu asistente financiero personal" />
+  <meta property="og:description" content="Gestiona patrimonio, inversiones y fiscalidad IRPF en una sola app elegante. Calculadora IRPF, tracker de cartera, asesor IA. Gratis." />
+  <meta property="og:image"       content="https://jbdd1.github.io/NET/og-image.png" />
+  <meta property="og:url"         content="https://jbdd1.github.io/NET/landing.html" />
+  <meta property="og:type"        content="website" />
+  <meta property="og:locale"      content="es_ES" />
+  <meta property="og:site_name"   content="Finova" />
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:title"       content="Finova — Tu asistente financiero personal" />
+  <meta name="twitter:description" content="Gestiona patrimonio, inversiones y fiscalidad IRPF en una sola app. Calculadora IRPF, tracker de cartera, asesor IA. Gratis." />
+  <meta name="twitter:image"       content="https://jbdd1.github.io/NET/og-image.png" />
+  <!-- Schema.org JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Finova",
+    "description": "App de finanzas personales para España: calculadora IRPF, tracker de cartera de inversión, asesor con IA y gestión de patrimonio neto.",
+    "applicationCategory": "FinanceApplication",
+    "operatingSystem": "Web",
+    "inLanguage": "es-ES",
+    "url": "https://jbdd1.github.io/NET/landing.html",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+    "featureList": ["Calculadora IRPF", "Tracker cartera inversión", "Gestión patrimonio neto", "Asesor financiero con IA", "Objetivos financieros", "Importación CSV bancos españoles"]
+  }
+  </script>
 
 <style>
 /* ══ DESIGN TOKENS — 5 themes ════════════════════════════════════ */
@@ -558,6 +589,151 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 .lp-forgot-btn { background:none; border:none; font-size:11px; color:var(--text-muted); cursor:pointer; transition:color .15s; }
 .lp-forgot-btn:hover { color:var(--accent); }
 
+/* ══ ANTES / DESPUÉS ══════════════════════════════════════════ */
+.lp-vs-grid {
+  display:grid; grid-template-columns:1fr 56px 1fr; gap:0; align-items:stretch;
+}
+.lp-vs-col {
+  border-radius:var(--r-lg); padding:28px 26px;
+  border:1px solid;
+}
+.lp-vs-col.bad {
+  background:color-mix(in srgb,var(--down) 5%,var(--bg-surface));
+  border-color:color-mix(in srgb,var(--down) 18%,transparent);
+}
+.lp-vs-col.good {
+  background:color-mix(in srgb,var(--up) 5%,var(--bg-surface));
+  border-color:color-mix(in srgb,var(--up) 18%,transparent);
+}
+.lp-vs-head {
+  display:flex; align-items:center; gap:10px; margin-bottom:18px;
+  padding-bottom:14px; border-bottom:1px solid;
+}
+.lp-vs-col.bad  .lp-vs-head { border-color:color-mix(in srgb,var(--down) 18%,transparent); }
+.lp-vs-col.good .lp-vs-head { border-color:color-mix(in srgb,var(--up) 18%,transparent); }
+.lp-vs-badge {
+  font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  padding:4px 11px; border-radius:99px;
+}
+.lp-vs-col.bad  .lp-vs-badge { background:color-mix(in srgb,var(--down) 14%,transparent); color:var(--down); }
+.lp-vs-col.good .lp-vs-badge { background:color-mix(in srgb,var(--up) 14%,transparent); color:var(--up); }
+.lp-vs-title { font-family:var(--font-serif); font-size:16px; font-weight:600; color:var(--text-primary); }
+.lp-vs-items { display:flex; flex-direction:column; gap:11px; }
+.lp-vs-item  { display:flex; align-items:flex-start; gap:9px; }
+.lp-vs-item-ic { font-size:15px; flex-shrink:0; margin-top:1px; }
+.lp-vs-item-text { font-size:13.5px; color:var(--text-secondary); line-height:1.55; }
+.lp-vs-divider {
+  display:flex; align-items:center; justify-content:center;
+}
+.lp-vs-vs {
+  width:40px; height:40px; border-radius:50%;
+  background:var(--bg-elevated); border:1px solid var(--border-subtle);
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; color:var(--text-muted); flex-shrink:0;
+}
+
+/* ══ HECHO EN ESPAÑA ══════════════════════════════════════════ */
+.lp-spain-section { background:var(--bg-surface); }
+.lp-spain-grid { display:grid; grid-template-columns:1fr 1fr; gap:56px; align-items:center; }
+.lp-spain-pills { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:26px; }
+.lp-spain-pill {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 13px; border-radius:99px; font-size:12px; font-weight:500;
+  background:var(--accent-soft); border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
+  color:var(--accent);
+}
+.lp-spain-checklist { display:flex; flex-direction:column; gap:14px; }
+.lp-spain-item { display:flex; align-items:flex-start; gap:12px; }
+.lp-spain-item-ic {
+  width:32px; height:32px; border-radius:var(--r-sm); flex-shrink:0;
+  background:var(--accent-soft); border:1px solid color-mix(in srgb,var(--accent) 18%,transparent);
+  display:flex; align-items:center; justify-content:center; font-size:15px; margin-top:2px;
+}
+.lp-spain-item-body {}
+.lp-spain-item-title { font-size:14px; font-weight:600; color:var(--text-primary); margin-bottom:2px; }
+.lp-spain-item-desc  { font-size:12.5px; color:var(--text-secondary); line-height:1.6; }
+.lp-spain-compare {
+  background:var(--bg-elevated); border-radius:var(--r-lg);
+  border:1px solid var(--border-subtle); padding:22px; overflow:hidden;
+}
+.lp-spain-compare-title {
+  font-family:var(--font-serif); font-size:14px; font-weight:600;
+  color:var(--text-primary); margin-bottom:14px;
+}
+.lp-spain-cmp-hd {
+  display:grid; grid-template-columns:1fr 72px 72px 72px;
+  gap:0; font-size:10px; font-weight:700; letter-spacing:.06em; color:var(--text-muted);
+  text-transform:uppercase; padding-bottom:10px; border-bottom:1px solid var(--border-subtle);
+}
+.lp-spain-cmp-row {
+  display:grid; grid-template-columns:1fr 72px 72px 72px;
+  gap:0; padding:9px 0; border-bottom:1px solid var(--border-faint);
+  font-size:12.5px; align-items:center;
+}
+.lp-spain-cmp-row:last-child { border-bottom:none; }
+.lp-spain-cmp-feat { color:var(--text-secondary); }
+.lp-spain-cmp-val { text-align:center; font-weight:600; font-size:13px; }
+.lp-spain-cmp-val.yes { color:var(--up); }
+.lp-spain-cmp-val.no  { color:var(--down); opacity:.7; }
+.lp-spain-cmp-val.part { color:var(--accent); }
+
+/* ══ CHANGELOG STRIP ══════════════════════════════════════════ */
+.lp-changelog {
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  background:var(--bg-elevated); border-radius:var(--r-lg);
+  border:1px solid var(--border-subtle); padding:16px 22px;
+  margin-bottom:32px;
+}
+.lp-cl-dot {
+  width:8px; height:8px; border-radius:50%; background:var(--up);
+  flex-shrink:0; animation:badge-glow 2.5s ease-in-out infinite;
+}
+.lp-cl-pill {
+  font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+  padding:4px 10px; border-radius:99px;
+  background:color-mix(in srgb,var(--up) 12%,transparent);
+  border:1px solid color-mix(in srgb,var(--up) 22%,transparent); color:var(--up); white-space:nowrap;
+}
+.lp-cl-text { flex:1; font-size:13px; color:var(--text-secondary); min-width:160px; }
+.lp-cl-text strong { color:var(--text-primary); }
+.lp-cl-tags { display:flex; gap:7px; flex-wrap:wrap; }
+.lp-cl-tag {
+  font-size:11px; padding:4px 10px; border-radius:99px;
+  background:var(--accent-soft); border:1px solid color-mix(in srgb,var(--accent) 18%,transparent);
+  color:var(--accent); font-weight:500; white-space:nowrap;
+}
+
+/* ══ FLOATING SUPPORT ══════════════════════════════════════════ */
+.lp-float-btn {
+  position:fixed; bottom:24px; right:24px; z-index:400;
+  display:flex; align-items:center; gap:8px;
+  padding:11px 18px; border-radius:99px;
+  background:color-mix(in srgb,var(--bg-surface) 92%,transparent);
+  backdrop-filter:blur(12px) saturate(160%);
+  border:1px solid var(--border-subtle);
+  box-shadow:var(--shadow-md); cursor:pointer;
+  font-size:13px; font-weight:500; color:var(--text-secondary);
+  text-decoration:none; transition:border-color .15s,box-shadow .15s,transform .12s,color .15s;
+}
+.lp-float-btn:hover { border-color:var(--accent); color:var(--text-primary); box-shadow:var(--shadow-lg); transform:translateY(-2px); }
+.lp-float-dot { width:7px; height:7px; border-radius:50%; background:var(--up); flex-shrink:0; }
+@media (max-width:480px) {
+  .lp-float-btn { bottom:70px; right:14px; padding:12px; border-radius:50%; width:46px; height:46px; justify-content:center; }
+  .lp-float-label { display:none; }
+}
+
+/* ══ RESPONSIVE — new sections ════════════════════════════════ */
+@media (max-width:860px) {
+  .lp-vs-grid { grid-template-columns:1fr; gap:12px; }
+  .lp-vs-divider { display:none; }
+  .lp-spain-grid { grid-template-columns:1fr; gap:32px; }
+}
+@media (max-width:480px) {
+  .lp-changelog { flex-direction:column; align-items:flex-start; gap:10px; }
+  .lp-spain-cmp-hd,.lp-spain-cmp-row { grid-template-columns:1fr 56px 56px 56px; }
+  .lp-spain-cmp-hd span:last-child,.lp-spain-cmp-row .lp-spain-cmp-val:last-child { display:none; }
+}
+
 /* ══ FEATURE DETAIL MODAL ══════════════════════════════════════ */
 .lp-feat { cursor:pointer; }
 .lp-feat-more {
@@ -760,6 +936,7 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
   </a>
   <nav class="lp-nav">
     <a href="#features">Funcionalidades</a>
+    <a href="#spain">IRPF &amp; España</a>
     <a href="#trust">Privacidad</a>
     <a href="#faq">FAQ</a>
     <a href="#themes">Temas</a>
@@ -781,10 +958,11 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 
 <!-- MOBILE MENU -->
 <div class="lp-mobile-menu" id="lpMobileMenu">
-  <a href="#features" onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Funcionalidades</a>
-  <a href="#trust"    onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Privacidad</a>
-  <a href="#faq"      onclick="document.getElementById('lpMobileMenu').classList.remove('open')">FAQ</a>
-  <a href="#themes"   onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Temas</a>
+  <a href="#features"    onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Funcionalidades</a>
+  <a href="#spain"       onclick="document.getElementById('lpMobileMenu').classList.remove('open')">IRPF &amp; España</a>
+  <a href="#trust"       onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Privacidad</a>
+  <a href="#faq"         onclick="document.getElementById('lpMobileMenu').classList.remove('open')">FAQ</a>
+  <a href="#themes"      onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Temas</a>
   <div class="lp-mobile-menu-btns">
     <button class="btn-ghost" onclick="lpOpenModal('signin');document.getElementById('lpMobileMenu').classList.remove('open')">Iniciar sesión</button>
     <a href="index.html" class="btn-accent">Ir a la app →</a>
@@ -904,6 +1082,46 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 
 <div class="lp-hr"></div>
 
+<!-- ANTES / DESPUÉS -->
+<section class="lp-section" id="before-after">
+  <div class="lp-inner">
+    <div class="lp-tag lp-ani">◈ El cambio real</div>
+    <h2 class="lp-h2 lp-ani" style="animation-delay:.06s">La diferencia entre <em>intuir</em><br>y saber con datos</h2>
+    <p class="lp-lead lp-ani" style="animation-delay:.12s">Muchos gestionan sus finanzas con Excel disperso y sin una imagen clara. Finova lo cambia por completo.</p>
+    <div class="lp-vs-grid lp-ani" style="animation-delay:.18s">
+      <div class="lp-vs-col bad">
+        <div class="lp-vs-head">
+          <span class="lp-vs-badge">❌ Sin Finova</span>
+          <span class="lp-vs-title">La forma habitual</span>
+        </div>
+        <div class="lp-vs-items">
+          <div class="lp-vs-item"><span class="lp-vs-item-ic">📂</span><span class="lp-vs-item-text">Hojas de Excel dispersas por carpetas, sin sincronizar entre dispositivos</span></div>
+          <div class="lp-vs-item"><span class="lp-vs-item-ic">❓</span><span class="lp-vs-item-text">Sin saber tu patrimonio neto real en ningún momento</span></div>
+          <div class="lp-vs-item"><span class="lp-vs-item-ic">😰</span><span class="lp-vs-item-text">Sorpresas en la declaración de la renta por no llevar el IRPF al día</span></div>
+          <div class="lp-vs-item"><span class="lp-vs-item-ic">🌐</span><span class="lp-vs-item-text">Apps americanas (Mint, Copilot) que no entienden el sistema fiscal español</span></div>
+          <div class="lp-vs-item"><span class="lp-vs-item-ic">⏱️</span><span class="lp-vs-item-text">Horas recalculando plusvalías y perdiendo el hilo antes de cada renta</span></div>
+        </div>
+      </div>
+      <div class="lp-vs-divider"><div class="lp-vs-vs">VS</div></div>
+      <div class="lp-vs-col good">
+        <div class="lp-vs-head">
+          <span class="lp-vs-badge">✅ Con Finova</span>
+          <span class="lp-vs-title">Tu nueva realidad</span>
+        </div>
+        <div class="lp-vs-items">
+          <div class="lp-vs-item"><span class="lp-vs-item-ic">📊</span><span class="lp-vs-item-text">Un único dashboard con todo: patrimonio, cartera, gastos e inversiones</span></div>
+          <div class="lp-vs-item"><span class="lp-vs-item-ic">💡</span><span class="lp-vs-item-text">Patrimonio neto actualizado en tiempo real, en cualquier dispositivo</span></div>
+          <div class="lp-vs-item"><span class="lp-vs-item-ic">🧾</span><span class="lp-vs-item-text">Calculadora IRPF integrada: plusvalías y base imponible al instante</span></div>
+          <div class="lp-vs-item"><span class="lp-vs-item-ic">🇪🇸</span><span class="lp-vs-item-text">Diseñada para España: tramos IRPF, bancos españoles, formato español</span></div>
+          <div class="lp-vs-item"><span class="lp-vs-item-ic">⚡</span><span class="lp-vs-item-text">Decisiones financieras con datos reales, no suposiciones</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="lp-hr"></div>
+
 <!-- TRUST & PRIVACY -->
 <section class="lp-section lp-trust-section" id="trust">
   <div class="lp-inner">
@@ -945,6 +1163,67 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
         <small>Importa un CSV desde cualquier banco español y empieza en 2 minutos · Próximamente: conexión Open Banking automática</small>
       </div>
       <button class="btn-outline" onclick="lpOpenModal('signup')">Empezar gratis →</button>
+    </div>
+  </div>
+</section>
+
+<div class="lp-hr"></div>
+
+<!-- HECHO EN ESPAÑA -->
+<section class="lp-section lp-spain-section" id="spain">
+  <div class="lp-inner">
+    <div class="lp-spain-grid">
+      <div>
+        <div class="lp-tag lp-ani">◈ Hecho en España, para España</div>
+        <h2 class="lp-h2 lp-ani" style="animation-delay:.06s">La única app de finanzas<br>con <em>IRPF real español</em></h2>
+        <p class="lp-lead lp-ani" style="animation-delay:.10s" style="max-width:440px">
+          Las apps americanas calculan impuestos con tipos genéricos que no tienen nada que ver con el IRPF español. Finova es la alternativa nativa: fiscalidad española, bancos españoles, declaración de la renta española.
+        </p>
+        <div class="lp-spain-pills lp-ani" style="animation-delay:.14s">
+          <span class="lp-spain-pill">🇪🇸 Tramos IRPF 2024/2025</span>
+          <span class="lp-spain-pill">📅 Calendario fiscal español</span>
+          <span class="lp-spain-pill">🏦 BBVA, Santander, CaixaBank…</span>
+          <span class="lp-spain-pill">💶 Todo en euros</span>
+        </div>
+        <div class="lp-spain-checklist lp-ani" style="animation-delay:.18s">
+          <div class="lp-spain-item">
+            <div class="lp-spain-item-ic">🧾</div>
+            <div class="lp-spain-item-body">
+              <div class="lp-spain-item-title">Calculadora IRPF integrada</div>
+              <div class="lp-spain-item-desc">Calcula tus plusvalías, pérdidas patrimoniales y cuota estimada con los tramos del IRPF español. Sin hojas de cálculo, sin estimaciones a ojo.</div>
+            </div>
+          </div>
+          <div class="lp-spain-item">
+            <div class="lp-spain-item-ic">📥</div>
+            <div class="lp-spain-item-body">
+              <div class="lp-spain-item-title">Importación CSV de bancos españoles</div>
+              <div class="lp-spain-item-desc">Compatible con los formatos de exportación de BBVA, Santander, CaixaBank, ING, Revolut y más. Importa tus movimientos en segundos.</div>
+            </div>
+          </div>
+          <div class="lp-spain-item">
+            <div class="lp-spain-item-ic">🤖</div>
+            <div class="lp-spain-item-body">
+              <div class="lp-spain-item-title">Asesor IA que entiende el sistema español</div>
+              <div class="lp-spain-item-desc">Consulta sobre la regla de los 2 meses, la compensación de pérdidas, el límite de aportación a planes de pensiones — en español y con contexto fiscal real.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="lp-ani-right" style="animation-delay:.12s">
+        <div class="lp-spain-compare">
+          <div class="lp-spain-compare-title">Finova vs las alternativas</div>
+          <div class="lp-spain-cmp-hd">
+            <span>Característica</span><span style="text-align:center">Finova</span><span style="text-align:center">Finary</span><span style="text-align:center">Excel</span>
+          </div>
+          <div class="lp-spain-cmp-row"><span class="lp-spain-cmp-feat">Calculadora IRPF española</span><span class="lp-spain-cmp-val yes">✓</span><span class="lp-spain-cmp-val no">✗</span><span class="lp-spain-cmp-val part">Manual</span></div>
+          <div class="lp-spain-cmp-row"><span class="lp-spain-cmp-feat">Importación CSV bancos ES</span><span class="lp-spain-cmp-val yes">✓</span><span class="lp-spain-cmp-val part">Parcial</span><span class="lp-spain-cmp-val part">Manual</span></div>
+          <div class="lp-spain-cmp-row"><span class="lp-spain-cmp-feat">Asesor IA financiero</span><span class="lp-spain-cmp-val yes">✓</span><span class="lp-spain-cmp-val no">✗</span><span class="lp-spain-cmp-val no">✗</span></div>
+          <div class="lp-spain-cmp-row"><span class="lp-spain-cmp-feat">Tracker cartera inversión</span><span class="lp-spain-cmp-val yes">✓</span><span class="lp-spain-cmp-val yes">✓</span><span class="lp-spain-cmp-val part">Manual</span></div>
+          <div class="lp-spain-cmp-row"><span class="lp-spain-cmp-feat">Objetivos financieros</span><span class="lp-spain-cmp-val yes">✓</span><span class="lp-spain-cmp-val part">Básico</span><span class="lp-spain-cmp-val no">✗</span></div>
+          <div class="lp-spain-cmp-row"><span class="lp-spain-cmp-feat">100% gratis, sin límites</span><span class="lp-spain-cmp-val yes">✓</span><span class="lp-spain-cmp-val no">Freemium</span><span class="lp-spain-cmp-val yes">✓</span></div>
+          <div class="lp-spain-cmp-row"><span class="lp-spain-cmp-feat">Sin credenciales bancarias</span><span class="lp-spain-cmp-val yes">✓</span><span class="lp-spain-cmp-val no">✗</span><span class="lp-spain-cmp-val yes">✓</span></div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -1091,6 +1370,16 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 <!-- CTA BAND -->
 <section class="lp-cta-band">
   <div class="lp-inner">
+    <div class="lp-changelog lp-ani">
+      <div class="lp-cl-dot"></div>
+      <span class="lp-cl-pill">En desarrollo activo</span>
+      <div class="lp-cl-text"><strong>Última actualización: junio 2026</strong> — Historial de versiones, modales de funcionalidades, mejoras de privacidad y rendimiento</div>
+      <div class="lp-cl-tags">
+        <span class="lp-cl-tag">Historial versiones</span>
+        <span class="lp-cl-tag">Modales funciones</span>
+        <span class="lp-cl-tag">IRPF 2025</span>
+      </div>
+    </div>
     <div class="lp-tag lp-ani" style="justify-content:center;margin-bottom:13px">◈ Empieza hoy</div>
     <h2 class="lp-ani" style="animation-delay:.06s">Tus finanzas merecen<br>una app <em>a tu altura</em></h2>
     <p class="lp-ani" style="animation-delay:.12s">Sin publicidad. Sin vender tus datos.<br>Tu información vive en tu cuenta, no en servidores de terceros.</p>
@@ -1116,6 +1405,13 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
     <div class="lp-footer-copy">© 2025 Finova</div>
   </div>
 </footer>
+
+<!-- FLOATING SUPPORT BUTTON -->
+<a href="mailto:MyFinova1@gmail.com" class="lp-float-btn" aria-label="Contacto y soporte">
+  <span class="lp-float-dot"></span>
+  <span class="lp-float-label">Contacto</span>
+  <span>✉</span>
+</a>
 
 <!-- FEATURE DETAIL MODAL -->
 <div class="feat-overlay" id="featOverlay" onclick="if(event.target===this)lpCloseFeat()">
