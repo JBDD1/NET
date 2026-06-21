@@ -168,6 +168,13 @@ button { font-family: var(--font-sans); }
 @keyframes gradient-pan { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
 @keyframes char-up   { from{opacity:0;transform:translateY(60%) rotateX(-30deg)} to{opacity:1;transform:none} }
 @keyframes particle-rise { 0%{transform:translateY(0) scale(1);opacity:.6} 100%{transform:translateY(-120px) scale(.3);opacity:0} }
+@keyframes eyebrow-dot   { 0%,100%{opacity:.5;transform:scale(1)} 50%{opacity:1;transform:scale(1.5)} }
+@keyframes logo-shimmer  { 0%{transform:translateX(-150%) skewX(-20deg)} 100%{transform:translateX(300%) skewX(-20deg)} }
+@keyframes badge-sweep   { 0%,65%,100%{transform:translateX(-100%)} 32%{transform:translateX(200%)} }
+@keyframes orb-pulse     { 0%,100%{opacity:.55} 50%{opacity:1} }
+@keyframes cta-ambient   { 0%,100%{opacity:.4} 50%{opacity:.85} }
+@keyframes h2-line-grow  { from{width:0} to{width:48px} }
+@keyframes trust-bob     { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
 
 /* ── Animated em gradient in headlines ──────────────────────── */
 .lp-h2 em, .lp-headline em {
@@ -236,6 +243,67 @@ button { font-family: var(--font-sans); }
   background-clip: text;
 }
 
+/* ── Logo shimmer on hover ──────────────────────────────────── */
+.lp-logo-icon { position:relative; overflow:hidden; transition:transform .3s, box-shadow .3s; }
+.lp-logo-icon::after {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.22) 50%, transparent 70%);
+  transform: translateX(-150%) skewX(-20deg);
+  pointer-events:none;
+}
+.lp-logo:hover .lp-logo-icon::after { animation: logo-shimmer .6s ease forwards; }
+.lp-logo:hover .lp-logo-icon { box-shadow: 0 0 20px color-mix(in srgb,var(--accent) 35%,transparent); }
+
+/* ── Hero eyebrow pulsing dot ───────────────────────────────── */
+.lp-eyebrow { display:inline-flex; align-items:center; gap:7px; }
+.lp-eyebrow::before {
+  content:''; width:7px; height:7px; border-radius:50%;
+  background:var(--accent); flex-shrink:0;
+  animation: eyebrow-dot 2s ease-in-out infinite;
+}
+
+/* ── Roadmap badge shimmer ──────────────────────────────────── */
+.lp-rm-badge { position:relative; overflow:hidden; }
+.lp-rm-badge::after {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.28) 50%, transparent 100%);
+  transform: translateX(-100%);
+  animation: badge-sweep 4s ease-in-out infinite;
+}
+
+/* ── Section h2 gold underline ──────────────────────────────── */
+.lp-h2 { position:relative; display:inline-block; }
+.in > .lp-h2::after, .lp-h2.in::after {
+  content:''; position:absolute; bottom:-10px; left:0;
+  height:2px; background:var(--accent); border-radius:2px;
+  animation: h2-line-grow .8s cubic-bezier(.16,1,.3,1) forwards;
+}
+
+/* ── Orb ambient pulse ──────────────────────────────────────── */
+.lp-orb { animation-name: orb-drift-1, orb-pulse !important; }
+.lp-orb-1 { animation: orb-drift-1 8s ease-in-out infinite, orb-pulse 4s ease-in-out infinite !important; }
+.lp-orb-2 { animation: orb-drift-2 11s ease-in-out infinite, orb-pulse 5s ease-in-out 1s infinite reverse !important; }
+.lp-orb-3 { animation: orb-drift-3 14s ease-in-out infinite, orb-pulse 6s ease-in-out 2s infinite !important; }
+
+/* ── CTA section ambient glow ───────────────────────────────── */
+.lp-cta-block { position:relative; isolation:isolate; }
+.lp-cta-block::before {
+  content:''; position:absolute; inset:-60px; z-index:-1;
+  background: radial-gradient(ellipse at 50% 60%, color-mix(in srgb,var(--accent) 9%,transparent) 0%, transparent 70%);
+  animation: cta-ambient 5s ease-in-out infinite;
+  pointer-events:none;
+}
+
+/* ── Trust logo stagger bob ─────────────────────────────────── */
+.lp-trust-card:nth-child(1) { animation: trust-bob 5s ease-in-out infinite 0s; }
+.lp-trust-card:nth-child(2) { animation: trust-bob 5s ease-in-out infinite .4s; }
+.lp-trust-card:nth-child(3) { animation: trust-bob 5s ease-in-out infinite .8s; }
+.lp-trust-card:nth-child(4) { animation: trust-bob 5s ease-in-out infinite 1.2s; }
+.lp-trust-card:nth-child(5) { animation: trust-bob 5s ease-in-out infinite 1.6s; }
+.lp-trust-card:nth-child(6) { animation: trust-bob 5s ease-in-out infinite 2.0s; }
+/* pause bob while tilting so they don't fight */
+.lp-trust-card:hover { animation: none !important; }
+
 /* ══ SCROLL PROGRESS ════════════════════════════════════════════ */
 #scrollLine {
   position:fixed; top:0; left:0; z-index:500;
@@ -256,7 +324,7 @@ button { font-family: var(--font-sans); }
   transition:background .3s;
 }
 .lp-logo { display:flex; align-items:center; gap:9px; text-decoration:none; }
-.lp-logo-icon { display:flex; align-items:center; justify-content:center; width:34px; height:34px; flex-shrink:0; transition:transform .3s; border-radius:8px; overflow:hidden; }
+.lp-logo-icon { display:flex; align-items:center; justify-content:center; width:40px; height:40px; flex-shrink:0; transition:transform .3s; border-radius:10px; }
 .lp-logo:hover .lp-logo-icon { transform:scale(1.08); }
 .lp-logo-text { font-family:var(--font-serif); font-size:18px; font-weight:600; color:var(--text-primary); }
 .lp-nav { display:flex; align-items:center; gap:28px; }
@@ -1188,7 +1256,7 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 <!-- HEADER -->
 <header class="lp-header">
   <a href="landing.html" class="lp-logo">
-    <span class="lp-logo-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="34" height="34"><rect width="512" height="512" rx="110" fill="#141210"/><rect x="72" y="66" width="68" height="362" rx="12" fill="#d4a960"/><rect x="72" y="66" width="280" height="68" rx="12" fill="#d4a960"/><rect x="72" y="210" width="210" height="62" rx="12" fill="#d4a960"/><rect x="308" y="326" width="144" height="122" rx="14" fill="none" stroke="#d4a960" stroke-width="8"/><rect x="336" y="306" width="10" height="22" rx="4" fill="#d4a960"/><rect x="362" y="306" width="10" height="22" rx="4" fill="#d4a960"/><rect x="388" y="306" width="10" height="22" rx="4" fill="#d4a960"/><rect x="322" y="340" width="48" height="42" rx="7" fill="#d4a960"/><rect x="382" y="340" width="48" height="42" rx="7" fill="#d4a960"/><rect x="322" y="394" width="48" height="42" rx="7" fill="#d4a960"/><rect x="382" y="394" width="48" height="42" rx="7" fill="#d4a960"/></svg></span>
+    <span class="lp-logo-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="40" height="40" style="border-radius:10px;display:block"><defs><linearGradient id="bg-n" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1f1b17"/><stop offset="100%" stop-color="#0d0b09"/></linearGradient><linearGradient id="gld-n" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f2cc80"/><stop offset="100%" stop-color="#b8831e"/></linearGradient></defs><rect width="512" height="512" rx="108" fill="url(#bg-n)"/><rect x="4" y="4" width="504" height="504" rx="106" fill="none" stroke="#d4a960" stroke-width="5" opacity=".25"/><rect x="76" y="70" width="74" height="364" rx="14" fill="url(#gld-n)"/><rect x="76" y="70" width="272" height="74" rx="14" fill="url(#gld-n)"/><rect x="76" y="213" width="204" height="66" rx="14" fill="url(#gld-n)"/><rect x="296" y="316" width="158" height="134" rx="18" fill="none" stroke="url(#gld-n)" stroke-width="13"/><rect x="324" y="292" width="14" height="26" rx="6" fill="url(#gld-n)"/><rect x="354" y="292" width="14" height="26" rx="6" fill="url(#gld-n)"/><rect x="384" y="292" width="14" height="26" rx="6" fill="url(#gld-n)"/><rect x="310" y="334" width="54" height="46" rx="9" fill="url(#gld-n)"/><rect x="376" y="334" width="54" height="46" rx="9" fill="url(#gld-n)"/><rect x="310" y="390" width="54" height="46" rx="9" fill="url(#gld-n)"/><rect x="376" y="390" width="54" height="46" rx="9" fill="url(#gld-n)"/></svg></span>
     <span class="lp-logo-text">Finova</span>
   </a>
   <nav class="lp-nav">
@@ -1992,7 +2060,7 @@ async function lpJoinWaitlist(e) {
 <footer class="lp-footer">
   <div class="lp-footer-inner">
     <div class="lp-footer-logo">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="22" height="22"><rect width="512" height="512" rx="110" fill="#141210"/><rect x="72" y="66" width="68" height="362" rx="12" fill="#d4a960"/><rect x="72" y="66" width="280" height="68" rx="12" fill="#d4a960"/><rect x="72" y="210" width="210" height="62" rx="12" fill="#d4a960"/><rect x="308" y="326" width="144" height="122" rx="14" fill="none" stroke="#d4a960" stroke-width="8"/><rect x="336" y="306" width="10" height="22" rx="4" fill="#d4a960"/><rect x="362" y="306" width="10" height="22" rx="4" fill="#d4a960"/><rect x="388" y="306" width="10" height="22" rx="4" fill="#d4a960"/><rect x="322" y="340" width="48" height="42" rx="7" fill="#d4a960"/><rect x="382" y="340" width="48" height="42" rx="7" fill="#d4a960"/><rect x="322" y="394" width="48" height="42" rx="7" fill="#d4a960"/><rect x="382" y="394" width="48" height="42" rx="7" fill="#d4a960"/></svg>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="24" height="24" style="border-radius:6px;display:block"><defs><linearGradient id="bg-f" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1f1b17"/><stop offset="100%" stop-color="#0d0b09"/></linearGradient><linearGradient id="gld-f" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f2cc80"/><stop offset="100%" stop-color="#b8831e"/></linearGradient></defs><rect width="512" height="512" rx="108" fill="url(#bg-f)"/><rect x="76" y="70" width="74" height="364" rx="14" fill="url(#gld-f)"/><rect x="76" y="70" width="272" height="74" rx="14" fill="url(#gld-f)"/><rect x="76" y="213" width="204" height="66" rx="14" fill="url(#gld-f)"/><rect x="296" y="316" width="158" height="134" rx="18" fill="none" stroke="url(#gld-f)" stroke-width="13"/><rect x="324" y="292" width="14" height="26" rx="6" fill="url(#gld-f)"/><rect x="354" y="292" width="14" height="26" rx="6" fill="url(#gld-f)"/><rect x="384" y="292" width="14" height="26" rx="6" fill="url(#gld-f)"/><rect x="310" y="334" width="54" height="46" rx="9" fill="url(#gld-f)"/><rect x="376" y="334" width="54" height="46" rx="9" fill="url(#gld-f)"/><rect x="310" y="390" width="54" height="46" rx="9" fill="url(#gld-f)"/><rect x="376" y="390" width="54" height="46" rx="9" fill="url(#gld-f)"/></svg>
       <span style="font-family:var(--font-serif);font-size:14px;color:var(--text-secondary)">Finova</span>
     </div>
     <div class="lp-footer-links">
@@ -2033,7 +2101,7 @@ async function lpJoinWaitlist(e) {
   <div class="lp-modal" role="dialog" aria-modal="true">
     <button class="lp-modal-x" onclick="lpCloseModal()" aria-label="Cerrar">✕</button>
     <div class="lp-modal-top">
-      <div class="modal-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="52" height="52" style="border-radius:12px"><rect width="512" height="512" rx="110" fill="#141210"/><rect x="72" y="66" width="68" height="362" rx="12" fill="#d4a960"/><rect x="72" y="66" width="280" height="68" rx="12" fill="#d4a960"/><rect x="72" y="210" width="210" height="62" rx="12" fill="#d4a960"/><rect x="308" y="326" width="144" height="122" rx="14" fill="none" stroke="#d4a960" stroke-width="8"/><rect x="336" y="306" width="10" height="22" rx="4" fill="#d4a960"/><rect x="362" y="306" width="10" height="22" rx="4" fill="#d4a960"/><rect x="388" y="306" width="10" height="22" rx="4" fill="#d4a960"/><rect x="322" y="340" width="48" height="42" rx="7" fill="#d4a960"/><rect x="382" y="340" width="48" height="42" rx="7" fill="#d4a960"/><rect x="322" y="394" width="48" height="42" rx="7" fill="#d4a960"/><rect x="382" y="394" width="48" height="42" rx="7" fill="#d4a960"/></svg></div>
+      <div class="modal-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="56" height="56" style="border-radius:13px;display:block;box-shadow:0 8px 32px rgba(212,169,96,.25)"><defs><linearGradient id="bg-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1f1b17"/><stop offset="100%" stop-color="#0d0b09"/></linearGradient><linearGradient id="gld-m" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f2cc80"/><stop offset="100%" stop-color="#b8831e"/></linearGradient></defs><rect width="512" height="512" rx="108" fill="url(#bg-m)"/><rect x="4" y="4" width="504" height="504" rx="106" fill="none" stroke="#d4a960" stroke-width="5" opacity=".25"/><rect x="76" y="70" width="74" height="364" rx="14" fill="url(#gld-m)"/><rect x="76" y="70" width="272" height="74" rx="14" fill="url(#gld-m)"/><rect x="76" y="213" width="204" height="66" rx="14" fill="url(#gld-m)"/><rect x="296" y="316" width="158" height="134" rx="18" fill="none" stroke="url(#gld-m)" stroke-width="13"/><rect x="324" y="292" width="14" height="26" rx="6" fill="url(#gld-m)"/><rect x="354" y="292" width="14" height="26" rx="6" fill="url(#gld-m)"/><rect x="384" y="292" width="14" height="26" rx="6" fill="url(#gld-m)"/><rect x="310" y="334" width="54" height="46" rx="9" fill="url(#gld-m)"/><rect x="376" y="334" width="54" height="46" rx="9" fill="url(#gld-m)"/><rect x="310" y="390" width="54" height="46" rx="9" fill="url(#gld-m)"/><rect x="376" y="390" width="54" height="46" rx="9" fill="url(#gld-m)"/></svg></div>
       <div class="modal-title">Bienvenido a Finova</div>
       <div class="modal-tagline">Tu asistente financiero personal</div>
     </div>
