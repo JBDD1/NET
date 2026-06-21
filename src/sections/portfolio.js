@@ -3,6 +3,102 @@
    Secciones 8 y 25: Cartera de inversión + Análisis de cartera
 ═══════════════════════════════════════════════════════════════ */
 
+var SERVER_URL = window.location.hostname === 'localhost'
+  ? 'http://localhost:3000'
+  : 'https://net-production-651a.up.railway.app';
+
+function _portSparkDraw(id, rawData, isHero) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const data = rawData.filter(v => v != null && isFinite(v));
+  if (data.length < 2) { canvas.style.display = 'none'; return; }
+
+  const W   = canvas.parentElement.clientWidth || 200;
+  const H   = 44;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.style.display = 'block';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const pad = 4;
+  const pts = data.map((v, i) => ({
+    x: (i / (data.length - 1)) * W,
+    y: H - pad - ((v - min) / range) * (H - pad * 2),
+  }));
+
+  const trend = data[data.length - 1] - data[0];
+  let r, g, b;
+  if (isHero) { r = 255; g = 253; b = 248; }
+  else {
+    const cs  = getComputedStyle(document.documentElement);
+    const hex = (trend >= 0 ? cs.getPropertyValue('--up') : cs.getPropertyValue('--down'))
+      .trim().replace('#', '');
+    r = parseInt(hex.slice(0, 2), 16) || 120;
+    g = parseInt(hex.slice(2, 4), 16) || 180;
+    b = parseInt(hex.slice(4, 6), 16) || 120;
+  }
+
+  const DURATION = 650;
+  const t0 = performance.now();
+
+  (function frame(now) {
+    const p    = Math.min((now - t0) / DURATION, 1);
+    const ease = p < 0.5 ? 2 * p * p : -1 + (4 - 2 * p) * p;
+    const cnt  = Math.max(2, Math.ceil(ease * (pts.length - 1)) + 1);
+    const vis  = pts.slice(0, cnt);
+
+    ctx.clearRect(0, 0, W, H);
+
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, `rgba(${r},${g},${b},0.18)`);
+    grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+
+    ctx.beginPath();
+    ctx.moveTo(vis[0].x, H);
+    ctx.lineTo(vis[0].x, vis[0].y);
+    for (let i = 1; i < vis.length; i++) ctx.lineTo(vis[i].x, vis[i].y);
+    ctx.lineTo(vis[vis.length - 1].x, H);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(vis[0].x, vis[0].y);
+    for (let i = 1; i < vis.length; i++) ctx.lineTo(vis[i].x, vis[i].y);
+    ctx.strokeStyle = isHero ? `rgba(${r},${g},${b},0.8)` : `rgb(${r},${g},${b})`;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap  = 'round';
+    ctx.stroke();
+
+    // Dot pulsante en el punto final
+    if (p >= 1) {
+      const last = pts[pts.length - 1];
+      const pulseT = (now / 900) % 1;
+      const pulseR = 2.5 + pulseT * 4;
+      const pulseA = (1 - pulseT) * 0.5;
+      ctx.beginPath();
+      ctx.arc(last.x, last.y, pulseR, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${r},${g},${b},${pulseA})`;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(last.x, last.y, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = isHero ? `rgba(${r},${g},${b},0.9)` : `rgb(${r},${g},${b})`;
+      ctx.fill();
+      requestAnimationFrame(frame);
+    } else {
+      requestAnimationFrame(frame);
+    }
+  })(t0);
+}
+
 let _tickerDbPromise = null;
 function _loadTickerDb() {
   if (typeof TICKER_DB !== 'undefined') return Promise.resolve();
@@ -112,6 +208,17 @@ function renderPortfolio() {
     cagrSubEl.textContent = partial ? 'Rentabilidad anual compuesta (datos parciales)' : 'Rentabilidad anual compuesta';
     cagrSubEl.title = partial ? `${((missingCost / allCost) * 100).toFixed(0)}% del coste de cartera no tiene fecha de compra — el CAGR excluye esos activos` : '';
   }
+
+  requestAnimationFrame(() => {
+    const hist   = APP.networthHistory || [];
+    const slice  = hist.slice(-7);
+    const pvData = slice.map(h => h.portfolioValue ?? h.value ?? null).filter(v => v != null && isFinite(v));
+    _portSparkDraw('spark-port-value', pvData, false);
+    if (totalCost > 0 && pvData.length >= 2) {
+      _portSparkDraw('spark-port-gain', pvData.map(v => v - totalCost), false);
+      _portSparkDraw('spark-port-pct',  pvData.map(v => (v - totalCost) / totalCost * 100), false);
+    }
+  });
 
   // Mejor y peor por ganancia absoluta en EUR — el % puede engañar (€200 +300% < €80.000 +12%)
   if (APP.portfolio.length > 0) {
@@ -742,7 +849,7 @@ async function applyTickerLookup(rawTicker, silent = false) {
   if (!needsCountry && !needsSector) return;
 
   try {
-    const r = await fetch(`/api/yahoo-info?ticker=${encodeURIComponent(ticker)}`);
+    const r = await fetch(`${SERVER_URL}/api/yahoo-info?ticker=${encodeURIComponent(ticker)}`);
     if (!r.ok) return;
     const data = await r.json();
     if (data.error) return;
@@ -886,7 +993,7 @@ function openAssetPriceChart(id) {
 
     if (asset.ticker) {
       try {
-        const r    = await fetch(`/api/yahoo?ticker=${encodeURIComponent(asset.ticker)}&range=1y`);
+        const r    = await fetch(`${SERVER_URL}/api/yahoo?ticker=${encodeURIComponent(asset.ticker)}&range=1y`);
         const data = await r.json().catch(() => null);
         if (data?.error) {
           showToast('Precio no disponible: ' + data.error, 'error');

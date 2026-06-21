@@ -12,11 +12,30 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="style.css" />
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#a8803e" />
-  <meta name="mobile-web-app-capable" content="yes" />
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icon-16.png" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="shortcut icon" href="icon-32.png" />
+
+  <!-- PWA — iOS Safari -->
+  <meta name="apple-mobile-web-app-title" content="Finova" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="apple-touch-icon" href="icon.svg" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png" />
+  <link rel="apple-touch-icon" sizes="167x167" href="icon-167.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="icon-152.png" />
+  <link rel="apple-touch-icon" sizes="120x120" href="icon-120.png" />
+  <meta name="theme-color" content="#15110c" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Finova — Tu asistente financiero personal" />
+  <meta property="og:description" content="Gestiona tu patrimonio, inversiones, fiscalidad IRPF y objetivos en una app elegante. Gratis." />
+  <meta property="og:image" content="https://jbdd1.github.io/NET/icon-512.png" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
   <script>
     /* Aplicar tema ANTES del primer paint para evitar parpadeo */
     try {
@@ -41,7 +60,7 @@
     <div class="login-card">
 
       <div class="login-logo">
-        <span class="login-logo-icon">◈</span>
+        <span class="login-logo-icon"><svg viewBox="0 0 32 32" width="44" height="44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#d4a960"/><rect x="7" y="6" width="4" height="20" rx="1" fill="#141210"/><rect x="7" y="6" width="17" height="4" rx="1" fill="#141210"/><rect x="7" y="13" width="13" height="3.5" rx="1" fill="#141210"/><rect x="21.5" y="21.5" width="3" height="2.5" rx="0.7" fill="#141210" opacity=".8"/><rect x="21.5" y="24.5" width="3" height="1" rx="0.5" fill="#141210" opacity=".5"/></svg></span>
         <span class="login-logo-text">Finova</span>
       </div>
       <p class="login-tagline">Tu asistente financiero personal</p>
@@ -78,7 +97,7 @@
   <div id="app-loading" aria-hidden="true">
     <div class="app-loading-inner">
       <div class="app-loading-logo">
-        <span class="logo-icon" style="font-size:2.4rem">◈</span>
+        <span class="logo-icon"><svg viewBox="0 0 32 32" width="52" height="52" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#d4a960"/><rect x="7" y="6" width="4" height="20" rx="1" fill="#141210"/><rect x="7" y="6" width="17" height="4" rx="1" fill="#141210"/><rect x="7" y="13" width="13" height="3.5" rx="1" fill="#141210"/><rect x="21.5" y="21.5" width="3" height="2.5" rx="0.7" fill="#141210" opacity=".8"/><rect x="21.5" y="24.5" width="3" height="1" rx="0.5" fill="#141210" opacity=".5"/></svg></span>
         <span class="logo-text" style="font-size:1.6rem;letter-spacing:.04em">Finova</span>
       </div>
       <div class="app-loading-spinner"></div>
@@ -89,7 +108,7 @@
     <div class="sidebar-header">
       <div class="logo-wrap">
         <div class="logo">
-          <span class="logo-icon">◈</span>
+          <span class="logo-icon"><svg viewBox="0 0 32 32" width="26" height="26" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="var(--accent)"/><rect x="7" y="6" width="4" height="20" rx="1" fill="var(--accent-ink)"/><rect x="7" y="6" width="17" height="4" rx="1" fill="var(--accent-ink)"/><rect x="7" y="13" width="13" height="3.5" rx="1" fill="var(--accent-ink)"/><rect x="21.5" y="21.5" width="3" height="2.5" rx="0.7" fill="var(--accent-ink)" opacity=".8"/><rect x="21.5" y="24.5" width="3" height="1" rx="0.5" fill="var(--accent-ink)" opacity=".5"/></svg></span>
           <span class="logo-text">Finova</span>
         </div>
         <span class="logo-f" aria-hidden="true">F</span>
@@ -132,7 +151,7 @@
       <!-- GRUPO: Inversiones (con sub-items) -->
       <div class="nav-group" id="nav-group-inversiones">
         <button class="nav-item nav-group-header" id="nav-group-toggle-inversiones">
-          <span class="nav-icon">◈</span>
+          <span class="nav-icon">↗</span>
           <span class="nav-label">Inversiones</span>
           <span class="nav-arrow nav-label">›</span>
         </button>
@@ -771,6 +790,7 @@
         <div class="kpi-card">
           <div class="kpi-label">Valor total cartera</div>
           <div class="kpi-value" id="port-total-value" aria-label="Valor total de la cartera al precio actual">€0</div>
+          <canvas class="kpi-sparkline" id="spark-port-value" role="img" aria-label="Evolución del valor de la cartera"></canvas>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Coste total</div>
@@ -779,10 +799,12 @@
         <div class="kpi-card">
           <div class="kpi-label">Ganancia / Pérdida</div>
           <div class="kpi-value" id="port-total-gain" aria-label="Ganancia o pérdida latente total de la cartera">€0</div>
+          <canvas class="kpi-sparkline" id="spark-port-gain" role="img" aria-label="Evolución de la ganancia latente"></canvas>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Rentabilidad</div>
           <div class="kpi-value" id="port-total-pct" aria-label="Rentabilidad total de la cartera en porcentaje">0%</div>
+          <canvas class="kpi-sparkline" id="spark-port-pct" role="img" aria-label="Evolución de la rentabilidad"></canvas>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">CAGR cartera</div>
@@ -963,32 +985,39 @@
           <div class="kpi-value" id="nw-total">€0</div>
           <div class="kpi-change" id="nw-liabilities-hint" style="color:var(--danger)"></div>
           <div class="kpi-change" id="nw-mom-change" style="display:none"></div>
+          <canvas class="kpi-sparkline" id="spark-nw-total" role="img" aria-label="Evolución del patrimonio neto"></canvas>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Efectivo & Cuentas</div>
           <div class="kpi-value" id="nw-cash">€0</div>
+          <canvas class="kpi-sparkline" id="spark-nw-cash" role="img" aria-label="Evolución del efectivo"></canvas>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Inversiones</div>
           <div class="kpi-value" id="nw-investments">€0</div>
+          <canvas class="kpi-sparkline" id="spark-nw-invest" role="img" aria-label="Evolución de inversiones"></canvas>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">🏠 Inmuebles</div>
           <div class="kpi-value" id="nw-real-estate">€0</div>
+          <canvas class="kpi-sparkline" id="spark-nw-realestate" role="img" aria-label="Evolución de inmuebles"></canvas>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Activos Alternativos</div>
           <div class="kpi-value" id="nw-alternatives">€0</div>
+          <canvas class="kpi-sparkline" id="spark-nw-alts" role="img" aria-label="Evolución de activos alternativos"></canvas>
         </div>
       </div>
       <div class="kpi-grid kpi-grid-3" style="margin-top:var(--gap)">
         <div class="kpi-card" style="border-top:2px solid var(--danger)">
           <div class="kpi-label">⊖ Total Deuda</div>
           <div class="kpi-value negative" id="nw-liabilities">€0</div>
+          <canvas class="kpi-sparkline" id="spark-nw-liab" role="img" aria-label="Evolución de deuda"></canvas>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Total Activos</div>
           <div class="kpi-value" id="nw-total-assets">€0</div>
+          <canvas class="kpi-sparkline" id="spark-nw-assets" role="img" aria-label="Evolución de activos totales"></canvas>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Ratio Deuda / Activos</div>
@@ -1530,7 +1559,7 @@
       <!-- Welcome banner — shown only after finishing onboarding -->
       <div id="ob-welcome-banner" class="ob-welcome-banner" style="display:none">
         <div class="ob-welcome-left">
-          <span class="ob-welcome-icon">◈</span>
+          <span class="ob-welcome-icon">✓</span>
           <div>
             <div class="ob-welcome-title">¡Configuración completada!</div>
             <div class="ob-welcome-sub">Tus datos están guardados. Ya puedes tomar el control de tus finanzas.</div>
@@ -1971,7 +2000,7 @@
       <span class="mobile-nav-label">Gastos</span>
     </button>
     <button class="mobile-nav-btn" data-section="portfolio">
-      <span class="mobile-nav-icon">◈</span>
+      <span class="mobile-nav-icon">↗</span>
       <span class="mobile-nav-label">Cartera</span>
     </button>
     <button class="mobile-nav-btn" data-section="settings">
@@ -2021,7 +2050,7 @@
 
       <div class="mobile-menu-group">
         <button class="mobile-menu-group-hdr" data-group="mmg-inversiones">
-          <span class="mmi-icon">◈</span>
+          <span class="mmi-icon">↗</span>
           <span class="mmi-label">Inversiones</span>
           <span class="mmi-arrow">›</span>
         </button>

@@ -105,6 +105,7 @@ async function initAuth() {
 
 // ─── Guarda metadatos en servidor ────────────────────────────
 function _saveUserMeta(uid, email, displayName) {
+  if (!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return;
   try {
     fetch('/api/user-meta', {
       method:  'POST',

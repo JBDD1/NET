@@ -888,6 +888,7 @@ function getChartDefaults() {
    3. PERSISTENCIA (localStorage)
 ═══════════════════════════════════════════════════════════════ */
 const STORAGE_KEY     = 'finova_data_v1'; // clave legacy (sin auth)
+const _HAS_SERVER     = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 function _getStorageKey() {
   return (typeof APP !== 'undefined' && APP && APP.uid)
     ? `finova_${APP.uid}_data_v1`
@@ -1306,10 +1307,7 @@ function _attachAPPRedaction() {
 
 /** Envía un ping de sesión al servidor para métricas de retención D1/D7/D30. Fire-and-forget. */
 function _pingSession() {
-  if (_isDemoMode || !APP.clientId) return;
-  // Solo enviar en el servidor Finova — evitar errores 405 en Live Server u otros entornos
-  const p = parseInt(location.port, 10);
-  if (p && p !== 3000 && p !== 80 && p !== 443) return;
+  if (_isDemoMode || !APP.clientId || !_HAS_SERVER) return;
   fetch('/api/session', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1736,7 +1734,7 @@ function renderSection(sectionId) {
 }
 
 function _trackSectionVisit(section) {
-  if (_isDemoMode || !APP.clientId) return;
+  if (_isDemoMode || !APP.clientId || !_HAS_SERVER) return;
   try {
     fetch('/api/session', {
       method:  'POST',
@@ -2715,6 +2713,7 @@ async function init() {
         return;
       }
     }
+    if (!e.key) return;
     switch (e.key.toLowerCase()) {
       case 'n': e.preventDefault(); openAddTransaction(); break;
       case 'i': e.preventDefault(); openAddAsset();       break;

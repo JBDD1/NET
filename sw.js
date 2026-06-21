@@ -59,6 +59,13 @@ const CRITICAL_ASSETS = [
   './src/utils/pdf.js',
   './manifest.json',
   './icon.svg',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-180.png',
+  './icon-152.png',
+  './icon-120.png',
+  './icon-32.png',
+  './icon-16.png',
 ];
 
 // Optional assets — load after install; failures are logged but never block the SW.

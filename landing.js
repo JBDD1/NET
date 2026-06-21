@@ -37,6 +37,12 @@ let _lpMode = 'signin';
   _initScrollProgress();
   _initSmoothScroll();
   _initCounters();
+  _initNavScroll();
+  _initMouseGlow();
+  _initTiltCards();
+  _initMagneticBtns();
+  _initParticles();
+  _initTextSplit();
 
   // Safety: reveal all still-hidden elements after 1.5 s
   // (fallback if IntersectionObserver never fires — e.g. hidden iframe, print)
@@ -367,6 +373,168 @@ function _mockTransactions() {
     <div class="fm-tx-head"><div class="fm-tx-search">🔍  Buscar transacciones…</div></div>
     <div class="fm-txs">${txs}</div>
   </div>`;
+}
+
+/* ── Nav compact on scroll ────────────────────────────────────── */
+function _initNavScroll() {
+  const hdr = document.querySelector('.lp-header');
+  if (!hdr) return;
+  let ticking = false;
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        hdr.classList.toggle('scrolled', window.scrollY > 60);
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+}
+
+/* ── Cursor glow ──────────────────────────────────────────────── */
+function _initMouseGlow() {
+  let glow = document.getElementById('lp-cursor-glow');
+  if (!glow) {
+    glow = document.createElement('div');
+    glow.id = 'lp-cursor-glow';
+    document.body.prepend(glow);
+  }
+  let mx = -999, my = -999, cx = -999, cy = -999;
+  let raf = null;
+
+  document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; }, { passive: true });
+
+  function tick() {
+    cx += (mx - cx) * 0.08;
+    cy += (my - cy) * 0.08;
+    glow.style.left = cx + 'px';
+    glow.style.top  = cy + 'px';
+    raf = requestAnimationFrame(tick);
+  }
+  raf = requestAnimationFrame(tick);
+
+  document.addEventListener('mouseleave', () => {
+    cancelAnimationFrame(raf);
+    glow.style.opacity = '0';
+  });
+  document.addEventListener('mouseenter', () => {
+    glow.style.opacity = '1';
+    raf = requestAnimationFrame(tick);
+  });
+}
+
+/* ── 3-D tilt + spotlight on feature cards ────────────────────── */
+function _initTiltCards() {
+  const cards = document.querySelectorAll('.lp-feat, .lp-trust-card, .lp-price-card');
+  cards.forEach(card => {
+    card.addEventListener('mousemove', e => {
+      const r  = card.getBoundingClientRect();
+      const x  = e.clientX - r.left;
+      const y  = e.clientY - r.top;
+      const cx = r.width  / 2;
+      const cy = r.height / 2;
+      const rx = ((y - cy) / cy) * -8;
+      const ry = ((x - cx) / cx) *  8;
+      card.style.transform = `perspective(800px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-4px)`;
+      card.style.setProperty('--mx', (x / r.width  * 100).toFixed(1) + '%');
+      card.style.setProperty('--my', (y / r.height * 100).toFixed(1) + '%');
+    }, { passive: true });
+
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = '';
+    });
+  });
+}
+
+/* ── Magnetic buttons ─────────────────────────────────────────── */
+function _initMagneticBtns() {
+  document.querySelectorAll('.btn-cta, .lp-btn-primary').forEach(btn => {
+    btn.addEventListener('mousemove', e => {
+      const r  = btn.getBoundingClientRect();
+      const dx = (e.clientX - (r.left + r.width  / 2)) * 0.3;
+      const dy = (e.clientY - (r.top  + r.height / 2)) * 0.3;
+      btn.style.transform = `translate(${dx}px, ${dy}px)`;
+    }, { passive: true });
+    btn.addEventListener('mouseleave', () => { btn.style.transform = ''; });
+  });
+}
+
+/* ── Floating particle canvas ─────────────────────────────────── */
+function _initParticles() {
+  let canvas = document.getElementById('lp-particles');
+  if (!canvas) {
+    canvas = document.createElement('canvas');
+    canvas.id = 'lp-particles';
+    document.body.prepend(canvas);
+  }
+  const ctx = canvas.getContext('2d');
+  const NUM = 55;
+
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize, { passive: true });
+
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#d4a960';
+
+  const particles = Array.from({ length: NUM }, () => ({
+    x:  Math.random() * window.innerWidth,
+    y:  Math.random() * window.innerHeight,
+    r:  Math.random() * 1.5 + 0.4,
+    vx: (Math.random() - 0.5) * 0.25,
+    vy: (Math.random() - 0.5) * 0.25,
+    a:  Math.random() * 0.35 + 0.05,
+  }));
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0) p.x = canvas.width;
+      if (p.x > canvas.width)  p.x = 0;
+      if (p.y < 0) p.y = canvas.height;
+      if (p.y > canvas.height) p.y = 0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = accent;
+      ctx.globalAlpha = p.a;
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+/* ── Split headline text into staggered chars ─────────────────── */
+function _initTextSplit() {
+  const targets = document.querySelectorAll('.lp-headline-split');
+  targets.forEach(el => {
+    const text = el.textContent;
+    el.textContent = '';
+    el.style.visibility = 'visible';
+    [...text].forEach((ch, i) => {
+      const span = document.createElement('span');
+      span.className = 'lp-char';
+      span.textContent = ch === ' ' ? ' ' : ch;
+      span.style.animationDelay = (i * 0.035) + 's';
+      el.appendChild(span);
+    });
+  });
+
+  if (!window.IntersectionObserver) return;
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.querySelectorAll('.lp-char').forEach(c => c.classList.add('in'));
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.2 });
+  targets.forEach(el => io.observe(el));
 }
 
 const _LP_FEAT_DATA = {

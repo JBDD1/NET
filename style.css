@@ -807,7 +807,7 @@ ul  { list-style: none; }
 
 .logo-wrap { display: flex; align-items: center; min-width: 0; }
 .logo { display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; }
-.logo-icon { color: var(--sidebar-accent); font-size: 16px; flex-shrink: 0; }
+.logo-icon { display: flex; align-items: center; flex-shrink: 0; }
 .logo-text {
   font-family: var(--font-sans);
   font-size: 15px;
@@ -2843,7 +2843,16 @@ ul  { list-style: none; }
   border-radius: var(--r-xs) !important;
   margin-left: var(--sp-2);
 }
-@keyframes toastIn  { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+@keyframes toastIn {
+  0%   { opacity: 0; transform: translateY(20px) scale(.9); }
+  60%  { transform: translateY(-4px) scale(1.02); }
+  80%  { transform: translateY(2px) scale(.99); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toastOut {
+  to { opacity: 0; transform: translateY(10px) scale(.93); }
+}
+.toast.removing { animation: toastOut .2s ease forwards; }
 @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: scale(.95); } }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -3133,13 +3142,50 @@ body, .kpi-card, .sidebar, .topbar, .modal, .watchlist-card, .alternative-card, 
 }
 
 /* ── KPI cards — staggered entrance ──────────────────────── */
-.section.active .kpi-card { animation: kpiCardIn .42s cubic-bezier(.16,1,.3,1) both; }
-.section.active .kpi-card:nth-child(1) { animation-delay:  60ms; }
-.section.active .kpi-card:nth-child(2) { animation-delay: 110ms; }
-.section.active .kpi-card:nth-child(3) { animation-delay: 160ms; }
-.section.active .kpi-card:nth-child(4) { animation-delay: 210ms; }
-.section.active .kpi-card:nth-child(5) { animation-delay: 260ms; }
-.section.active .kpi-card:nth-child(6) { animation-delay: 310ms; }
+.section.active .kpi-card { animation: kpiCardIn .48s cubic-bezier(.16,1,.3,1) both; }
+.section.active .kpi-card:nth-child(1)  { animation-delay:  50ms; }
+.section.active .kpi-card:nth-child(2)  { animation-delay: 100ms; }
+.section.active .kpi-card:nth-child(3)  { animation-delay: 150ms; }
+.section.active .kpi-card:nth-child(4)  { animation-delay: 200ms; }
+.section.active .kpi-card:nth-child(5)  { animation-delay: 250ms; }
+.section.active .kpi-card:nth-child(6)  { animation-delay: 300ms; }
+.section.active .kpi-card:nth-child(7)  { animation-delay: 350ms; }
+.section.active .kpi-card:nth-child(8)  { animation-delay: 400ms; }
+
+/* ── KPI card hover — lift + glow ─────────────────────────── */
+.kpi-card:not(.kpi-hero):hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06);
+  border-color: var(--accent-soft) !important;
+}
+.kpi-hero:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0,0,0,.18);
+}
+
+/* ── Hero card shimmer ────────────────────────────────────── */
+@keyframes heroShimmer {
+  0%   { transform: translateX(-120%) skewX(-18deg); }
+  100% { transform: translateX(220%)  skewX(-18deg); }
+}
+.kpi-hero::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 45%; height: 100%;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.08) 50%, transparent 100%);
+  animation: heroShimmer 3.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ── KPI value pulse on load ──────────────────────────────── */
+@keyframes valuePop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.04); }
+  70%  { transform: scale(.98); }
+  100% { transform: scale(1); }
+}
+.section.active .kpi-hero .kpi-value { animation: valuePop .55s cubic-bezier(.34,1.56,.64,1) .35s both; }
 
 /* ── Cards — staggered fade up ────────────────────────────── */
 .section.active .card,
@@ -3245,8 +3291,167 @@ body, .kpi-card, .sidebar, .topbar, .modal, .watchlist-card, .alternative-card, 
 .nav-sub.open .nav-sub-item:nth-child(3) { transition-delay: 110ms; }
 .nav-sub:not(.open) .nav-sub-item        { transition-delay: 0ms; }
 
-/* ── Modal — pop entrance ─────────────────────────────────── */
-.modal-content { animation: popIn .28s cubic-bezier(.16,1,.3,1) both; }
+/* ── Modal — spring entrance ──────────────────────────────── */
+@keyframes modalSpring {
+  0%   { opacity: 0; transform: scale(.88) translateY(28px); filter: blur(3px); }
+  55%  { transform: scale(1.025) translateY(-4px); filter: blur(0); }
+  75%  { transform: scale(.985); }
+  100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+.modal-content { animation: modalSpring .42s cubic-bezier(.16,1,.3,1) both; }
+
+/* ═══════════════════════════════════════════════════════════════
+   PREMIUM MICRO-INTERACTIONS
+═══════════════════════════════════════════════════════════════ */
+
+/* ── 1. Botón primario — barrido de luz al hover ───────────── */
+.btn-primary { position: relative; overflow: hidden; }
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -75%;
+  width: 50%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
+  transform: skewX(-18deg);
+  transition: left .5s ease;
+  pointer-events: none;
+}
+.btn-primary:hover::before { left: 130%; }
+
+/* ── 2. Fila de tabla — borde accent deslizante ────────────── */
+.data-table tbody tr td { position: relative; }
+.data-table tbody tr td:first-child::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform .22s cubic-bezier(.34,1.56,.64,1);
+  pointer-events: none;
+}
+.data-table tbody tr:hover td:first-child::after { transform: scaleY(1); }
+
+/* ── 3. KPI hero valor — glow pulsante ─────────────────────── */
+@keyframes valueGlow {
+  0%, 100% { text-shadow: 0 0  0px rgba(255,253,248,0); }
+  50%       { text-shadow: 0 0 18px rgba(255,253,248,.35); }
+}
+.kpi-hero .kpi-value {
+  animation: valuePop .55s cubic-bezier(.34,1.56,.64,1) .35s both,
+             valueGlow 3.5s ease-in-out 1s infinite;
+}
+
+/* ── 4. KPI change positivo — dot pulsante ─────────────────── */
+@keyframes dotPulse {
+  0%, 100% { transform: scale(1);   opacity: .9; }
+  50%       { transform: scale(2.2); opacity: 0; }
+}
+.kpi-change.positive::before {
+  content: '';
+  display: inline-block;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 5px;
+  vertical-align: middle;
+  animation: dotPulse 2.4s ease-in-out infinite;
+}
+
+/* ── 5. Nav item — ripple al hacer clic ────────────────────── */
+@keyframes navRipple {
+  from { transform: scale(0); opacity: .25; }
+  to   { transform: scale(3.5); opacity: 0; }
+}
+.nav-item { isolation: isolate; }
+.nav-item::after {
+  content: '';
+  position: absolute;
+  inset: 50% auto auto 24px;
+  width: 36px; height: 36px;
+  margin: -18px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: scale(0);
+  pointer-events: none;
+}
+.nav-item:active::after { animation: navRipple .38s ease; }
+
+/* ── 6. Progress bar — shimmer continuo ────────────────────── */
+@keyframes barShimmer {
+  0%   { mask-position: -200% 0; -webkit-mask-position: -200% 0; }
+  100% { mask-position:  300% 0; -webkit-mask-position:  300% 0; }
+}
+.goal-progress-fill::after,
+.breakdown-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.2) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: barShimmer 2s linear infinite;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.goal-progress-fill,
+.breakdown-bar-fill { position: relative; overflow: hidden; }
+
+/* ── 7. Highlights row (mejor/peor inversión) — float ─────── */
+@keyframes cardFloat {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-4px); }
+}
+.highlight-card { animation: cardFloat 4s ease-in-out infinite; }
+.highlight-card:nth-child(2) { animation-delay: .8s; }
+.highlight-card:nth-child(3) { animation-delay: 1.6s; }
+.highlight-card:hover { animation-play-state: paused; }
+
+/* ── 8. Sidebar logo — brillo sutil ───────────────────────── */
+@keyframes logoGlow {
+  0%, 100% { filter: drop-shadow(0 0  0px var(--accent)); }
+  50%       { filter: drop-shadow(0 0  8px var(--accent)); }
+}
+.logo-icon svg { animation: logoGlow 5s ease-in-out infinite; }
+
+/* ── 9. Hero card — halo de fondo animado ──────────────────── */
+@keyframes heroHalo {
+  0%, 100% { transform: scale(1) rotate(0deg);   opacity: .07; }
+  50%       { transform: scale(1.18) rotate(25deg); opacity: .12; }
+}
+.kpi-hero::after {
+  animation: heroHalo 8s ease-in-out infinite;
+}
+
+/* ── 10. Flash de atención en card ─────────────────────────── */
+@keyframes attentionRing {
+  0%   { box-shadow: 0 0 0 0   var(--accent-soft); }
+  60%  { box-shadow: 0 0 0 12px transparent; }
+  100% { box-shadow: 0 0 0 0   transparent; }
+}
+.kpi-card.flash-attention { animation: attentionRing .8s ease; }
+
+/* ── 11. Número cambiado — flash de color ──────────────────── */
+@keyframes numFlash {
+  0%   { color: inherit; }
+  30%  { color: var(--accent); }
+  100% { color: inherit; }
+}
+.value-updated { animation: numFlash .6s ease; }
+
+/* ── 12. Section h1 — underline que crece ──────────────────── */
+.section-header h1 { position: relative; display: inline-block; }
+.section-header h1::after {
+  content: '';
+  position: absolute;
+  left: 0; bottom: -3px;
+  height: 2px;
+  width: 0;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width .5s cubic-bezier(.16,1,.3,1) .2s;
+}
+.section.active .section-header h1::after { width: 100%; }
 
 /* ── Input focus glow ────────────────────────────────────── */
 .text-input:focus {
@@ -6973,10 +7178,9 @@ tr[tabindex="0"]:focus {
   margin-bottom: 4px;
 }
 .login-logo-icon {
-  font-size: 2.2rem;
-  color: #a8803e;
-  line-height: 1;
-  text-shadow: 0 0 20px rgba(168,128,62,.4);
+  display: flex;
+  align-items: center;
+  filter: drop-shadow(0 0 12px rgba(212,169,96,.4));
 }
 .login-logo-text {
   font-size: 2rem;

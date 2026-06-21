@@ -7,6 +7,10 @@
    28. ASESOR IA — MULTI-PROVEEDOR
 ═══════════════════════════════════════════════════════════════ */
 
+var SERVER_URL = window.location.hostname === 'localhost'
+  ? 'http://localhost:3000'
+  : 'https://net-production-651a.up.railway.app';
+
 let aiHistory = [];
 const AI_MAX_HISTORY = 10; // últimos 5 turnos de conversación enviados a la API
 
@@ -21,7 +25,7 @@ async function initServerAI() {
   if (_serverAI !== null) return;
   _serverAI = false;
   try {
-    const res = await fetch('/api/ai-status', { signal: AbortSignal.timeout(3000) });
+    const res = await fetch(`${SERVER_URL}/api/ai-status`, { signal: AbortSignal.timeout(3000) });
     if (res.ok) {
       const data = await res.json();
       _serverAI = !!data.serverAI;
@@ -315,7 +319,7 @@ function _aiLocalFallback(question) {
 }
 
 async function callViaProxy(provider, apiKey, systemPrompt) {
-  const res = await fetch('/api/ai', {
+  const res = await fetch(`${SERVER_URL}/api/ai`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ provider, apiKey, messages: aiHistory.slice(-AI_MAX_HISTORY), systemPrompt }),

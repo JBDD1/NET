@@ -5,11 +5,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "generate-icons": "node scripts/generate-icons.js",
     "dev":      "vite",
     "build":    "vite build",
     "build:gh": "cross-env VITE_BASE=/FinovaKimi/ vite build",
     "preview":  "vite preview",
-    "start":    "node server.js",
+    "start":    "node server.cjs",
     "test":     "node --experimental-vm-modules node_modules/.bin/jest"
   },
   "devDependencies": {

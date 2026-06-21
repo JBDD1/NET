@@ -9,6 +9,7 @@ const ROOT = __dirname;
 const SYNC_DIR       = path.join(ROOT, 'data', 'sync');
 const USERS_DIR      = path.join(ROOT, 'data', 'users');
 const ANALYTICS_FILE = path.join(ROOT, 'data', 'analytics.json');
+const WAITLIST_FILE  = path.join(ROOT, 'data', 'waitlist.json');
 if (!fs.existsSync(SYNC_DIR))  fs.mkdirSync(SYNC_DIR,  { recursive: true });
 if (!fs.existsSync(USERS_DIR)) fs.mkdirSync(USERS_DIR, { recursive: true });
 
@@ -933,6 +934,50 @@ function handleStats(req, res) {
   }
 }
 
+/* ─── Waitlist early adopters ────────────────────────────────── */
+const _EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+function handleWaitlist(req, res) {
+  const ip = (req.socket?.remoteAddress || 'unknown').replace(/^::ffff:/, '');
+  if (!_rateOk('/api/waitlist', ip, 5)) {
+    res.writeHead(429, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'Demasiadas peticiones. Inténtalo más tarde.' }));
+  }
+  let body = '';
+  req.on('data', d => { body += d; if (body.length > 2000) body = '\x00OVERSIZE'; });
+  req.on('end', () => {
+    if (body.startsWith('\x00')) {
+      res.writeHead(400, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'Petición demasiado grande.' }));
+    }
+    let email;
+    try { ({ email } = JSON.parse(body)); } catch {
+      res.writeHead(400, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'JSON inválido.' }));
+    }
+    if (!email || typeof email !== 'string') {
+      res.writeHead(400, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'Email requerido.' }));
+    }
+    email = email.trim().toLowerCase().slice(0, 254);
+    if (!_EMAIL_RE.test(email)) {
+      res.writeHead(400, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'Email no válido.' }));
+    }
+    let list = [];
+    try { list = JSON.parse(fs.readFileSync(WAITLIST_FILE, 'utf8')); } catch {}
+    if (!Array.isArray(list)) list = [];
+    if (list.some(e => e.email === email)) {
+      res.writeHead(200, _apiHeaders(req));
+      return res.end(JSON.stringify({ ok: true, already: true, message: 'Ya estás en la lista. ¡Te avisamos!' }));
+    }
+    list.push({ email, date: new Date().toISOString(), ip });
+    try {
+      fs.writeFileSync(WAITLIST_FILE, JSON.stringify(list, null, 2));
+    } catch (err) {
+      res.writeHead(500, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'Error al guardar. Inténtalo de nuevo.' }));
+    }
+    res.writeHead(200, _apiHeaders(req));
+    res.end(JSON.stringify({ ok: true, message: '¡Apuntado! Te avisamos cuando llegue el plan Premium.' }));
+  });
+}
+
 /* ─── Sync backup ────────────────────────────────────────────── */
 const _SYNC_CODE_RE   = /^[a-f0-9]{8,16}$/;
 const _SYNC_MAX_BYTES = 8_000_000;
@@ -1241,6 +1286,9 @@ http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/api/stats') {
     return handleStats(req, res);
   }
+
+  // Waitlist early adopters
+  if (req.method === 'POST' && req.url === '/api/waitlist') return handleWaitlist(req, res);
 
   // Sync backup
   if (req.method === 'POST' && req.url === '/api/sync-upload') {
