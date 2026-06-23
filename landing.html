@@ -175,6 +175,11 @@ button { font-family: var(--font-sans); }
 @keyframes cta-ambient   { 0%,100%{opacity:.4} 50%{opacity:.85} }
 @keyframes h2-line-grow  { from{width:0} to{width:48px} }
 @keyframes trust-bob     { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+@keyframes sparkle-out   { 0%{opacity:1;transform:translate(-50%,-50%) translate(0,0) scale(1)} 100%{opacity:0;transform:translate(-50%,-50%) translate(var(--sdx),var(--sdy)) scale(0)} }
+@keyframes beam-sweep    { 0%{transform:translateX(-100%) rotate(25deg)} 100%{transform:translateX(300%) rotate(25deg)} }
+@keyframes grid-pan      { from{background-position:0 0} to{background-position:60px 60px} }
+@keyframes feat-border   { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+@keyframes aurora-shift  { 0%{transform:translate(0,0) scale(1) rotate(0deg)} 33%{transform:translate(40px,-30px) scale(1.1) rotate(5deg)} 66%{transform:translate(-20px,20px) scale(.95) rotate(-3deg)} 100%{transform:translate(0,0) scale(1) rotate(0deg)} }
 
 /* ── Animated em gradient in headlines ──────────────────────── */
 .lp-h2 em, .lp-headline em {
@@ -303,6 +308,79 @@ button { font-family: var(--font-sans); }
 .lp-trust-card:nth-child(6) { animation: trust-bob 5s ease-in-out infinite 2.0s; }
 /* pause bob while tilting so they don't fight */
 .lp-trust-card:hover { animation: none !important; }
+
+/* ── Click sparkle particles ────────────────────────────────── */
+.lp-sparkle {
+  position:fixed; pointer-events:none; z-index:9999;
+  width:var(--sr,4px); height:var(--sr,4px); border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 6px 2px color-mix(in srgb,var(--accent) 60%,transparent);
+  transform:translate(-50%,-50%);
+  animation:sparkle-out .65s cubic-bezier(.2,0,.6,1) forwards;
+}
+
+/* ── Hero grid background ────────────────────────────────────── */
+.lp-hero::before {
+  content:'';
+  position:absolute; inset:0; z-index:0; pointer-events:none;
+  background-image:
+    linear-gradient(color-mix(in srgb,var(--accent) 4%,transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb,var(--accent) 4%,transparent) 1px, transparent 1px);
+  background-size:60px 60px;
+  animation:grid-pan 8s linear infinite;
+  mask-image:radial-gradient(ellipse 80% 60% at 50% 30%, black 0%, transparent 100%);
+  -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 30%, black 0%, transparent 100%);
+}
+
+/* ── Aurora blobs behind hero ───────────────────────────────── */
+.lp-orb--1 {
+  background:radial-gradient(circle, color-mix(in srgb,var(--accent) 15%,transparent), transparent 70%) !important;
+  animation:aurora-shift 14s ease-in-out infinite, orb-pulse 5s ease-in-out infinite !important;
+}
+.lp-orb--2 {
+  background:radial-gradient(circle, color-mix(in srgb,var(--accent) 10%,transparent), transparent 70%) !important;
+  animation:aurora-shift 18s ease-in-out infinite reverse, orb-pulse 7s ease-in-out 2s infinite !important;
+}
+.lp-orb--3 {
+  background:radial-gradient(circle, color-mix(in srgb,var(--accent) 8%,transparent), transparent 70%) !important;
+  animation:aurora-shift 11s ease-in-out infinite 1s, orb-pulse 4s ease-in-out 1s infinite !important;
+}
+
+/* ── Feature card animated gradient border on hover ─────────── */
+.lp-feat {
+  border:1px solid var(--border-subtle);
+  background-clip:padding-box;
+  transition:border-color .3s, box-shadow .3s, transform .25s;
+}
+.lp-feat:hover {
+  border-color:transparent;
+  box-shadow:0 0 0 1.5px var(--accent),
+             0 20px 60px color-mix(in srgb,var(--accent) 12%,transparent),
+             0 4px 20px color-mix(in srgb,#000 30%,transparent);
+}
+
+/* ── Section ambient light beam ─────────────────────────────── */
+.lp-section:nth-child(odd)::before {
+  content:'';
+  position:absolute; top:0; left:-10%; width:120%; height:1px;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent) 25%,transparent),transparent);
+  pointer-events:none;
+}
+
+/* ── Nobank pill glow ───────────────────────────────────────── */
+.lp-nobank-pill {
+  position:relative; overflow:hidden;
+}
+.lp-nobank-pill::after {
+  content:'';
+  position:absolute; inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);
+  transform:translateX(-100%);
+  animation:beam-sweep 3s ease-in-out infinite 2s;
+}
+
+/* ── Hero content above pseudo-element ──────────────────────── */
+.lp-hero-grid { position:relative; z-index:1; }
 
 /* ══ SCROLL PROGRESS ════════════════════════════════════════════ */
 #scrollLine {

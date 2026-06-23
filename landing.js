@@ -42,6 +42,7 @@ let _lpMode = 'signin';
   _initTiltCards();
   _initMagneticBtns();
   _initParticles();
+  _initSparkles();
   _initTextSplit();
 
   // Safety: reveal all still-hidden elements after 1.5 s
@@ -468,7 +469,9 @@ function _initParticles() {
     document.body.prepend(canvas);
   }
   const ctx = canvas.getContext('2d');
-  const NUM = 55;
+  const NUM = 75;
+  const LINK_DIST = 140;
+  let mouseX = -9999, mouseY = -9999;
 
   function resize() {
     canvas.width  = window.innerWidth;
@@ -476,37 +479,119 @@ function _initParticles() {
   }
   resize();
   window.addEventListener('resize', resize, { passive: true });
+  document.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; }, { passive: true });
 
   const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#d4a960';
 
   const particles = Array.from({ length: NUM }, () => ({
-    x:  Math.random() * window.innerWidth,
-    y:  Math.random() * window.innerHeight,
-    r:  Math.random() * 1.5 + 0.4,
-    vx: (Math.random() - 0.5) * 0.25,
-    vy: (Math.random() - 0.5) * 0.25,
-    a:  Math.random() * 0.35 + 0.05,
+    x:   Math.random() * window.innerWidth,
+    y:   Math.random() * window.innerHeight,
+    r:   Math.random() * 1.8 + 0.3,
+    vx:  (Math.random() - 0.5) * 0.28,
+    vy:  (Math.random() - 0.5) * 0.28,
+    a:   Math.random() * 0.45 + 0.08,
+    ta:  Math.random() * 0.45 + 0.08,
+    ts:  Math.random() * 0.008 + 0.003,
   }));
 
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Update particles
     particles.forEach(p => {
+      // Twinkle
+      if (Math.abs(p.a - p.ta) < 0.015) p.ta = Math.random() * 0.45 + 0.06;
+      p.a += (p.ta - p.a) * p.ts;
+
+      // Mouse repulsion
+      const mdx = p.x - mouseX;
+      const mdy = p.y - mouseY;
+      const md  = Math.sqrt(mdx * mdx + mdy * mdy);
+      if (md < 100 && md > 0) {
+        const f = ((100 - md) / 100) * 0.6;
+        p.vx += (mdx / md) * f;
+        p.vy += (mdy / md) * f;
+      }
+
+      // Damping
+      p.vx *= 0.97;
+      p.vy *= 0.97;
+
       p.x += p.vx;
       p.y += p.vy;
-      if (p.x < 0) p.x = canvas.width;
-      if (p.x > canvas.width)  p.x = 0;
-      if (p.y < 0) p.y = canvas.height;
-      if (p.y > canvas.height) p.y = 0;
+      if (p.x < -10) p.x = canvas.width + 10;
+      if (p.x > canvas.width + 10)  p.x = -10;
+      if (p.y < -10) p.y = canvas.height + 10;
+      if (p.y > canvas.height + 10) p.y = -10;
+    });
+
+    // Draw constellation lines
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const d  = Math.sqrt(dx * dx + dy * dy);
+        if (d < LINK_DIST) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = accent;
+          ctx.globalAlpha = (1 - d / LINK_DIST) * 0.14;
+          ctx.lineWidth   = 0.6;
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw particles
+    particles.forEach(p => {
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = accent;
+      ctx.fillStyle   = accent;
       ctx.globalAlpha = p.a;
       ctx.fill();
+      // Soft glow on larger particles
+      if (p.r > 1.2) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 3, 0, Math.PI * 2);
+        ctx.fillStyle   = accent;
+        ctx.globalAlpha = p.a * 0.08;
+        ctx.fill();
+      }
     });
     ctx.globalAlpha = 1;
     requestAnimationFrame(draw);
   }
   draw();
+}
+
+/* ── Click sparkle burst ──────────────────────────────────────── */
+function _initSparkles() {
+  document.addEventListener('click', e => {
+    if (e.target.closest('button, a, input, textarea, select, label')) return;
+    _burst(e.clientX, e.clientY, 10);
+  });
+
+  document.querySelectorAll('.btn-cta, .lp-btn-primary').forEach(btn => {
+    btn.addEventListener('click', e => {
+      _burst(e.clientX, e.clientY, 16);
+    });
+  });
+}
+
+function _burst(cx, cy, count) {
+  for (let i = 0; i < count; i++) {
+    const s  = document.createElement('div');
+    const angle = (i / count) * Math.PI * 2;
+    const dist  = 28 + Math.random() * 44;
+    s.className = 'lp-sparkle';
+    s.style.cssText = `left:${cx}px;top:${cy}px;`
+      + `--sdx:${Math.cos(angle) * dist}px;--sdy:${Math.sin(angle) * dist}px;`
+      + `--sr:${Math.random() * 3 + 2}px;`
+      + `animation-delay:${i * 0.028}s;animation-duration:${0.5 + Math.random() * 0.3}s`;
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 900);
+  }
 }
 
 /* ── Split headline text into staggered chars ─────────────────── */
