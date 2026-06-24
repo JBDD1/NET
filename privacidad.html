@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="es" data-variant="obsidian-brass" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidad — Finova</title>
+  <meta name="description" content="Política de privacidad de Finova. Tus datos financieros se almacenan en tu dispositivo, no en nuestros servidores." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preload" as="style"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap"
+    onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" /></noscript>
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <meta name="theme-color" content="#d4a960" />
+  <meta name="robots" content="index, follow" />
+<style>
+/* ══ DESIGN TOKENS — 5 themes ═══════════════════════════════════ */
+:root {
+  --r-sm:8px; --r-md:12px; --r-lg:16px;
+  --font-serif:'Playfair Display',Georgia,serif;
+  --font-sans:'Inter',system-ui,sans-serif;
+}
+:root,
+:root[data-variant="obsidian-brass"],
+:root[data-variant="obsidian-brass"][data-theme="light"] {
+  --bg-base:#f4efe6; --bg-surface:#fffdf8; --bg-elevated:#ede6d7; --bg-hover:#ebe3d1;
+  --border-faint:rgba(40,32,20,.07); --border-subtle:rgba(40,32,20,.13); --border-default:rgba(40,32,20,.20);
+  --text-primary:#15110c; --text-secondary:#6a604f; --text-muted:#a89c85;
+  --accent:#a8803e; --accent-soft:rgba(168,128,62,.12); --accent-dark:#8a6630; --accent-ink:#fffdf8;
+  --shadow-md:0 4px 16px rgba(21,17,12,.10); --shadow-lg:0 18px 48px rgba(21,17,12,.18);
+}
+:root[data-theme="dark"],
+:root[data-variant="obsidian-brass"][data-theme="dark"] {
+  --bg-base:#0d0c0a; --bg-surface:#171410; --bg-elevated:#1f1b15; --bg-hover:#28231b;
+  --border-faint:rgba(212,176,120,.06); --border-subtle:rgba(212,176,120,.13); --border-default:rgba(212,176,120,.20);
+  --text-primary:#ece2cb; --text-secondary:#968a72; --text-muted:#5a5246;
+  --accent:#d4a960; --accent-soft:rgba(212,169,96,.12); --accent-dark:#b88e48; --accent-ink:#15110c;
+  --shadow-md:0 6px 20px rgba(0,0,0,.50); --shadow-lg:0 22px 56px rgba(0,0,0,.65);
+}
+:root[data-variant="linen-editorial"] {
+  --bg-base:#ebe5d6; --bg-surface:#f6f1e3; --bg-elevated:#e4dec8; --bg-hover:#ddd6bc;
+  --border-faint:rgba(28,24,20,.08); --border-subtle:rgba(28,24,20,.14); --border-default:rgba(28,24,20,.22);
+  --text-primary:#1c1814; --text-secondary:#5e574a; --text-muted:#9c9380;
+  --accent:#7a2b2b; --accent-soft:rgba(122,43,43,.10); --accent-dark:#5e2020; --accent-ink:#f6f1e3;
+  --shadow-md:0 4px 16px rgba(28,24,20,.12); --shadow-lg:0 18px 48px rgba(28,24,20,.18);
+}
+:root[data-variant="linen-editorial"][data-theme="dark"] {
+  --bg-base:#14110d; --bg-surface:#1e1a14; --bg-elevated:#25201a; --bg-hover:#2e2820;
+  --border-faint:rgba(220,200,160,.06); --border-subtle:rgba(220,200,160,.13); --border-default:rgba(220,200,160,.20);
+  --text-primary:#ebe5d6; --text-secondary:#948c7e; --text-muted:#5a5246;
+  --accent:#c75555; --accent-soft:rgba(199,85,85,.14); --accent-dark:#a83e3e; --accent-ink:#14110d;
+  --shadow-md:0 6px 20px rgba(0,0,0,.50); --shadow-lg:0 22px 56px rgba(0,0,0,.65);
+}
+:root[data-variant="midnight-emerald"] {
+  --bg-base:#ede8db; --bg-surface:#f8f4e8; --bg-elevated:#e3dcc6; --bg-hover:#d8d0b6;
+  --border-faint:rgba(13,38,32,.07); --border-subtle:rgba(13,38,32,.14); --border-default:rgba(13,38,32,.22);
+  --text-primary:#0d2620; --text-secondary:#4d6660; --text-muted:#8a9c95;
+  --accent:#b8924a; --accent-soft:rgba(184,146,74,.12); --accent-dark:#97743a; --accent-ink:#0c1f1a;
+  --shadow-md:0 4px 16px rgba(12,31,26,.12); --shadow-lg:0 18px 48px rgba(12,31,26,.18);
+}
+:root[data-variant="midnight-emerald"][data-theme="dark"] {
+  --bg-base:#08130f; --bg-surface:#0e1f1a; --bg-elevated:#142a23; --bg-hover:#1b342c;
+  --border-faint:rgba(220,200,160,.06); --border-subtle:rgba(220,200,160,.13); --border-default:rgba(220,200,160,.20);
+  --text-primary:#e6dcc5; --text-secondary:#859289; --text-muted:#4d6660;
+  --accent:#d4b878; --accent-soft:rgba(212,184,120,.14); --accent-dark:#b89a5a; --accent-ink:#08130f;
+  --shadow-md:0 6px 20px rgba(0,0,0,.50); --shadow-lg:0 22px 56px rgba(0,0,0,.65);
+}
+:root[data-variant="soft-mono"] {
+  --bg-base:#f3f3f0; --bg-surface:#ffffff; --bg-elevated:#e8e8e4; --bg-hover:#dddddc;
+  --border-faint:rgba(10,10,10,.07); --border-subtle:rgba(10,10,10,.13); --border-default:rgba(10,10,10,.24);
+  --text-primary:#0a0a0a; --text-secondary:#5a5a58; --text-muted:#a4a4a0;
+  --accent:#ff5530; --accent-soft:rgba(255,85,48,.10); --accent-dark:#e44520; --accent-ink:#ffffff;
+  --shadow-md:0 4px 16px rgba(0,0,0,.08); --shadow-lg:0 18px 48px rgba(0,0,0,.16);
+}
+:root[data-variant="soft-mono"][data-theme="dark"] {
+  --bg-base:#070707; --bg-surface:#121212; --bg-elevated:#1c1c1c; --bg-hover:#262626;
+  --border-faint:rgba(255,255,255,.07); --border-subtle:rgba(255,255,255,.13); --border-default:rgba(255,255,255,.22);
+  --text-primary:#f3f3f0; --text-secondary:#8a8a86; --text-muted:#525250;
+  --accent:#ff6a45; --accent-soft:rgba(255,106,69,.14); --accent-dark:#e0532f; --accent-ink:#070707;
+  --shadow-md:0 6px 20px rgba(0,0,0,.55); --shadow-lg:0 22px 56px rgba(0,0,0,.70);
+}
+:root[data-variant="terracotta-warmth"] {
+  --bg-base:#efe7d8; --bg-surface:#f9f3e6; --bg-elevated:#e6dcc8; --bg-hover:#ddd1ba;
+  --border-faint:rgba(36,26,19,.07); --border-subtle:rgba(36,26,19,.14); --border-default:rgba(36,26,19,.22);
+  --text-primary:#241a13; --text-secondary:#6a5849; --text-muted:#a89580;
+  --accent:#b8593a; --accent-soft:rgba(184,89,58,.12); --accent-dark:#94432a; --accent-ink:#f9f3e6;
+  --shadow-md:0 4px 16px rgba(36,25,19,.12); --shadow-lg:0 18px 48px rgba(36,25,19,.18);
+}
+:root[data-variant="terracotta-warmth"][data-theme="dark"] {
+  --bg-base:#120d09; --bg-surface:#1c1510; --bg-elevated:#261d16; --bg-hover:#30241c;
+  --border-faint:rgba(220,190,150,.06); --border-subtle:rgba(220,190,150,.13); --border-default:rgba(220,190,150,.20);
+  --text-primary:#efe7d8; --text-secondary:#9a8a78; --text-muted:#5a4e44;
+  --accent:#d47a55; --accent-soft:rgba(212,122,85,.14); --accent-dark:#b85f3a; --accent-ink:#120d09;
+  --shadow-md:0 6px 20px rgba(0,0,0,.55); --shadow-lg:0 22px 56px rgba(0,0,0,.70);
+}
+
+/* ══ BASE ════════════════════════════════════════════════════════ */
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body {
+  font-family:var(--font-sans);
+  background:var(--bg-base);
+  color:var(--text-primary);
+  line-height:1.6;
+  min-height:100vh;
+  display:flex; flex-direction:column;
+  transition:background .3s, color .3s;
+}
+
+/* ══ HEADER ══════════════════════════════════════════════════════ */
+.lp-header {
+  position:sticky; top:0; z-index:100;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px clamp(20px,5vw,60px);
+  background:var(--bg-base);
+  border-bottom:1px solid var(--border-faint);
+  transition:background .3s, box-shadow .3s;
+}
+.lp-logo { display:flex; align-items:center; gap:9px; text-decoration:none; }
+.lp-logo-icon {
+  display:flex; align-items:center; justify-content:center;
+  width:40px; height:40px; flex-shrink:0;
+  border-radius:10px; overflow:hidden;
+  transition:transform .3s, box-shadow .3s;
+  position:relative;
+}
+.lp-logo-icon::after {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.22) 50%,transparent 70%);
+  transform:translateX(-150%) skewX(-20deg); pointer-events:none;
+}
+.lp-logo:hover .lp-logo-icon::after { animation:logo-shimmer .6s ease forwards; }
+.lp-logo:hover .lp-logo-icon { box-shadow:0 0 20px color-mix(in srgb,var(--accent) 35%,transparent); }
+@keyframes logo-shimmer { 0%{transform:translateX(-150%) skewX(-20deg)} 100%{transform:translateX(300%) skewX(-20deg)} }
+.lp-logo-text { font-family:var(--font-serif); font-size:18px; font-weight:600; color:var(--text-primary); }
+.doc-back {
+  font-size:13px; color:var(--text-secondary); text-decoration:none;
+  display:flex; align-items:center; gap:5px;
+  transition:color .15s;
+}
+.doc-back:hover { color:var(--accent); }
+
+/* ══ PAGE HERO ═══════════════════════════════════════════════════ */
+.doc-hero {
+  background:var(--bg-surface);
+  border-bottom:1px solid var(--border-subtle);
+  padding:56px clamp(20px,8vw,120px) 48px;
+  position:relative; overflow:hidden;
+}
+.doc-hero::before {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(ellipse 60% 100% at 80% 50%, color-mix(in srgb,var(--accent) 6%,transparent) 0%, transparent 70%);
+}
+.doc-hero-inner { max-width:800px; position:relative; }
+.doc-breadcrumb {
+  display:flex; align-items:center; gap:6px;
+  font-size:12px; color:var(--text-muted); margin-bottom:20px;
+}
+.doc-breadcrumb a { color:var(--text-muted); text-decoration:none; transition:color .15s; }
+.doc-breadcrumb a:hover { color:var(--accent); }
+.doc-breadcrumb-sep { opacity:.4; }
+.doc-tag {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--accent); background:var(--accent-soft);
+  border:1px solid color-mix(in srgb,var(--accent) 25%,transparent);
+  border-radius:100px; padding:4px 12px; margin-bottom:16px;
+}
+.doc-hero h1 {
+  font-family:var(--font-serif); font-size:clamp(28px,4vw,42px);
+  font-weight:600; line-height:1.2; color:var(--text-primary);
+  margin-bottom:14px;
+}
+.doc-hero p {
+  font-size:15px; color:var(--text-secondary); max-width:560px; line-height:1.7;
+}
+.doc-meta {
+  display:flex; align-items:center; gap:16px; margin-top:20px;
+  font-size:12px; color:var(--text-muted);
+}
+.doc-meta-dot { width:4px; height:4px; border-radius:50%; background:var(--border-default); }
+
+/* ══ LAYOUT ══════════════════════════════════════════════════════ */
+.doc-layout {
+  flex:1;
+  display:grid;
+  grid-template-columns:240px 1fr;
+  gap:0;
+  max-width:1100px;
+  margin:0 auto;
+  padding:0 clamp(16px,4vw,60px);
+  width:100%;
+  align-items:start;
+}
+
+/* ══ TOC SIDEBAR ═════════════════════════════════════════════════ */
+.doc-toc {
+  position:sticky; top:80px;
+  padding:32px 0 32px 0;
+  border-right:1px solid var(--border-faint);
+  margin-right:40px;
+}
+.doc-toc-title {
+  font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--text-muted); margin-bottom:12px;
+}
+.doc-toc a {
+  display:block; font-size:13px; color:var(--text-secondary);
+  text-decoration:none; padding:5px 0;
+  border-left:2px solid transparent;
+  padding-left:12px; margin-left:-12px;
+  transition:color .15s, border-color .15s;
+  line-height:1.4;
+}
+.doc-toc a:hover { color:var(--accent); border-left-color:var(--accent); }
+
+/* ══ CONTENT ═════════════════════════════════════════════════════ */
+.doc-content {
+  padding:40px 0 80px;
+  max-width:700px;
+}
+.doc-section {
+  margin-bottom:40px;
+  padding:28px 32px;
+  background:var(--bg-surface);
+  border:1px solid var(--border-subtle);
+  border-radius:var(--r-lg);
+  transition:border-color .2s, box-shadow .2s;
+}
+.doc-section:hover {
+  border-color:color-mix(in srgb,var(--accent) 25%,transparent);
+  box-shadow:0 4px 24px color-mix(in srgb,var(--accent) 6%,transparent);
+}
+.doc-section h2 {
+  font-family:var(--font-serif); font-size:19px; font-weight:600;
+  color:var(--text-primary); margin-bottom:16px;
+  display:flex; align-items:center; gap:10px;
+}
+.doc-section-num {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:26px; height:26px; border-radius:6px; flex-shrink:0;
+  background:var(--accent-soft); color:var(--accent);
+  font-family:var(--font-sans); font-size:12px; font-weight:700;
+}
+.doc-section h3 {
+  font-size:14px; font-weight:600; color:var(--text-primary);
+  margin:20px 0 8px;
+}
+.doc-section p {
+  font-size:14.5px; color:var(--text-secondary); line-height:1.8;
+  margin-bottom:12px;
+}
+.doc-section p:last-child { margin-bottom:0; }
+.doc-section ul, .doc-section ol {
+  padding-left:18px; margin-bottom:12px;
+}
+.doc-section li {
+  font-size:14.5px; color:var(--text-secondary); line-height:1.8;
+  margin-bottom:4px;
+}
+.doc-section strong { color:var(--text-primary); font-weight:600; }
+.doc-section a { color:var(--accent); text-decoration:none; }
+.doc-section a:hover { text-decoration:underline; }
+
+.doc-highlight {
+  background:var(--accent-soft);
+  border:1px solid color-mix(in srgb,var(--accent) 20%,transparent);
+  border-radius:var(--r-md); padding:14px 18px; margin:16px 0;
+}
+.doc-highlight p { color:var(--text-primary) !important; font-size:14px !important; margin:0 !important; }
+
+/* ══ FOOTER ══════════════════════════════════════════════════════ */
+.lp-footer {
+  border-top:1px solid var(--border-subtle);
+  background:var(--bg-surface);
+  padding:28px clamp(20px,5vw,60px);
+}
+.lp-footer-inner {
+  max-width:1100px; margin:0 auto;
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:16px;
+}
+.lp-footer-logo { display:flex; align-items:center; gap:8px; }
+.lp-footer-links { display:flex; gap:20px; flex-wrap:wrap; }
+.lp-footer-links a { font-size:12px; color:var(--text-muted); text-decoration:none; transition:color .15s; }
+.lp-footer-links a:hover { color:var(--accent); }
+.lp-footer-copy { font-size:12px; color:var(--text-muted); }
+
+/* ══ RESPONSIVE ══════════════════════════════════════════════════ */
+@media (max-width:768px) {
+  .doc-layout { grid-template-columns:1fr; }
+  .doc-toc { display:none; }
+  .doc-content { padding:24px 0 60px; }
+  .doc-section { padding:20px 18px; }
+  .doc-hero { padding:40px 20px 36px; }
+  .lp-footer-inner { flex-direction:column; align-items:flex-start; }
+}
+</style>
+</head>
+<body>
+<script>
+try {
+  const lu = localStorage.getItem('finova_last_uid');
+  const bk = lu ? ('finova_' + lu + '_data_v1') : 'finova_data_v1';
+  const d  = JSON.parse(localStorage.getItem(bk) || localStorage.getItem('finova_data_v1') || '{}');
+  if (d.variant) document.documentElement.setAttribute('data-variant', d.variant);
+  if (d.theme)   document.documentElement.setAttribute('data-theme',   d.theme);
+} catch(_) {}
+</script>
+
+<!-- HEADER -->
+<header class="lp-header">
+  <a href="landing.html" class="lp-logo">
+    <span class="lp-logo-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="40" height="40" style="border-radius:10px;display:block"><defs><linearGradient id="bg-p" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1f1b17"/><stop offset="100%" stop-color="#0d0b09"/></linearGradient><linearGradient id="gld-p" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f2cc80"/><stop offset="100%" stop-color="#b8831e"/></linearGradient></defs><rect width="512" height="512" rx="108" fill="url(#bg-p)"/><rect x="4" y="4" width="504" height="504" rx="106" fill="none" stroke="#d4a960" stroke-width="5" opacity=".25"/><rect x="76" y="70" width="74" height="364" rx="14" fill="url(#gld-p)"/><rect x="76" y="70" width="272" height="74" rx="14" fill="url(#gld-p)"/><rect x="76" y="213" width="204" height="66" rx="14" fill="url(#gld-p)"/><rect x="296" y="316" width="158" height="134" rx="18" fill="none" stroke="url(#gld-p)" stroke-width="13"/><rect x="324" y="292" width="14" height="26" rx="6" fill="url(#gld-p)"/><rect x="354" y="292" width="14" height="26" rx="6" fill="url(#gld-p)"/><rect x="384" y="292" width="14" height="26" rx="6" fill="url(#gld-p)"/><rect x="310" y="334" width="54" height="46" rx="9" fill="url(#gld-p)"/><rect x="376" y="334" width="54" height="46" rx="9" fill="url(#gld-p)"/><rect x="310" y="390" width="54" height="46" rx="9" fill="url(#gld-p)"/><rect x="376" y="390" width="54" height="46" rx="9" fill="url(#gld-p)"/></svg></span>
+    <span class="lp-logo-text">Finova</span>
+  </a>
+  <a href="landing.html" class="doc-back">← Volver a inicio</a>
+</header>
+
+<!-- PAGE HERO -->
+<div class="doc-hero">
+  <div class="doc-hero-inner">
+    <div class="doc-breadcrumb">
+      <a href="landing.html">Finova</a>
+      <span class="doc-breadcrumb-sep">›</span>
+      <span>Política de Privacidad</span>
+    </div>
+    <div class="doc-tag">🔒 Privacidad</div>
+    <h1>Política de Privacidad</h1>
+    <p>Tus datos financieros se almacenan en tu dispositivo. Esta política explica con total transparencia qué datos tratamos, cómo y por qué.</p>
+    <div class="doc-meta">
+      <span>Última actualización: 31 de mayo de 2026</span>
+      <span class="doc-meta-dot"></span>
+      <span>9 secciones</span>
+      <span class="doc-meta-dot"></span>
+      <a href="mailto:MyFinova1@gmail.com" style="color:var(--accent);text-decoration:none;">MyFinova1@gmail.com</a>
+    </div>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="doc-layout">
+
+  <!-- TOC -->
+  <nav class="doc-toc" aria-label="Índice">
+    <div class="doc-toc-title">En esta página</div>
+    <a href="#s1">1. Quiénes somos</a>
+    <a href="#s2">2. Qué datos tratamos</a>
+    <a href="#s3">3. Con quién compartimos datos</a>
+    <a href="#s4">4. Tus claves de API</a>
+    <a href="#s5">5. Seguridad</a>
+    <a href="#s6">6. Tus derechos</a>
+    <a href="#s7">7. Menores de edad</a>
+    <a href="#s8">8. Cambios en esta política</a>
+    <a href="#s9">9. Normativa aplicable</a>
+  </nav>
+
+  <!-- CONTENT -->
+  <main class="doc-content">
+
+    <div class="doc-section" id="s1">
+      <h2><span class="doc-section-num">1</span>Quiénes somos</h2>
+      <p>Finova ("la aplicación", "nosotros") es una aplicación web de gestión financiera personal que permite a los usuarios registrar transacciones, gestionar carteras de inversión, calcular su patrimonio neto y obtener orientación fiscal estimada sobre el IRPF español.</p>
+      <p>Si tienes cualquier duda sobre esta política o sobre el tratamiento de tus datos, puedes escribirnos a: <a href="mailto:MyFinova1@gmail.com"><strong>MyFinova1@gmail.com</strong></a></p>
+    </div>
+
+    <div class="doc-section" id="s2">
+      <h2><span class="doc-section-num">2</span>Qué datos tratamos</h2>
+
+      <h3>2.1 Datos almacenados únicamente en tu dispositivo</h3>
+      <p>La inmensa mayoría de la información que introduces en Finova —transacciones, categorías de gasto, posiciones de tu cartera de inversión, watchlist, dividendos, patrimonio neto, activos alternativos, objetivos financieros, datos fiscales y registros de Bizum— se guarda <strong>exclusivamente en el almacenamiento local de tu navegador (localStorage)</strong>.</p>
+      <div class="doc-highlight">
+        <p>🔒 Esta información <strong>nunca se envía ni se almacena en ningún servidor nuestro</strong>. Solo tú tienes acceso a estos datos desde el dispositivo y navegador donde los introduces.</p>
+      </div>
+      <ul>
+        <li>Si borras los datos del navegador, formateas el dispositivo, o usas otro navegador, esa información se pierde y no podemos recuperarla.</li>
+        <li>Te recomendamos usar la función de copia de seguridad (exportar backup) que ofrece la aplicación para conservar tus datos.</li>
+      </ul>
+
+      <h3>2.2 Datos que sí pasan por nuestro servidor</h3>
+      <p>Cuando utilizas el <strong>Asesor IA</strong>, el mensaje que escribes junto con un contexto resumido de tu situación financiera se envía a través de nuestro servidor hacia el proveedor de inteligencia artificial que hayas configurado (Anthropic/Claude, OpenAI, Google/Gemini o Groq).</p>
+      <p>Nuestro servidor actúa únicamente como intermediario técnico:</p>
+      <ul>
+        <li>No almacenamos de forma permanente el contenido de tus conversaciones con la IA.</li>
+        <li>No guardamos tu contexto financiero en ninguna base de datos.</li>
+        <li>Tu clave API se guarda en el almacenamiento local de tu navegador, no en nuestros servidores.</li>
+      </ul>
+      <p>Cuando consultas precios de mercado en tiempo real, tu solicitud pasa igualmente por nuestro servidor como intermediario, sin que almacenemos esa consulta de forma permanente.</p>
+
+      <h3>2.3 Datos técnicos básicos</h3>
+      <p>Nuestro servidor puede registrar de forma temporal información técnica estándar (dirección IP, marca de tiempo) con el único fin de aplicar límites de uso razonables y evitar abusos. Esta información no se cruza con tus datos financieros. Actualmente Finova <strong>no utiliza ningún servicio de analítica de terceros</strong> ni sistemas de seguimiento publicitario.</p>
+    </div>
+
+    <div class="doc-section" id="s3">
+      <h2><span class="doc-section-num">3</span>Con quién compartimos datos</h2>
+      <p>No vendemos, alquilamos ni compartimos tus datos personales o financieros con terceros para fines publicitarios o comerciales.</p>
+      <p>Los únicos terceros que pueden recibir información, y solo cuando tú decides usar esa función, son:</p>
+      <ul>
+        <li><strong>Proveedores de IA</strong> (Anthropic, OpenAI, Google, Groq): reciben tu consulta y contexto financiero resumido únicamente cuando usas el Asesor IA.</li>
+        <li><strong>Proveedores de datos de mercado</strong>: reciben tu solicitud de precio o tipo de cambio únicamente cuando consultas esa información.</li>
+      </ul>
+      <p>Cada uno de estos proveedores tiene su propia política de privacidad, que te recomendamos revisar.</p>
+    </div>
+
+    <div class="doc-section" id="s4">
+      <h2><span class="doc-section-num">4</span>Tus claves de API</h2>
+      <p>Si decides usar el Asesor IA, necesitas introducir tu propia clave API del proveedor que elijas. Esta clave:</p>
+      <ul>
+        <li>Se almacena en el almacenamiento local de tu navegador.</li>
+        <li>Se envía a nuestro servidor únicamente en el momento de cada consulta, para poder reenviarla al proveedor correspondiente.</li>
+        <li>No se guarda de forma permanente en nuestros servidores.</li>
+      </ul>
+      <p>Te recomendamos no compartir tu clave API con nadie y revocarla desde la plataforma del proveedor si sospechas que ha sido comprometida.</p>
+    </div>
+
+    <div class="doc-section" id="s5">
+      <h2><span class="doc-section-num">5</span>Seguridad</h2>
+      <p>Aplicamos medidas razonables para proteger la información que pasa por nuestro servidor, incluyendo el uso de conexiones cifradas (HTTPS).</p>
+      <p>Como la mayoría de tus datos financieros nunca salen de tu dispositivo, la seguridad de esa información depende en gran medida de la seguridad de tu propio navegador y dispositivo. Te recomendamos:</p>
+      <ul>
+        <li>Mantener actualizado tu navegador y sistema operativo.</li>
+        <li>No usar Finova en dispositivos compartidos o públicos sin cerrar la sesión y limpiar los datos después.</li>
+        <li>Hacer copias de seguridad periódicas desde la función de exportar backup.</li>
+      </ul>
+    </div>
+
+    <div class="doc-section" id="s6">
+      <h2><span class="doc-section-num">6</span>Tus derechos</h2>
+      <p>Como la mayor parte de tus datos se almacena únicamente en tu dispositivo, tienes control total y directo sobre ellos en todo momento:</p>
+      <ul>
+        <li><strong>Acceso:</strong> puedes ver toda tu información directamente en la aplicación.</li>
+        <li><strong>Rectificación:</strong> puedes editar o corregir cualquier dato desde la propia interfaz.</li>
+        <li><strong>Supresión:</strong> puedes borrar todos tus datos en cualquier momento desde Ajustes, o simplemente borrando los datos de navegación de tu navegador.</li>
+        <li><strong>Portabilidad:</strong> puedes exportar todos tus datos en formato JSON desde la función de backup, en cualquier momento.</li>
+      </ul>
+      <p>Para consultas sobre los datos que sí pasan por nuestro servidor, contacta en <a href="mailto:MyFinova1@gmail.com">MyFinova1@gmail.com</a>.</p>
+    </div>
+
+    <div class="doc-section" id="s7">
+      <h2><span class="doc-section-num">7</span>Menores de edad</h2>
+      <p>Finova no está dirigida a menores de 18 años y no recopilamos conscientemente datos de menores.</p>
+    </div>
+
+    <div class="doc-section" id="s8">
+      <h2><span class="doc-section-num">8</span>Cambios en esta política</h2>
+      <p>Podemos actualizar esta política de privacidad para reflejar cambios en la aplicación o en la normativa aplicable. Si hacemos cambios significativos, lo indicaremos de forma visible en la aplicación. La fecha de "Última actualización" al principio de este documento siempre refleja la versión más reciente.</p>
+    </div>
+
+    <div class="doc-section" id="s9">
+      <h2><span class="doc-section-num">9</span>Normativa aplicable</h2>
+      <p>Esta política se rige por la normativa española y europea de protección de datos, incluyendo el <strong>Reglamento General de Protección de Datos (RGPD/GDPR)</strong> en lo que resulte aplicable, dado que la mayor parte del tratamiento de datos ocurre localmente en el dispositivo del usuario y no en servidores de Finova.</p>
+      <div class="doc-highlight">
+        <p>📬 <strong>Contacto:</strong> <a href="mailto:MyFinova1@gmail.com">MyFinova1@gmail.com</a></p>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- FOOTER -->
+<footer class="lp-footer">
+  <div class="lp-footer-inner">
+    <div class="lp-footer-logo">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="24" height="24" style="border-radius:6px;display:block"><defs><linearGradient id="bg-fp" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1f1b17"/><stop offset="100%" stop-color="#0d0b09"/></linearGradient><linearGradient id="gld-fp" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f2cc80"/><stop offset="100%" stop-color="#b8831e"/></linearGradient></defs><rect width="512" height="512" rx="108" fill="url(#bg-fp)"/><rect x="76" y="70" width="74" height="364" rx="14" fill="url(#gld-fp)"/><rect x="76" y="70" width="272" height="74" rx="14" fill="url(#gld-fp)"/><rect x="76" y="213" width="204" height="66" rx="14" fill="url(#gld-fp)"/><rect x="296" y="316" width="158" height="134" rx="18" fill="none" stroke="url(#gld-fp)" stroke-width="13"/><rect x="324" y="292" width="14" height="26" rx="6" fill="url(#gld-fp)"/><rect x="354" y="292" width="14" height="26" rx="6" fill="url(#gld-fp)"/><rect x="384" y="292" width="14" height="26" rx="6" fill="url(#gld-fp)"/><rect x="310" y="334" width="54" height="46" rx="9" fill="url(#gld-fp)"/><rect x="376" y="334" width="54" height="46" rx="9" fill="url(#gld-fp)"/><rect x="310" y="390" width="54" height="46" rx="9" fill="url(#gld-fp)"/><rect x="376" y="390" width="54" height="46" rx="9" fill="url(#gld-fp)"/></svg>
+      <span style="font-family:var(--font-serif);font-size:14px;color:var(--text-secondary)">Finova</span>
+    </div>
+    <div class="lp-footer-links">
+      <a href="landing.html">Inicio</a>
+      <a href="privacidad.html" style="color:var(--accent)">Política de privacidad</a>
+      <a href="terminos.html">Términos de uso</a>
+      <a href="mailto:MyFinova1@gmail.com">Contacto</a>
+      <a href="index.html">Ir a la app →</a>
+    </div>
+    <div class="lp-footer-copy">© 2026 Finova</div>
+  </div>
+</footer>
+</body>
+</html>
