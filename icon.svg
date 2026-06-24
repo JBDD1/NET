@@ -1,24 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Background -->
-  <rect width="512" height="512" rx="110" fill="#141210"/>
-
-  <!-- F — vertical bar -->
-  <rect x="72" y="66" width="68" height="362" rx="12" fill="#d4a960"/>
-  <!-- F — top horizontal bar -->
-  <rect x="72" y="66" width="280" height="68" rx="12" fill="#d4a960"/>
-  <!-- F — middle horizontal bar (shorter) -->
-  <rect x="72" y="210" width="210" height="62" rx="12" fill="#d4a960"/>
-
-  <!-- Chip icon (EMV-style "." after the F) -->
-  <!-- Outer border -->
-  <rect x="308" y="326" width="144" height="122" rx="14" fill="none" stroke="#d4a960" stroke-width="8"/>
-  <!-- Top connector pins -->
-  <rect x="336" y="306" width="10" height="22" rx="4" fill="#d4a960"/>
-  <rect x="362" y="306" width="10" height="22" rx="4" fill="#d4a960"/>
-  <rect x="388" y="306" width="10" height="22" rx="4" fill="#d4a960"/>
-  <!-- Internal 2×2 contact grid -->
-  <rect x="322" y="340" width="48" height="42" rx="7" fill="#d4a960"/>
-  <rect x="382" y="340" width="48" height="42" rx="7" fill="#d4a960"/>
-  <rect x="322" y="394" width="48" height="42" rx="7" fill="#d4a960"/>
-  <rect x="382" y="394" width="48" height="42" rx="7" fill="#d4a960"/>
+  <rect width="512" height="512" rx="112" fill="#141210"/>
+  <!-- F — stem -->
+  <rect x="80" y="80" width="56" height="352" rx="14" fill="#d4a960"/>
+  <!-- F — top bar -->
+  <rect x="80" y="80" width="192" height="56" rx="14" fill="#d4a960"/>
+  <!-- F — middle bar -->
+  <rect x="80" y="216" width="136" height="48" rx="14" fill="#d4a960"/>
+  <!-- EMV chip — outer border -->
+  <rect x="284" y="220" width="160" height="216" rx="26" fill="none" stroke="#d4a960" stroke-width="18"/>
+  <!-- EMV chip — 2×3 contact pads -->
+  <rect x="302" y="244" width="52" height="46" rx="10" fill="#d4a960"/>
+  <rect x="374" y="244" width="52" height="46" rx="10" fill="#d4a960"/>
+  <rect x="302" y="304" width="52" height="46" rx="10" fill="#d4a960"/>
+  <rect x="374" y="304" width="52" height="46" rx="10" fill="#d4a960"/>
+  <rect x="302" y="364" width="52" height="46" rx="10" fill="#d4a960"/>
+  <rect x="374" y="364" width="52" height="46" rx="10" fill="#d4a960"/>
 </svg>
