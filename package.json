@@ -13,7 +13,9 @@
     "build:gh":         "cross-env VITE_BASE=/FinovaKimi/ vite build --mode production",
     "preview":          "vite preview",
     "start":            "node server.cjs",
-    "test":             "node --experimental-vm-modules node_modules/.bin/jest"
+    "test":             "node --experimental-vm-modules node_modules/.bin/jest",
+    "release":          "bash scripts/release.sh",
+    "version:patch":    "node -e \"const p=require('./package.json');const v=p.version.split('.').map(Number);v[2]++;require('fs').writeFileSync('package.json',JSON.stringify({...p,version:v.join('.')},null,2)+'\\n')\" && git add package.json && git commit -m \"chore: bump version\" && git tag -a v$(node -p \"require('./package.json').version\") -m 'release' && git push origin --tags && echo 'Tag creado y pusheado'"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0",

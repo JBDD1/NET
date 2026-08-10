@@ -1,0 +1,52 @@
+name: CI — Finova
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Verificar que el build funciona
+        run: npm run build
+
+      - name: Verificar que no hay secrets en el código fuente
+        run: |
+          # Buscar patrones de API keys accidentales en src/
+          if grep -rE "sk-ant-api|sk-proj-|gsk_[a-zA-Z0-9]|AIzaSy[a-zA-Z0-9_-]{30}" src/ \
+               --include="*.js" --include="*.html" 2>/dev/null; then
+            echo "❌ ERROR: Se detectaron posibles API keys en src/"
+            exit 1
+          fi
+          echo "✅ Sin API keys detectadas en src/"
+
+      - name: Verificar que no hay source maps en el build
+        run: |
+          if find dist/ -name "*.map" -type f 2>/dev/null | grep -q .; then
+            echo "❌ ERROR: Se encontraron source maps en dist/"
+            exit 1
+          fi
+          echo "✅ Sin source maps en el build"
+
+      - name: Verificar que no hay service account en el repo
+        run: |
+          if find . -name "*service-account*.json" -not -path "*/node_modules/*" | grep -q .; then
+            echo "❌ ERROR: Se encontró un archivo de service account en el repo"
+            exit 1
+          fi
+          echo "✅ Sin service account files detectados"

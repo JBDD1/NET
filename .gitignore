@@ -1,13 +1,44 @@
+# ── Dependencias ──────────────────────────────────────────────
 node_modules/
-data/
-# .env sin sufijo contiene secretos reales (API keys de servidor, etc.)
+
+# ── Build de Vite ─────────────────────────────────────────────
+dist/
+dist-ssr/
+.vite/
+
+# ── Variables de entorno con secretos ─────────────────────────
+# .env sin sufijo y .env.local contienen secrets reales → nunca al repo
 .env
-# .env.local y .env.*.local son overrides locales con secretos — NO committear
 .env.local
 .env.*.local
-# .env.development y .env.production SÍ se committean (solo contienen Firebase client keys, que son públicas)
+# .env.development y .env.production SÍ se committean
+# (solo contienen Firebase client keys, públicas por diseño)
+
+# ── Datos de usuarios (Railway los tiene en su propio disco) ──
+# Se excluye data/ completo para evitar subir datos privados
+data/
+
+# ── Logs ──────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Editor ────────────────────────────────────────────────────
+.vscode/settings.json
+.vscode/*.code-workspace
+.idea/
+
+# ── Sistema operativo ─────────────────────────────────────────
 .DS_Store
 Thumbs.db
-dist/
-.vite/
-*.log
+desktop.ini
+
+# ── Certificados locales ──────────────────────────────────────
+*.pem
+*.key
+*.cert
+
+# ── Firebase service account — NUNCA subir al repo ────────────
+firebase-service-account.json
+*service-account*.json
