@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Command node -ErrorAction SilentlyContinue; Get-Command node.exe -ErrorAction SilentlyContinue; $env:PATH -split ';' | Where-Object { $_ -match 'node' })",
+      "WebSearch",
+      "Bash(grep -E \"\\\\.\\(js|html|css|json|svg\\)$\")",
+      "Bash(python3)",
+      "Bash(Select-String -Path \"c:\\\\Users\\\\BARANDA\\\\Desktop\\\\Finova\\\\files\\\\src\\\\sections\\\\fiscal.js\" -Pattern \"[a-zA-Z] \\\\/ [a-zA-Z]\")",
+      "Bash(Select-Object LineNumber, Line)",
+      "PowerShell(Select-String -Path \"c:\\\\Users\\\\BARANDA\\\\Desktop\\\\Finova\\\\files\\\\src\\\\sections\\\\fiscal.js\" -Pattern \"\\\\/ \" | ForEach-Object { \"$\\($_.LineNumber\\): $\\($_.Line.Trim\\(\\)\\)\" })",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\BARANDA\\\\Desktop\\\\Finova\\\\files\" -Recurse -Force)",
+      "Bash(Select-Object -First 50)",
+      "Bash(grep -n \"function exportTransactionsCSV\\\\|function exportPortfolioExcel\\\\|function downloadBackup\\\\|async function exportMonthlyPDF\\\\|async function exportFiscalPDF\" \"/mnt/c/Users/BARANDA/Desktop/Finova/files/src/core/script.js\" | head -20)",
+      "Read(//mnt/c/Users/BARANDA/Desktop/Finova/files/src/core/**)",
+      "Bash(Get-Content \"c:\\\\Users\\\\BARANDA\\\\Desktop\\\\Finova\\\\files\\\\style.css\")",
+      "Bash(Measure-Object -Line)",
+      "Bash(Select-Object -ExpandProperty Lines)",
+      "Bash(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\BARANDA\\\\Desktop\\\\Finova\\\\files\\\\src\\\\auth\")",
+      "Bash(Out-Null)",
+      "Bash(Write-Host \"OK\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"c:\\\\Users\\\\BARANDA\\\\Desktop\\\\Finova\\\\files\\\\src\\\\auth\")",
+      "Bash(Select-Object FullName)",
+      "Bash(gh auth *)",
+      "Bash(git --version)",
+      "Bash(git config *)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git branch *)",
+      "Bash(git push *)",
+      "Bash(dir /b *.html)",
+      "Bash(dir /b *.md)",
+      "Bash(dir /b src\\\\*)",
+      "Bash(ls \"c:\\\\Users\\\\BARANDA\\\\Desktop\\\\Finova\\\\files\" && echo \"---\" && ls \"c:\\\\Users\\\\BARANDA\\\\Desktop\\\\Finova\")",
+      "Read(//c/Users/BARANDA/Desktop/Finova/**)",
+      "Bash(npm install *)",
+      "PowerShell($env:PATH = $env:PATH + \";C:\\\\Program Files\\\\nodejs;C:\\\\Users\\\\BARANDA\\\\AppData\\\\Roaming\\\\npm\"; node --version; npm --version)",
+      "Bash(git rm *)"
+    ]
+  }
+}

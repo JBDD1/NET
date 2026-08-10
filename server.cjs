@@ -4,6 +4,36 @@ const crypto = require('crypto');
 const fs     = require('fs');
 const path   = require('path');
 
+/* ─── Firebase Admin SDK (opcional) ─────────────────────────── */
+// Cuando las 3 vars de entorno están configuradas, añade verificación de
+// revocación de tokens (checkRevoked=true). Sin ellas, el servidor sigue
+// funcionando con su propia verificación RS256 (igual de segura, sin revocación).
+let _adminSDK   = null;
+let _adminReady = false;
+try {
+  if (process.env.FIREBASE_PROJECT_ID &&
+      process.env.FIREBASE_CLIENT_EMAIL &&
+      process.env.FIREBASE_PRIVATE_KEY) {
+    const _fbAdmin = require('firebase-admin');
+    if (!_fbAdmin.apps.length) {
+      _fbAdmin.initializeApp({
+        credential: _fbAdmin.credential.cert({
+          projectId:   process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey:  process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        }),
+      });
+    }
+    _adminSDK   = _fbAdmin;
+    _adminReady = true;
+    console.log('[FINOVA] Firebase Admin SDK inicializado — revocación de tokens activa');
+  } else {
+    console.log('[FINOVA] Firebase Admin no configurado — verificación JWT propia sin revocación (válido en dev)');
+  }
+} catch (e) {
+  console.warn('[FINOVA] Firebase Admin SDK no disponible:', e.message);
+}
+
 const PORT = 3000;
 const ROOT = __dirname;
 const SYNC_DIR       = path.join(ROOT, 'data', 'sync');
@@ -14,7 +44,9 @@ if (!fs.existsSync(SYNC_DIR))  fs.mkdirSync(SYNC_DIR,  { recursive: true });
 if (!fs.existsSync(USERS_DIR)) fs.mkdirSync(USERS_DIR, { recursive: true });
 
 // ─── Admin ────────────────────────────────────────────────────
-const ADMIN_EMAILS = ['verdpo@gmail.com'];
+// Configura con variable de entorno: FINOVA_ADMIN_EMAILS=correo1@x.com,correo2@x.com
+const ADMIN_EMAILS = (process.env.FINOVA_ADMIN_EMAILS || 'MyFinova1@gmail.com')
+  .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 function _isAdminUid(uid) {
   if (!uid || !_UID_RE.test(uid)) return false;
   const meta = _readMeta(uid);
@@ -32,6 +64,50 @@ function _readMeta(uid) {
 }
 function _blockedPath(uid) { return path.join(USERS_DIR, `${uid}.blocked`); }
 function _isBlocked(uid)   { return fs.existsSync(_blockedPath(uid)); }
+
+// ─── Roles RBAC ──────────────────────────────────────────────
+// Roles: 'free' (default), 'premium', 'admin'
+// Stored in data/roles.json as { uid: role }
+// Admin role is also derived from _isAdminUid() (email-based)
+const _ROLES_FILE = path.join(ROOT, 'data', 'roles.json');
+
+function _getRoles() {
+  try { return JSON.parse(fs.readFileSync(_ROLES_FILE, 'utf8')); }
+  catch { return {}; }
+}
+
+function _getUserRole(uid) {
+  if (!uid) return 'free';
+  if (_isAdminUid(uid)) return 'admin';
+  return _getRoles()[uid] || 'free';
+}
+
+function _setUserRole(uid, role) {
+  if (!_UID_RE.test(uid)) throw new Error('UID inválido');
+  if (!['free', 'premium'].includes(role)) throw new Error('Rol inválido (free|premium)');
+  const roles = _getRoles();
+  if (role === 'free') delete roles[uid];
+  else roles[uid] = role;
+  fs.writeFileSync(_ROLES_FILE, JSON.stringify(roles, null, 2), 'utf8');
+}
+
+// Returns false and sends 403 if the verified uid doesn't have the required role.
+// LEVELS: free=0, premium=1, admin=2
+const _ROLE_LEVELS = { free: 0, premium: 1, admin: 2 };
+function _requireRole(uid, role, req, res) {
+  const userRole  = _getUserRole(uid);
+  const userLevel = _ROLE_LEVELS[userRole] || 0;
+  const needLevel = _ROLE_LEVELS[role]     || 0;
+  if (userLevel < needLevel) {
+    res.writeHead(403, _apiHeaders(req));
+    res.end(JSON.stringify({
+      error: `Acceso denegado. Se requiere plan ${role}.`,
+      requiredRole: role, currentRole: userRole,
+    }));
+    return false;
+  }
+  return true;
+}
 
 // ─── Clave IA del servidor ────────────────────────────────────
 // Pega aquí tu API Key de Claude para que el Asesor IA funcione
@@ -67,26 +143,37 @@ const MIME = {
    SEGURIDAD — Headers HTTP y CSP
 ═══════════════════════════════════════════════════════════════ */
 const _SEC = {
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options':         'SAMEORIGIN',
-  'Referrer-Policy':         'no-referrer',
-  'Permissions-Policy':      'camera=(), microphone=(), geolocation=()',
+  'X-Content-Type-Options':       'nosniff',
+  'X-Frame-Options':              'DENY',
+  'X-XSS-Protection':             '1; mode=block',
+  'Referrer-Policy':              'strict-origin-when-cross-origin',
+  'Permissions-Policy':           'camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=(), fullscreen=(self), picture-in-picture=(), interest-cohort=()',
+  'Strict-Transport-Security':    'max-age=31536000; includeSubDomains; preload',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+  'Cross-Origin-Opener-Policy':   'same-origin',
 };
 
 // Content Security Policy — aplicado a respuestas HTML
 const _CSP = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com www.gstatic.com apis.google.com",
-  "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
-  "font-src 'self' fonts.gstatic.com data:",
-  "connect-src 'self' query1.finance.yahoo.com query2.finance.yahoo.com " +
-    "open.er-api.com api.anthropic.com api.openai.com " +
-    "generativelanguage.googleapis.com api.groq.com bankaccountdata.gocardless.com " +
-    "identitytoolkit.googleapis.com securetoken.googleapis.com " +
-    "www.googleapis.com *.firebaseapp.com *.firebase.com *.firebaseio.com",
-  "img-src 'self' data: https: lh3.googleusercontent.com",
+  "default-src 'none'",
+  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com https://apis.google.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob: https://lh3.googleusercontent.com https://jbdd1.github.io",
+  "connect-src 'self' " +
+    "https://query1.finance.yahoo.com https://query2.finance.yahoo.com " +
+    "https://open.er-api.com https://api.anthropic.com https://api.openai.com " +
+    "https://generativelanguage.googleapis.com https://api.groq.com " +
+    "https://identitytoolkit.googleapis.com https://securetoken.googleapis.com " +
+    "https://www.googleapis.com https://*.firebaseapp.com https://*.firebase.com https://*.firebaseio.com",
   "frame-src https://*.firebaseapp.com https://accounts.google.com",
+  "manifest-src 'self'",
+  "worker-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
   "frame-ancestors 'none'",
+  "upgrade-insecure-requests",
 ].join('; ');
 
 // Headers base para todas las respuestas JSON de la API
@@ -100,6 +187,9 @@ function _apiHeaders(reqOrExtra, extra) {
     'Content-Type':                'application/json',
     'Access-Control-Allow-Origin': _corsOrigin(req),
     'Vary':                        'Origin',
+    'Cache-Control':               'no-store, no-cache, must-revalidate, private',
+    'Pragma':                      'no-cache',
+    'Expires':                     '0',
     ...(e || {}),
     ..._SEC,
   };
@@ -122,6 +212,22 @@ function _rateOk(route, ip, maxPerMin) {
   return e.count <= maxPerMin;
 }
 
+// Token bucket — permite bursts cortos pero penaliza el abuso sostenido.
+// maxTokens: capacidad máxima del bucket | refillPerSec: tokens que se regeneran por segundo
+const _tbMap = new Map(); // key → { tokens, lastRefill }
+
+function _tokenBucketOk(key, maxTokens, refillPerSec) {
+  const nowSec = Date.now() / 1000;
+  let b = _tbMap.get(key);
+  if (!b) { b = { tokens: maxTokens, lastRefill: nowSec }; _tbMap.set(key, b); }
+  const elapsed = nowSec - b.lastRefill;
+  b.tokens = Math.min(maxTokens, b.tokens + elapsed * refillPerSec);
+  b.lastRefill = nowSec;
+  if (b.tokens < 1) return false;
+  b.tokens -= 1;
+  return true;
+}
+
 // Global Groq counter — tracks total server-key usage across all IPs.
 // Free plan: 30 req/min, 14 400 req/day for llama-3.3-70b-versatile.
 // We cap at 25/min and 12 000/day to leave headroom for bursts.
@@ -136,10 +242,31 @@ function _groqGlobalOk() {
   return true;
 }
 
+// Per-UID daily AI quota: free=5/day, premium=50/day, admin=unlimited
+const _aiUidMap = new Map(); // uid → { count, resetAt }
+const _AI_DAILY_LIMITS = { free: 5, premium: 50 };
+
+function _aiUidRateOk(uid, role) {
+  if (role === 'admin') return true;
+  const limit = _AI_DAILY_LIMITS[role] || _AI_DAILY_LIMITS.free;
+  const now   = Date.now();
+  let e = _aiUidMap.get(uid);
+  if (!e || e.resetAt <= now) {
+    e = { count: 0, resetAt: now + 86_400_000 };
+    _aiUidMap.set(uid, e);
+  }
+  if (e.count >= limit) return false;
+  e.count++;
+  return true;
+}
+
 // Limpieza de entradas expiradas cada 5 minutos
 setInterval(() => {
-  const now = Date.now();
-  for (const [k, v] of _rlMap) if (v.resetAt <= now) _rlMap.delete(k);
+  const now    = Date.now();
+  const nowSec = now / 1000;
+  for (const [k, v] of _rlMap)    if (v.resetAt <= now)                _rlMap.delete(k);
+  for (const [k, v] of _aiUidMap) if (v.resetAt <= now)                _aiUidMap.delete(k);
+  for (const [k, v] of _tbMap)    if (v.lastRefill < nowSec - 3600)    _tbMap.delete(k);
 }, 300_000).unref();
 
 function _clientIp(req) {
@@ -535,9 +662,31 @@ function handleAIStatus(req, res) {
 
 /* ─── AI proxy dispatcher ────────────────────────────────────── */
 async function handleAIProxy(req, res) {
-  // Rate limit: 15 peticiones por minuto por IP
+  // 1. Require Firebase auth
+  let uid = null;
+  if (_AUTH_ENABLED) {
+    uid = await _requireAuth(req, res);
+    if (uid === null) return; // 401 already sent
+    if (_isBlocked(uid)) {
+      res.writeHead(403, _apiHeaders(req));
+      return res.end(JSON.stringify({ error: 'Cuenta suspendida. Contacta con soporte.' }));
+    }
+  }
+
+  // 2. Per-UID daily quota (free: 5/day, premium: 50/day, admin: unlimited)
+  const role = _getUserRole(uid);
+  if (uid && !_aiUidRateOk(uid, role)) {
+    const limit = _AI_DAILY_LIMITS[role] || _AI_DAILY_LIMITS.free;
+    res.writeHead(429, _apiHeaders(req, { 'Retry-After': '86400' }));
+    return res.end(JSON.stringify({
+      error: `Has alcanzado el límite diario de ${limit} consultas (plan ${role === 'premium' ? 'Premium' : 'Gratuito'}).${role !== 'premium' ? ' Mejora a Premium para 50 consultas/día.' : ' Vuelve mañana.'}`,
+      limitReached: true, role, limit,
+    }));
+  }
+
+  // 3. Per-IP token bucket (15 tokens, refill 0.25/s = ~15/min sostenido, burst de 15)
   const ip = _clientIp(req);
-  if (!_rateOk('ai', ip, 15)) {
+  if (!_tokenBucketOk(`ai:${ip}`, 15, 0.25)) {
     res.writeHead(429, _apiHeaders(req, { 'Retry-After': '60' }));
     return res.end(JSON.stringify({ error: 'Demasiadas peticiones al Asesor IA. Espera un minuto e inténtalo de nuevo.' }));
   }
@@ -574,6 +723,32 @@ async function handleAIProxy(req, res) {
       res.end(JSON.stringify({ error: err.message || 'Error desconocido' }));
     }
   });
+}
+
+// Verifies Firebase token and returns uid, or writes 401 and returns null.
+// Uses Admin SDK (with revocation check) when available; custom RS256 otherwise.
+async function _requireAuth(req, res) {
+  if (!_AUTH_ENABLED) return 'dev-uid';
+  const authHeader = req.headers['authorization'] || '';
+  try {
+    if (_adminReady) {
+      if (!authHeader.startsWith('Bearer ')) throw Object.assign(new Error('Token ausente'), { code: 'auth/no-token' });
+      const decoded = await _adminSDK.auth().verifyIdToken(authHeader.slice(7).trim(), true);
+      return decoded.uid;
+    }
+    return await _verifyFirebaseToken(authHeader);
+  } catch (e) {
+    const code      = e.code || '';
+    const isExpired = code === 'auth/id-token-expired' || e.message === 'Token expirado';
+    const isRevoked = code === 'auth/id-token-revoked';
+    res.writeHead(401, _apiHeaders(req));
+    res.end(JSON.stringify({
+      error: isExpired ? 'Sesión expirada. Vuelve a iniciar sesión.' :
+             isRevoked ? 'Sesión revocada. Vuelve a iniciar sesión.'  :
+                         'No autorizado: ' + e.message,
+    }));
+    return null;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -634,6 +809,7 @@ async function _gcCall(method, apiPath, body) {
 }
 
 async function handleBankInstitutions(req, res) {
+  if ((await _requireAuth(req, res)) === null) return;
   if (!GC_SECRET_ID || !GC_SECRET_KEY) {
     res.writeHead(503, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'GoCardless no configurado. Arranca el servidor con:\nFINOVA_GC_SECRET_ID=xxx FINOVA_GC_SECRET_KEY=xxx node server.js' }));
@@ -656,6 +832,7 @@ async function handleBankInstitutions(req, res) {
 }
 
 async function handleBankCreateRequisition(req, res) {
+  if ((await _requireAuth(req, res)) === null) return;
   if (!GC_SECRET_ID || !GC_SECRET_KEY) {
     res.writeHead(503, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'GoCardless no configurado.' }));
@@ -693,6 +870,7 @@ async function handleBankCreateRequisition(req, res) {
 }
 
 async function handleBankGetRequisition(req, res) {
+  if ((await _requireAuth(req, res)) === null) return;
   if (!GC_SECRET_ID || !GC_SECRET_KEY) {
     res.writeHead(503, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'GoCardless no configurado.' }));
@@ -710,6 +888,7 @@ async function handleBankGetRequisition(req, res) {
 }
 
 async function handleBankImport(req, res) {
+  if ((await _requireAuth(req, res)) === null) return;
   if (!GC_SECRET_ID || !GC_SECRET_KEY) {
     res.writeHead(503, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'GoCardless no configurado.' }));
@@ -769,6 +948,105 @@ async function handleBankImport(req, res) {
   });
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   SEGURIDAD — Firebase JWT verification + AES-256-GCM encryption
+═══════════════════════════════════════════════════════════════ */
+
+// Firebase project — used to verify JWT iss / aud claims.
+// Override with FINOVA_FIREBASE_PROJECT=DISABLED to skip token verification (local dev only).
+const _FIREBASE_PROJECT = process.env.FINOVA_FIREBASE_PROJECT || 'finova-92100';
+const _AUTH_ENABLED     = _FIREBASE_PROJECT !== 'DISABLED';
+
+// Google JWKS cache (RSA public keys for RS256 Firebase tokens)
+let _jwksCache = { keys: null, expAt: 0 };
+
+async function _getFirebasePublicKeys() {
+  if (_jwksCache.keys && Date.now() < _jwksCache.expAt) return _jwksCache.keys;
+  const r = await httpsGet('www.googleapis.com',
+    '/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com', {});
+  if (r.status !== 200) throw new Error('No se pudieron obtener las claves públicas de Firebase');
+  const { keys } = JSON.parse(r.body);
+  const cc     = r.resHeaders?.['cache-control'] || '';
+  const maxAge = parseInt((cc.match(/max-age=(\d+)/) || [])[1] || '3600', 10);
+  _jwksCache = { keys, expAt: Date.now() + maxAge * 1000 };
+  return keys;
+}
+
+function _b64urlDecode(s) {
+  s += '='.repeat((4 - s.length % 4) % 4);
+  return Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+}
+
+// Verifies a Firebase ID Token (RS256 JWT) and returns the verified UID.
+// Throws on any validation failure — never returns an unverified UID.
+async function _verifyFirebaseToken(authHeader) {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) throw new Error('Token ausente');
+  const parts = authHeader.slice(7).trim().split('.');
+  if (parts.length !== 3) throw new Error('Token malformado');
+  let header, payload;
+  try {
+    header  = JSON.parse(_b64urlDecode(parts[0]));
+    payload = JSON.parse(_b64urlDecode(parts[1]));
+  } catch { throw new Error('Token malformado'); }
+  if (header.alg !== 'RS256') throw new Error('Algoritmo no soportado');
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.exp  <= now)     throw new Error('Token expirado');
+  if (payload.iat   > now + 300) throw new Error('Token emitido en el futuro');
+  if (payload.aud !== _FIREBASE_PROJECT)
+    throw new Error('Token para proyecto incorrecto');
+  if (payload.iss !== `https://securetoken.google.com/${_FIREBASE_PROJECT}`)
+    throw new Error('Emisor inválido');
+  if (!payload.sub || typeof payload.sub !== 'string') throw new Error('UID ausente en token');
+  const keys = await _getFirebasePublicKeys();
+  const jwk  = keys.find(k => k.kid === header.kid);
+  if (!jwk) throw new Error('Clave pública no encontrada para este token');
+  const pubKey = crypto.createPublicKey({ key: jwk, format: 'jwk' });
+  const input  = Buffer.from(parts[0] + '.' + parts[1]);
+  const sig    = _b64urlDecode(parts[2]);
+  const valid  = crypto.verify('sha256', input,
+    { key: pubKey, padding: crypto.constants.RSA_PKCS1_PADDING }, sig);
+  if (!valid) throw new Error('Firma inválida');
+  return payload.sub; // verified Firebase UID
+}
+
+// AES-256-GCM encryption for user JSON files at rest.
+// Set FINOVA_ENC_KEY to a 64-char hex string (32 random bytes).
+// Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+const _ENC_KEY = (() => {
+  const hex = process.env.FINOVA_ENC_KEY || '';
+  if (!hex) return null;
+  const buf = Buffer.from(hex, 'hex');
+  return buf.length === 32 ? buf : null;
+})();
+
+function _encryptUserData(plaintext) {
+  if (!_ENC_KEY) return plaintext;
+  const iv  = crypto.randomBytes(12);
+  const c   = crypto.createCipheriv('aes-256-gcm', _ENC_KEY, iv);
+  const enc = Buffer.concat([c.update(plaintext, 'utf8'), c.final()]);
+  const tag = c.getAuthTag();
+  return 'enc1:' + Buffer.concat([iv, tag, enc]).toString('base64');
+}
+
+function _decryptUserData(data) {
+  if (!_ENC_KEY || !data.startsWith('enc1:')) return data;
+  const buf = Buffer.from(data.slice(5), 'base64');
+  const iv  = buf.slice(0, 12);
+  const tag = buf.slice(12, 28);
+  const enc = buf.slice(28);
+  const d   = crypto.createDecipheriv('aes-256-gcm', _ENC_KEY, iv);
+  d.setAuthTag(tag);
+  return d.update(enc) + d.final('utf8');
+}
+
+// CSRF: only allow requests from known origins (for state-mutating endpoints)
+function _originOk(req) {
+  const o = req.headers.origin  || '';
+  const r = (req.headers.referer || '').split('/').slice(0, 3).join('/');
+  const check = o || r;
+  return !check || _ALLOWED_ORIGINS.has(check);
+}
+
 /* ─── Datos de usuario autenticado (Firebase UID) ───────────── */
 const _UID_RE = /^[a-zA-Z0-9]{20,128}$/;
 
@@ -778,11 +1056,28 @@ async function handleUserDataGet(req, res) {
     res.writeHead(429, _apiHeaders(req, { 'Retry-After': '60' }));
     return res.end(JSON.stringify({ error: 'Demasiadas peticiones. Espera un minuto.' }));
   }
-  const urlObj = new URL(req.url, 'http://localhost');
-  const uid    = urlObj.searchParams.get('uid') || '';
+
+  // Verify Firebase ID token — the UID is extracted from the verified token,
+  // never trusted from the query string.
+  let uid;
+  if (_AUTH_ENABLED) {
+    try {
+      uid = await _verifyFirebaseToken(req.headers['authorization']);
+    } catch (e) {
+      res.writeHead(401, _apiHeaders(req));
+      return res.end(JSON.stringify({ error: 'No autorizado: ' + e.message }));
+    }
+  } else {
+    uid = new URL(req.url, 'http://localhost').searchParams.get('uid') || '';
+  }
+
   if (!_UID_RE.test(uid)) {
     res.writeHead(400, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'UID inválido' }));
+  }
+  if (_isBlocked(uid)) {
+    res.writeHead(403, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'Cuenta suspendida' }));
   }
   const file = path.join(USERS_DIR, `${uid}.json`);
   if (!fs.existsSync(file)) {
@@ -790,7 +1085,8 @@ async function handleUserDataGet(req, res) {
     return res.end(JSON.stringify({ ok: true, data: null }));
   }
   try {
-    const data = fs.readFileSync(file, 'utf8');
+    const raw  = fs.readFileSync(file, 'utf8');
+    const data = _decryptUserData(raw);
     res.writeHead(200, _apiHeaders(req));
     res.end(JSON.stringify({ ok: true, data }));
   } catch (e) {
@@ -800,11 +1096,27 @@ async function handleUserDataGet(req, res) {
 }
 
 async function handleUserDataPost(req, res) {
+  if (!_originOk(req)) {
+    res.writeHead(403, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'Origen no permitido' }));
+  }
   const ip = _clientIp(req);
   if (!_rateOk('user-post', ip, 30)) {
     res.writeHead(429, _apiHeaders(req, { 'Retry-After': '60' }));
     return res.end(JSON.stringify({ error: 'Demasiadas peticiones. Espera un minuto.' }));
   }
+
+  // Verify token before streaming body — Node.js buffers request data during the await.
+  let verifiedUid = null;
+  if (_AUTH_ENABLED) {
+    try {
+      verifiedUid = await _verifyFirebaseToken(req.headers['authorization']);
+    } catch (e) {
+      res.writeHead(401, _apiHeaders(req));
+      return res.end(JSON.stringify({ error: 'No autorizado: ' + e.message }));
+    }
+  }
+
   let body = '';
   req.on('data', chunk => {
     body += chunk;
@@ -821,11 +1133,17 @@ async function handleUserDataPost(req, res) {
         res.writeHead(400, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'UID inválido' }));
       }
+      // Token UID must match the UID in the request body.
+      if (verifiedUid !== null && verifiedUid !== uid) {
+        res.writeHead(403, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'Acceso denegado' }));
+      }
       if (typeof data !== 'string' || data.length > _SYNC_MAX_BYTES) {
         res.writeHead(400, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'Payload inválido' }));
       }
-      fs.writeFileSync(path.join(USERS_DIR, `${uid}.json`), data, 'utf8');
+      const toWrite = _encryptUserData(data);
+      fs.writeFileSync(path.join(USERS_DIR, `${uid}.json`), toWrite, 'utf8');
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true, saved: new Date().toISOString() }));
     } catch (e) {
@@ -895,7 +1213,8 @@ async function handleSession(req, res) {
   });
 }
 
-function handleStats(req, res) {
+async function handleStats(req, res) {
+  if ((await _adminGuard(req, res)) === null) return;
   try {
     const data    = _loadAnalytics();
     const today   = _todayUTC();
@@ -983,6 +1302,8 @@ const _SYNC_CODE_RE   = /^[a-f0-9]{8,16}$/;
 const _SYNC_MAX_BYTES = 8_000_000;
 
 async function handleSyncUpload(req, res) {
+  // Verificar token ANTES de leer el body (Node.js no pierde datos durante el await)
+  if ((await _requireAuth(req, res)) === null) return;
   let body = '';
   req.on('data', chunk => {
     body += chunk;
@@ -1013,13 +1334,15 @@ async function handleSyncUpload(req, res) {
   });
 }
 
-function handleSyncDownload(req, res) {
+async function handleSyncDownload(req, res) {
   // Rate limit: 10 peticiones por minuto por IP — evita enumeración de códigos de sync
   const ip = _clientIp(req);
   if (!_rateOk('sync-dl', ip, 10)) {
     res.writeHead(429, _apiHeaders(req, { 'Retry-After': '60' }));
     return res.end(JSON.stringify({ error: 'Demasiadas peticiones. Espera un minuto.' }));
   }
+
+  if ((await _requireAuth(req, res)) === null) return;
 
   const urlObj = new URL(req.url, 'http://localhost');
   const code   = urlObj.searchParams.get('code') || '';
@@ -1039,6 +1362,21 @@ function handleSyncDownload(req, res) {
 
 /* ─── User metadata (email, displayName, lastAccess) ─────────── */
 async function handleUserMeta(req, res) {
+  if (!_originOk(req)) {
+    res.writeHead(403, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'Origen no permitido' }));
+  }
+
+  let verifiedUid = null;
+  if (_AUTH_ENABLED) {
+    try {
+      verifiedUid = await _verifyFirebaseToken(req.headers['authorization']);
+    } catch (e) {
+      res.writeHead(401, _apiHeaders(req));
+      return res.end(JSON.stringify({ error: 'No autorizado: ' + e.message }));
+    }
+  }
+
   let body = '';
   req.on('data', c => body += c);
   req.on('end', () => {
@@ -1047,6 +1385,10 @@ async function handleUserMeta(req, res) {
       if (!uid || !_UID_RE.test(uid)) {
         res.writeHead(400, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'UID inválido' }));
+      }
+      if (verifiedUid !== null && verifiedUid !== uid) {
+        res.writeHead(403, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'Acceso denegado' }));
       }
       const existing = _readMeta(uid) || {};
       const meta = {
@@ -1067,21 +1409,21 @@ async function handleUserMeta(req, res) {
 }
 
 /* ─── Admin API ───────────────────────────────────────────────── */
-function _adminGuard(req, res, body) {
-  const adminUid = body?.adminUid || new URL(req.url, 'http://localhost').searchParams.get('adminUid') || '';
-  if (!_isAdminUid(adminUid)) {
+// Verifica token Y rol admin. Devuelve uid verificado o null (401/403 ya enviado).
+// adminUid del body/query ya no se usa — el uid viene del token Firebase.
+async function _adminGuard(req, res) {
+  const uid = await _requireAuth(req, res);
+  if (uid === null) return null;
+  if (!_isAdminUid(uid)) {
     res.writeHead(403, _apiHeaders(req));
-    res.end(JSON.stringify({ error: 'Acceso denegado' }));
-    return false;
+    res.end(JSON.stringify({ error: 'Acceso denegado: se requiere rol admin' }));
+    return null;
   }
-  return true;
+  return uid;
 }
 
-function handleAdminUsers(req, res) {
-  const adminUid = new URL(req.url, 'http://localhost').searchParams.get('adminUid') || '';
-  if (!_isAdminUid(adminUid)) {
-    res.writeHead(403, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'Acceso denegado' }));
-  }
+async function handleAdminUsers(req, res) {
+  if ((await _adminGuard(req, res)) === null) return;
   try {
     const files = fs.readdirSync(USERS_DIR).filter(f => f.endsWith('.json') && !f.endsWith('.meta.json'));
     const users = files.map(f => {
@@ -1108,14 +1450,13 @@ function handleAdminUsers(req, res) {
   }
 }
 
-function handleAdminBlock(req, res) {
+async function handleAdminBlock(req, res) {
+  if ((await _adminGuard(req, res)) === null) return;
   let body = '';
   req.on('data', c => body += c);
   req.on('end', () => {
     try {
-      const parsed = JSON.parse(body);
-      if (!_adminGuard(req, res, parsed)) return;
-      const { targetUid, blocked } = parsed;
+      const { targetUid, blocked } = JSON.parse(body);
       if (!targetUid || !_UID_RE.test(targetUid)) {
         res.writeHead(400, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'UID inválido' }));
       }
@@ -1132,14 +1473,13 @@ function handleAdminBlock(req, res) {
   });
 }
 
-function handleAdminSetAdmin(req, res) {
+async function handleAdminSetAdmin(req, res) {
+  if ((await _adminGuard(req, res)) === null) return;
   let body = '';
   req.on('data', c => body += c);
   req.on('end', () => {
     try {
-      const parsed = JSON.parse(body);
-      if (!_adminGuard(req, res, parsed)) return;
-      const { targetEmail, isAdmin } = parsed;
+      const { targetEmail, isAdmin } = JSON.parse(body);
       if (!targetEmail || !targetEmail.includes('@')) {
         res.writeHead(400, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'Email inválido' }));
       }
@@ -1161,11 +1501,8 @@ function handleAdminSetAdmin(req, res) {
   });
 }
 
-function handleAdminHealth(req, res) {
-  const adminUid = new URL(req.url, 'http://localhost').searchParams.get('adminUid') || '';
-  if (!_isAdminUid(adminUid)) {
-    res.writeHead(403, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'Acceso denegado' }));
-  }
+async function handleAdminHealth(req, res) {
+  if ((await _adminGuard(req, res)) === null) return;
   try {
     const userFiles   = fs.readdirSync(USERS_DIR).filter(f => f.endsWith('.json') && !f.endsWith('.meta.json'));
     const syncFiles   = fs.readdirSync(SYNC_DIR).filter(f => f.endsWith('.json'));
@@ -1189,11 +1526,8 @@ function handleAdminHealth(req, res) {
   }
 }
 
-function handleAdminStats(req, res) {
-  const adminUid = new URL(req.url, 'http://localhost').searchParams.get('adminUid') || '';
-  if (!_isAdminUid(adminUid)) {
-    res.writeHead(403, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'Acceso denegado' }));
-  }
+async function handleAdminStats(req, res) {
+  if ((await _adminGuard(req, res)) === null) return;
   try {
     const analytics = _loadAnalytics();
     const today     = _todayUTC();
@@ -1218,6 +1552,77 @@ function handleAdminStats(req, res) {
   }
 }
 
+/* ─── Admin: gestión de roles ───────────────────────────────── */
+async function handleAdminSetRole(req, res) {
+  // Requires Firebase token from a verified admin
+  const uid = await _requireAuth(req, res);
+  if (uid === null) return;
+  if (!_isAdminUid(uid)) {
+    res.writeHead(403, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'Acceso denegado: se requiere rol admin' }));
+  }
+  let body = '';
+  req.on('data', c => body += c);
+  req.on('end', () => {
+    try {
+      const { targetUid, role } = JSON.parse(body);
+      if (!targetUid || !_UID_RE.test(targetUid)) {
+        res.writeHead(400, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'UID inválido' }));
+      }
+      _setUserRole(targetUid, role);
+      res.writeHead(200, _apiHeaders(req));
+      res.end(JSON.stringify({ ok: true, targetUid, role }));
+    } catch (e) {
+      res.writeHead(400, _apiHeaders(req)); res.end(JSON.stringify({ error: e.message }));
+    }
+  });
+}
+
+async function handleAdminGetRole(req, res) {
+  const uid = await _requireAuth(req, res);
+  if (uid === null) return;
+  if (!_isAdminUid(uid)) {
+    res.writeHead(403, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'Acceso denegado' }));
+  }
+  const targetUid = new URL(req.url, 'http://localhost').searchParams.get('uid') || '';
+  if (!_UID_RE.test(targetUid)) {
+    res.writeHead(400, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'UID inválido' }));
+  }
+  res.writeHead(200, _apiHeaders(req));
+  res.end(JSON.stringify({ ok: true, uid: targetUid, role: _getUserRole(targetUid) }));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HARDENING — Protecciones adicionales del servidor
+═══════════════════════════════════════════════════════════════ */
+
+// Máximo tamaño de body aceptado en peticiones POST (50 KB)
+const MAX_BODY_SIZE = 50 * 1024;
+
+// User-Agents de herramientas de escaneo automático
+const _BLOCKED_UA = [/sqlmap/i, /nikto/i, /nmap/i, /masscan/i, /zgrab/i, /gobuster/i, /dirbuster/i];
+function _isBlockedUA(req) {
+  const ua = req.headers['user-agent'] || '';
+  return _BLOCKED_UA.some(p => p.test(ua));
+}
+
+// Elimina headers que revelan tecnología (Node.js http no los envía por defecto,
+// pero los eliminamos por si algún middleware futuro los añade)
+function _sanitizeResHeaders(res) {
+  res.removeHeader('x-powered-by');
+  res.removeHeader('server');
+}
+
+// Log seguro — nunca imprime strings largos en claro (keys, tokens)
+function safeLog(label, data) {
+  if (typeof data === 'string' && data.length > 20) {
+    console.log(`[${label}]`, data.substring(0, 8) + '...[REDACTED]');
+  } else {
+    console.log(`[${label}]`, typeof data === 'object' ? '[object]' : data);
+  }
+}
+
 /* ─── HTTP server ────────────────────────────────────────────── */
 http.createServer((req, res) => {
   // Redirigir 127.0.0.1 → localhost (Firebase Auth solo acepta 'localhost')
@@ -1226,12 +1631,41 @@ http.createServer((req, res) => {
     return res.end();
   }
 
+  // ── Hardening global ──────────────────────────────────────────
+  _sanitizeResHeaders(res);
+
+  // Bloquear herramientas de escaneo automático
+  if (_isBlockedUA(req)) {
+    res.writeHead(403, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'Forbidden' }));
+  }
+
+  // Rechazar bodies demasiado grandes (previene ataques de payload)
+  // sync-upload y user-data aceptan hasta 8 MB; el resto se limita a 50 KB
+  if (req.method === 'POST') {
+    const cl = parseInt(req.headers['content-length'] || '0', 10);
+    const isLargeRoute = req.url === '/api/sync-upload' || req.url === '/api/user-data';
+    if (cl > (isLargeRoute ? _SYNC_MAX_BYTES : MAX_BODY_SIZE)) {
+      res.writeHead(413, _apiHeaders(req));
+      return res.end(JSON.stringify({ error: 'Payload demasiado grande' }));
+    }
+  }
+
+  // Validar Content-Type en peticiones POST a la API
+  if (req.method === 'POST' && req.url.startsWith('/api/')) {
+    const ct = req.headers['content-type'] || '';
+    if (!ct.includes('application/json')) {
+      res.writeHead(415, _apiHeaders(req));
+      return res.end(JSON.stringify({ error: 'Unsupported Media Type' }));
+    }
+  }
+
   // CORS preflight
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin':  _corsOrigin(req),
       'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Vary': 'Origin',
       ..._SEC,
     });
@@ -1273,11 +1707,13 @@ http.createServer((req, res) => {
   // Metadatos de usuario (email, nombre, último acceso)
   if (req.method === 'POST' && req.url === '/api/user-meta')         return handleUserMeta(req, res);
   // Admin API
-  if (req.method === 'GET'  && req.url.startsWith('/api/admin/users'))  return handleAdminUsers(req, res);
-  if (req.method === 'POST' && req.url === '/api/admin/block')          return handleAdminBlock(req, res);
-  if (req.method === 'POST' && req.url === '/api/admin/set-admin')      return handleAdminSetAdmin(req, res);
-  if (req.method === 'GET'  && req.url.startsWith('/api/admin/health')) return handleAdminHealth(req, res);
-  if (req.method === 'GET'  && req.url.startsWith('/api/admin/stats'))  return handleAdminStats(req, res);
+  if (req.method === 'GET'  && req.url.startsWith('/api/admin/users'))    return handleAdminUsers(req, res);
+  if (req.method === 'POST' && req.url === '/api/admin/block')            return handleAdminBlock(req, res);
+  if (req.method === 'POST' && req.url === '/api/admin/set-admin')        return handleAdminSetAdmin(req, res);
+  if (req.method === 'GET'  && req.url.startsWith('/api/admin/health'))   return handleAdminHealth(req, res);
+  if (req.method === 'GET'  && req.url.startsWith('/api/admin/stats'))    return handleAdminStats(req, res);
+  if (req.method === 'POST' && req.url === '/api/admin/set-role')         return handleAdminSetRole(req, res);
+  if (req.method === 'GET'  && req.url.startsWith('/api/admin/get-role')) return handleAdminGetRole(req, res);
 
   // Analytics
   if (req.method === 'POST' && req.url === '/api/session') {
@@ -1298,6 +1734,12 @@ http.createServer((req, res) => {
     return handleSyncDownload(req, res);
   }
 
+  // Rutas /api/* no reconocidas — no revelar estructura interna
+  if (req.url.startsWith('/api/')) {
+    res.writeHead(404, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'Not found' }));
+  }
+
   // Static files
   const url      = req.url.split('?')[0];
   const filePath = path.join(ROOT, url === '/' ? 'index.html' : url);
@@ -1305,7 +1747,7 @@ http.createServer((req, res) => {
   const mime     = MIME[ext] || 'text/plain';
 
   fs.readFile(filePath, (err, data) => {
-    if (err) { res.writeHead(404); return res.end('Archivo no encontrado'); }
+    if (err) { res.writeHead(404, { 'Content-Type': 'application/json', ..._SEC }); return res.end(JSON.stringify({ error: 'Not found' })); }
     const headers = { 'Content-Type': mime, ..._SEC };
     if (ext === '.html' || url === '/') headers['Content-Security-Policy'] = _CSP;
     res.writeHead(200, headers);

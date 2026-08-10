@@ -14,6 +14,21 @@ const RECURRING_FREQ_LABELS = {
 
 let _recurringConfirmShown = false;
 
+function _recFreqChange(val) {
+  const w = document.getElementById('f-rec-renewal-wrap');
+  if (w) w.style.display = val === 'monthly' ? '' : 'none';
+}
+
+function _recRenewalDayInput(val) {
+  const day = parseInt(val);
+  if (!day || day < 1 || day > 28) return;
+  const today = new Date();
+  const m = today.getDate() <= day ? today.getMonth() : today.getMonth() + 1;
+  const target = new Date(today.getFullYear(), m, day);
+  const el = document.getElementById('f-rec-date');
+  if (el) el.value = target.toISOString().slice(0, 10);
+}
+
 function _checkAndOfferAutoApply() {
   if (_recurringConfirmShown) return;
   const today = getTodayStr();
@@ -86,7 +101,7 @@ function renderRecurring() {
               <td><span class="cat-chip">${escapeHtml(r.category)}</span></td>
               <td><span class="badge badge-${r.type}">${r.type === 'income' ? 'Ingreso' : 'Gasto'}</span></td>
               <td class="text-right ${r.type === 'income' ? 'positive' : 'negative'}">${formatCurrency(r.amount)}</td>
-              <td>${RECURRING_FREQ_LABELS[r.frequency] || r.frequency}</td>
+              <td>${RECURRING_FREQ_LABELS[r.frequency] || r.frequency}${r.frequency === 'monthly' && r.renewalDay ? `<br><span style="font-size:11px;color:var(--text-muted)">día ${r.renewalDay}</span>` : ''}</td>
               <td${overdue ? ' style="color:var(--down);font-weight:600"' : ''}>${(() => {
                 if (!r.nextDate) return '—';
                 const diff = Math.ceil((new Date(r.nextDate + 'T00:00:00') - new Date()) / 86400000);
@@ -157,14 +172,18 @@ function openAddRecurring(prefill = null) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group">
         <label class="form-label">Frecuencia</label>
-        <select id="f-rec-freq" class="select-input">
+        <select id="f-rec-freq" class="select-input" onchange="_recFreqChange(this.value)">
           ${Object.entries(RECURRING_FREQ_LABELS).map(([v, l]) => `<option value="${v}" ${(r.frequency || 'monthly') === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
       </div>
-      <div class="form-group">
-        <label class="form-label">Próxima fecha</label>
-        <input type="date" id="f-rec-date" class="text-input" value="${r.nextDate || getTodayStr()}" />
+      <div class="form-group" id="f-rec-renewal-wrap" ${(r.frequency || 'monthly') !== 'monthly' ? 'style="display:none"' : ''}>
+        <label class="form-label">Día de renovación</label>
+        <input type="number" id="f-rec-renewal" class="text-input" placeholder="1 – 28" min="1" max="28" value="${r.renewalDay || ''}" oninput="_recRenewalDayInput(this.value)" />
       </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Próxima fecha</label>
+      <input type="date" id="f-rec-date" class="text-input" value="${r.nextDate || getTodayStr()}" />
     </div>
   `, () => {
     const description = document.getElementById('f-rec-desc').value.trim();
@@ -173,12 +192,13 @@ function openAddRecurring(prefill = null) {
     const category    = document.getElementById('f-rec-cat').value;
     const frequency   = document.getElementById('f-rec-freq').value;
     const nextDate    = document.getElementById('f-rec-date').value;
+    const renewalDay  = frequency === 'monthly' ? (parseInt(document.getElementById('f-rec-renewal').value) || null) : null;
 
     if (!description) return showToast('La descripción es obligatoria', 'error');
     if (!_validateTextInput(description, 'La descripción')) return;
     if (!amount)      return showToast('El importe debe ser mayor que 0', 'error');
 
-    const entry = { ...(r.id ? r : {}), id: r.id || generateId(), description, type, amount, category, frequency, nextDate, active: r.active !== false };
+    const entry = { ...(r.id ? r : {}), id: r.id || generateId(), description, type, amount, category, frequency, nextDate, renewalDay, active: r.active !== false };
 
     if (!APP.recurring) APP.recurring = [];
     if (isEdit) {
@@ -244,7 +264,7 @@ function applyRecurring(id, silent = false) {
   }
 
   // Advance nextDate only after the transaction was persisted
-  if (r.nextDate) r.nextDate = _advanceRecurringDate(r.nextDate, r.frequency);
+  if (r.nextDate) r.nextDate = _advanceRecurringDate(r.nextDate, r.frequency, r.renewalDay);
   saveData();
   renderRecurring();
   checkDueRecurring();

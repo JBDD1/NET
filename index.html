@@ -14,10 +14,11 @@
   <link rel="manifest" href="manifest.json" />
 
   <!-- Favicons -->
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="icon" type="image/png" sizes="48x48" href="icon-48.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="icon-16.png" />
-  <link rel="icon" href="icon.svg" type="image/svg+xml" />
-  <link rel="shortcut icon" href="icon-32.png" />
+  <link rel="shortcut icon" href="icon-48.png" />
 
   <!-- PWA — iOS Safari -->
   <meta name="apple-mobile-web-app-title" content="Finova" />
@@ -50,6 +51,12 @@
     }
   </script>
 
+  <!-- Security meta tags -->
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="X-Frame-Options" content="DENY" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+
 </head>
 <body>
 
@@ -60,7 +67,7 @@
     <div class="login-card">
 
       <div class="login-logo">
-        <span class="login-logo-icon"><svg viewBox="0 0 32 32" width="44" height="44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#d4a960"/><rect x="5" y="5" width="3.5" height="22" rx="1" fill="#141210"/><rect x="5" y="5" width="12" height="3.5" rx="1" fill="#141210"/><rect x="5" y="13.5" width="8.5" height="3" rx="1" fill="#141210"/><rect x="17.5" y="14" width="10" height="13.5" rx="1.8" fill="none" stroke="#141210" stroke-width="1.2"/><rect x="18.8" y="15.5" width="3" height="2.8" rx="0.6" fill="#141210"/><rect x="23.2" y="15.5" width="3" height="2.8" rx="0.6" fill="#141210"/><rect x="18.8" y="19.2" width="3" height="2.8" rx="0.6" fill="#141210"/><rect x="23.2" y="19.2" width="3" height="2.8" rx="0.6" fill="#141210"/><rect x="18.8" y="22.9" width="3" height="2.8" rx="0.6" fill="#141210"/><rect x="23.2" y="22.9" width="3" height="2.8" rx="0.6" fill="#141210"/></svg></span>
+        <span class="login-logo-icon"><img src="icon.svg" width="60" height="60" alt="Finova" style="display:block;border-radius:14px"></span>
         <span class="login-logo-text">Finova</span>
       </div>
       <p class="login-tagline">Tu asistente financiero personal</p>
@@ -97,7 +104,7 @@
   <div id="app-loading" aria-hidden="true">
     <div class="app-loading-inner">
       <div class="app-loading-logo">
-        <span class="logo-icon"><svg viewBox="0 0 32 32" width="52" height="52" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="#d4a960"/><rect x="5" y="5" width="3.5" height="22" rx="1" fill="#141210"/><rect x="5" y="5" width="12" height="3.5" rx="1" fill="#141210"/><rect x="5" y="13.5" width="8.5" height="3" rx="1" fill="#141210"/><rect x="17.5" y="14" width="10" height="13.5" rx="1.8" fill="none" stroke="#141210" stroke-width="1.2"/><rect x="18.8" y="15.5" width="3" height="2.8" rx="0.6" fill="#141210"/><rect x="23.2" y="15.5" width="3" height="2.8" rx="0.6" fill="#141210"/><rect x="18.8" y="19.2" width="3" height="2.8" rx="0.6" fill="#141210"/><rect x="23.2" y="19.2" width="3" height="2.8" rx="0.6" fill="#141210"/><rect x="18.8" y="22.9" width="3" height="2.8" rx="0.6" fill="#141210"/><rect x="23.2" y="22.9" width="3" height="2.8" rx="0.6" fill="#141210"/></svg></span>
+        <span class="logo-icon"><img src="icon.svg" width="68" height="68" alt="Finova" style="display:block;border-radius:17px"></span>
         <span class="logo-text" style="font-size:1.6rem;letter-spacing:.04em">Finova</span>
       </div>
       <div class="app-loading-spinner"></div>
@@ -108,10 +115,10 @@
     <div class="sidebar-header">
       <div class="logo-wrap">
         <div class="logo">
-          <span class="logo-icon"><svg viewBox="0 0 32 32" width="26" height="26" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="7" fill="var(--accent)"/><rect x="5" y="5" width="3.5" height="22" rx="1" fill="var(--accent-ink)"/><rect x="5" y="5" width="12" height="3.5" rx="1" fill="var(--accent-ink)"/><rect x="5" y="13.5" width="8.5" height="3" rx="1" fill="var(--accent-ink)"/><rect x="17.5" y="14" width="10" height="13.5" rx="1.8" fill="none" stroke="var(--accent-ink)" stroke-width="1.2"/><rect x="18.8" y="15.5" width="3" height="2.8" rx="0.6" fill="var(--accent-ink)"/><rect x="23.2" y="15.5" width="3" height="2.8" rx="0.6" fill="var(--accent-ink)"/><rect x="18.8" y="19.2" width="3" height="2.8" rx="0.6" fill="var(--accent-ink)"/><rect x="23.2" y="19.2" width="3" height="2.8" rx="0.6" fill="var(--accent-ink)"/><rect x="18.8" y="22.9" width="3" height="2.8" rx="0.6" fill="var(--accent-ink)"/><rect x="23.2" y="22.9" width="3" height="2.8" rx="0.6" fill="var(--accent-ink)"/></svg></span>
+          <span class="logo-icon"><img src="icon.svg" width="34" height="34" alt="Finova" style="display:block;border-radius:9px"></span>
           <span class="logo-text">Finova</span>
         </div>
-        <span class="logo-f" aria-hidden="true">F</span>
+        <span class="logo-f" aria-hidden="true"><img src="icon.svg" width="34" height="34" alt="" style="display:block;border-radius:9px"></span>
       </div>
       <button class="sidebar-toggle" id="sidebarToggle"><span>‹</span></button>
     </div>
@@ -915,61 +922,106 @@
     <!-- ─── DIVIDENDOS ────────────────────────────────────────── -->
     <section class="section" id="section-dividends">
       <div class="section-header">
-        <h1>Dividendos</h1>
+        <h1 id="div-section-title">Dividendos</h1>
         <button type="button" class="btn-primary" id="btnAddDividend" data-action="add-dividend">+ Registrar</button>
       </div>
 
-      <div class="kpi-grid kpi-grid-4">
-        <div class="kpi-card">
-          <div class="kpi-label">Ingresos pasivos anuales</div>
-          <div class="kpi-value positive" id="div-annual">€0</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Ingresos pasivos mensuales</div>
-          <div class="kpi-value positive" id="div-monthly">€0</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Yield medio cartera</div>
-          <div class="kpi-value" id="div-yield">0%</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Ingresos / día</div>
-          <div class="kpi-value positive" id="div-daily">€0</div>
-        </div>
+      <!-- ── Tab bar ── -->
+      <div class="section-tabs" role="tablist">
+        <button id="stk-tab-dividends" class="section-tab section-tab-active" role="tab" aria-selected="true"
+                onclick="switchDivTab('dividends')">
+          <span class="stk-tab-icon">◈</span> Dividendos
+        </button>
+        <button id="stk-tab-staking" class="section-tab" role="tab" aria-selected="false"
+                onclick="switchDivTab('staking')">
+          <span class="stk-tab-icon">⬡</span> Crypto Staking
+        </button>
       </div>
 
-      <div class="charts-grid">
-        <div class="chart-card chart-wide">
-          <div class="chart-header"><h3>Dividendos por mes</h3></div>
-          <div class="chart-wrapper"><canvas id="chart-dividends" role="img" aria-label="Gráfico de dividendos estimados por mes"></canvas></div>
+      <!-- ── Dividendos panel ── -->
+      <div id="div-panel-dividends">
+        <div class="kpi-grid kpi-grid-4">
+          <div class="kpi-card">
+            <div class="kpi-label">Ingresos pasivos anuales</div>
+            <div class="kpi-value positive" id="div-annual">€0</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Ingresos pasivos mensuales</div>
+            <div class="kpi-value positive" id="div-monthly">€0</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Yield medio cartera</div>
+            <div class="kpi-value" id="div-yield">0%</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Ingresos / día</div>
+            <div class="kpi-value positive" id="div-daily">€0</div>
+          </div>
         </div>
-      </div>
 
-      <div class="card">
-        <h3 class="card-title">📅 Próximos cobros</h3>
-        <div id="div-calendar"></div>
-      </div>
-
-      <div class="card">
-        <div class="table-wrapper">
-          <table class="data-table">
-            <caption class="sr-only">Dividendos: activo, ticker, dividendo por acción, frecuencia, número de acciones, ingreso anual estimado y yield sobre coste</caption>
-            <thead>
-              <tr>
-                <th>Activo</th>
-                <th>Ticker</th>
-                <th class="text-right">Div/acción (€)</th>
-                <th class="text-right">Frecuencia</th>
-                <th class="text-right">Nº acc.</th>
-                <th class="text-right">Anual (€)</th>
-                <th class="text-right" title="Yield sobre precio de compra">YoC</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="dividends-tbody"></tbody>
-          </table>
+        <div class="charts-grid">
+          <div class="chart-card chart-wide">
+            <div class="chart-header"><h3>Dividendos por mes</h3></div>
+            <div class="chart-wrapper"><canvas id="chart-dividends" role="img" aria-label="Gráfico de dividendos estimados por mes"></canvas></div>
+          </div>
         </div>
-      </div>
+
+        <div class="card">
+          <h3 class="card-title">📅 Próximos cobros</h3>
+          <div id="div-calendar"></div>
+        </div>
+
+        <div class="card">
+          <div class="table-wrapper">
+            <table class="data-table">
+              <caption class="sr-only">Dividendos: activo, ticker, dividendo por acción, frecuencia, número de acciones, ingreso anual estimado y yield sobre coste</caption>
+              <thead>
+                <tr>
+                  <th>Activo</th>
+                  <th>Ticker</th>
+                  <th class="text-right">Div/acción (€)</th>
+                  <th class="text-right">Frecuencia</th>
+                  <th class="text-right">Nº acc.</th>
+                  <th class="text-right">Anual (€)</th>
+                  <th class="text-right" title="Yield sobre precio de compra">YoC</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="dividends-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /div-panel-dividends -->
+
+      <!-- ── Staking panel ── -->
+      <div id="div-panel-staking" class="hidden">
+
+        <!-- KPI row -->
+        <div class="kpi-grid kpi-grid-5" id="stk-kpi-grid"></div>
+
+        <!-- Assets grid -->
+        <div class="card" style="overflow:visible">
+          <div class="stk-assets-hdr">
+            <h3 class="card-title" style="margin:0">Activos disponibles</h3>
+            <span class="stk-disclaimer-inline">APYs referenciales · No constituyen asesoramiento financiero</span>
+          </div>
+          <div id="stk-assets-grid" class="stk-assets-grid"></div>
+        </div>
+
+        <!-- Positions -->
+        <div class="card" id="stk-positions-card"></div>
+
+        <!-- Rewards projection chart -->
+        <div class="chart-card chart-wide" id="stk-chart-card">
+          <div class="chart-header"><h3>Proyección de recompensas (12 meses)</h3></div>
+          <div class="chart-wrapper"><canvas id="stk-chart" role="img" aria-label="Proyección de recompensas de staking"></canvas></div>
+        </div>
+
+        <!-- History -->
+        <div class="card" id="stk-history-card"></div>
+
+      </div><!-- /div-panel-staking -->
+
     </section>
 
     <!-- ─── PATRIMONIO NETO ───────────────────────────────────── -->
@@ -2320,6 +2372,13 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
   <script src="src/utils/premium.js"></script>
+  <!-- Core modules — load in dependency order -->
+  <script src="src/core/state.js"></script>
+  <script src="src/core/utils.js"></script>
+  <script src="src/core/charts.js"></script>
+  <script src="src/core/calcs.js"></script>
+  <script src="src/core/storage.js"></script>
+  <script src="src/core/navigation.js"></script>
   <script src="src/core/script.js"></script>
   <script src="src/sections/transactions.js"></script>
   <script src="src/sections/recurring.js"></script>
@@ -2329,6 +2388,7 @@
   <script src="src/sections/networth.js"></script>
   <script src="src/sections/dashboard.js"></script>
   <script src="src/sections/portfolio.js"></script>
+  <script src="src/sections/staking.js"></script>
   <script src="src/core/ai.js"></script>
   <!-- fiscal.js loaded on-demand by _lazyLoad when user navigates to the section -->
   <script src="src/utils/pdf.js"></script>

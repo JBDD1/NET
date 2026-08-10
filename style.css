@@ -769,18 +769,9 @@ ul  { list-style: none; }
   display: none;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
-  font-size: 18px;
-  font-weight: 600;
-  font-family: var(--font-serif);
-  font-style: italic;
-  color: var(--accent-ink, #fff);
-  letter-spacing: -0.5px;
   flex-shrink: 0;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.12);
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4));
+  animation: logoGlow 5s ease-in-out infinite;
 }
 
 .main-content {
@@ -1174,6 +1165,7 @@ ul  { list-style: none; }
 ───────────────────────────────────────────────────────────── */
 .section { display: none; padding: var(--sp-10) var(--sp-8) var(--sp-16); max-width: 100%; }
 .section.active { display: block; animation: sectionIn .18s ease both; }
+.hidden { display: none !important; }
 
 /* Gradiente ambiental — solo en dashboard, esquina superior derecha */
 #section-dashboard {
@@ -1485,8 +1477,27 @@ ul  { list-style: none; }
   display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: center;
 }
 .tx-search-input { min-width: 140px; max-width: 200px; }
-.month-nav-group { display: flex; align-items: center; gap: 2px; }
-.month-nav-btn { padding: 0 8px; font-size: 16px; line-height: 28px; }
+.month-nav-group {
+  display: flex; align-items: center; gap: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  height: 36px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  transition: border-color .18s, box-shadow .18s;
+}
+.month-nav-group:hover { border-color: var(--accent); }
+.month-nav-btn {
+  width: 32px; height: 36px; padding: 0;
+  font-size: 16px; font-weight: 300;
+  color: var(--accent); background: transparent; border-radius: 0;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.month-nav-btn:first-child { border-right: 1px solid var(--border-subtle); }
+.month-nav-btn:last-child  { border-left:  1px solid var(--border-subtle); }
+.month-nav-btn:hover { background: var(--accent-soft); }
 .tx-result-count { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .sortable-th:hover { color: var(--accent); }
 .sortable-th.sort-active { color: var(--accent); }
@@ -3412,7 +3423,8 @@ body, .kpi-card, .sidebar, .topbar, .modal, .watchlist-card, .alternative-card, 
   0%, 100% { filter: drop-shadow(0 0  0px var(--accent)); }
   50%       { filter: drop-shadow(0 0  8px var(--accent)); }
 }
-.logo-icon svg { animation: logoGlow 5s ease-in-out infinite; }
+.logo-icon svg,
+.logo-icon img { animation: logoGlow 5s ease-in-out infinite; }
 
 /* ── 9. Hero card — halo de fondo animado ──────────────────── */
 @keyframes heroHalo {
@@ -6327,17 +6339,44 @@ tr[tabindex="0"]:focus {
    label is hidden. Mobile: overlay technique + segmented presets.
 ═══════════════════════════════════════════════════════════════ */
 .month-nav-center {
+  position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: 120px;
+  height: 36px;
+  padding: 0 10px;
 }
-.month-nav-center .text-input {
-  flex: 1 1 auto;
-  min-width: 0;
-  width: auto !important;
+.month-nav-center input[type="month"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+  width: 100% !important;
+  height: 100%;
+  border: none;
+  background: transparent;
+  -webkit-appearance: none;
 }
-.tx-month-label { display: none; }
+.tx-month-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  pointer-events: none;
+  white-space: nowrap;
+  text-transform: capitalize;
+  letter-spacing: 0.01em;
+}
+.tx-month-label::after {
+  content: "📅";
+  font-size: 12px;
+  opacity: .65;
+}
 
 @media (max-width: 640px) {
   /* ── Filter group: single column on mobile ── */
@@ -7180,7 +7219,7 @@ tr[tabindex="0"]:focus {
 .login-logo-icon {
   display: flex;
   align-items: center;
-  filter: drop-shadow(0 0 12px rgba(212,169,96,.4));
+  filter: drop-shadow(0 0 20px rgba(212,169,96,.55)) drop-shadow(0 4px 12px rgba(0,0,0,.5));
 }
 .login-logo-text {
   font-size: 2rem;
@@ -7590,4 +7629,357 @@ tr[tabindex="0"]:focus {
 .photo-remove-btn:hover {
   opacity: 1;
   background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECTION TABS (Dividendos / Crypto Staking)
+═══════════════════════════════════════════════════════════════ */
+
+.section-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 1.8rem;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+.section-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 20px;
+  border: 1.5px solid var(--border-default);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+  transition: color .18s, border-color .18s, background .18s, box-shadow .18s;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+.section-tab:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.section-tab-active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.stk-tab-icon {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CRYPTO STAKING SECTION
+═══════════════════════════════════════════════════════════════ */
+
+/* ─── Assets header ─────────────────────────────────────────── */
+.stk-assets-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+  flex-wrap: wrap;
+}
+.stk-disclaimer-inline {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  font-style: italic;
+}
+
+/* ─── Assets grid ────────────────────────────────────────────── */
+.stk-assets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+.stk-asset-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.1rem;
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+.stk-asset-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-soft), 0 8px 24px rgba(0,0,0,.18);
+  transform: translateY(-2px);
+}
+
+/* ─── Coin logo ──────────────────────────────────────────────── */
+.stk-asset-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.stk-coin-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.stk-coin-logo-lg {
+  width: 48px;
+  height: 48px;
+  font-size: 22px;
+}
+.stk-asset-info {
+  flex: 1;
+  min-width: 0;
+}
+.stk-asset-name {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stk-asset-ticker {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: .04em;
+  margin-top: 1px;
+}
+
+/* ─── APY badge ──────────────────────────────────────────────── */
+.stk-apy-badge {
+  text-align: right;
+  flex-shrink: 0;
+}
+.stk-apy-val {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+.stk-apy-lbl {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-top: 1px;
+}
+
+/* ─── Meta rows ──────────────────────────────────────────────── */
+.stk-asset-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.stk-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.stk-meta-lbl {
+  color: var(--text-muted);
+}
+
+/* ─── Risk badges ────────────────────────────────────────────── */
+.stk-risk-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: .02em;
+}
+.stk-risk-low   { background: rgba(34,197,94,.14);  color: #22c55e; }
+.stk-risk-med   { background: rgba(234,179,8,.14);  color: #d4a317; }
+.stk-risk-medhi { background: rgba(249,115,22,.14); color: #f97316; }
+.stk-risk-hi    { background: rgba(239,68,68,.14);  color: #ef4444; }
+
+/* ─── Lock badges ────────────────────────────────────────────── */
+.stk-lock-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.stk-lock-free   { background: rgba(34,197,94,.10); color: #22c55e; }
+.stk-lock-locked { background: rgba(239,68,68,.10); color: #ef4444; }
+
+/* ─── Asset description ──────────────────────────────────────── */
+.stk-asset-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+  flex: 1;
+}
+
+/* ─── Stake button ───────────────────────────────────────────── */
+.stk-btn-stake {
+  width: 100%;
+  font-size: 13px;
+  padding: 9px 0;
+  margin-top: auto;
+  border-radius: var(--r-md);
+}
+
+/* ─── Position cell ──────────────────────────────────────────── */
+.stk-pos-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stk-coin-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── Modal coin header ──────────────────────────────────────── */
+.stk-modal-coin {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: 4px;
+}
+
+/* ─── Preview box ────────────────────────────────────────────── */
+.stk-preview-box {
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.stk-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  gap: 8px;
+}
+.stk-preview-row span { color: var(--text-muted); }
+
+/* ─── Disclaimer ─────────────────────────────────────────────── */
+.stk-disclaimer {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: rgba(239,68,68,.08);
+  border-left: 3px solid rgba(239,68,68,.5);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  padding: 8px 12px;
+  margin-top: 10px;
+  line-height: 1.5;
+}
+.stk-disclaimer-warn {
+  background: rgba(234,179,8,.08);
+  border-left-color: rgba(234,179,8,.6);
+}
+
+/* ─── Calculator ─────────────────────────────────────────────── */
+.stk-slider {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+  height: 4px;
+}
+.stk-calc-result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+.stk-calc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  gap: 8px;
+}
+.stk-calc-row span { color: var(--text-muted); }
+.stk-calc-total {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+.stk-calc-total span,
+.stk-calc-total strong { color: var(--text); font-weight: 700; }
+
+/* ─── Status badge ───────────────────────────────────────────── */
+.stk-status-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.stk-status-ok   { background: rgba(34,197,94,.12); color: #22c55e; }
+.stk-status-pend { background: rgba(234,179,8,.12); color: #d4a317; }
+
+/* ─── History header ─────────────────────────────────────────── */
+.stk-history-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* ─── Empty state ────────────────────────────────────────────── */
+.stk-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+}
+.stk-empty-icon {
+  font-size: 32px;
+  margin-bottom: 0.6rem;
+  opacity: 0.4;
+}
+.stk-empty-title {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+.stk-empty-sub {
+  color: var(--text-muted);
+  font-size: 13px;
+  max-width: 340px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .stk-assets-grid { grid-template-columns: 1fr 1fr; }
+  .stk-assets-hdr  { flex-direction: column; align-items: flex-start; }
+  .section-tabs     { overflow-x: auto; }
+  .section-tab      { padding: 8px 14px; font-size: 12px; }
+}
+@media (max-width: 480px) {
+  .stk-assets-grid { grid-template-columns: 1fr; }
 }

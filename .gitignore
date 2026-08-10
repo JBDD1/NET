@@ -1,7 +1,11 @@
 node_modules/
 data/
+# .env sin sufijo contiene secretos reales (API keys de servidor, etc.)
 .env
-*.env.*
+# .env.local y .env.*.local son overrides locales con secretos — NO committear
+.env.local
+.env.*.local
+# .env.development y .env.production SÍ se committean (solo contienen Firebase client keys, que son públicas)
 .DS_Store
 Thumbs.db
 dist/

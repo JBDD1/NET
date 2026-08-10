@@ -388,9 +388,9 @@ function _dashUpdateSparklines(annualDiv) {
   try {
     _drawSparkline('spark-networth',  _sparkNetworthData(7), true);
     _drawSparkline('spark-balance',   _sparkMonthlyData(7, 'balance'), false);
-    _drawSparkline('spark-portfolio', _sparkHistoryField(7, 'portfolioValue'), false);
+    _drawSparkline('spark-portfolio', _sparkPortfolioFallback(7), false);
     _drawSparkline('spark-savings',   _sparkMonthlyData(7, 'savings'), false, v => v.toFixed(1) + '%');
-    _drawSparkline('spark-cash',      _sparkHistoryField(7, 'cashValue'), false);
+    _drawSparkline('spark-cash',      _sparkCashFallback(7), false);
     _drawSparkline('spark-dividends', _sparkDividendsData(annualDiv, 7), false);
   } catch(e) { console.warn('sparklines:', e); }
 }
@@ -464,6 +464,28 @@ function _sparkNetworthData(n) {
 function _sparkHistoryField(n, field) {
   const pts = APP.networthHistory.slice(-n).map(h => h[field] ?? null).filter(v => v !== null);
   return pts.length >= 2 ? pts : [];
+}
+
+function _sparkPortfolioFallback(n) {
+  const hist = APP.networthHistory.slice(-n);
+  const direct = hist.map(h => h.portfolioValue ?? null).filter(v => v !== null);
+  if (direct.length >= 2) return direct;
+  const currNW = calcNetWorth() || 1;
+  const currPort = calcPortfolioValue();
+  if (currPort <= 0 || hist.length < 2) return [];
+  const ratio = currPort / currNW;
+  return hist.map(h => h.value * ratio);
+}
+
+function _sparkCashFallback(n) {
+  const hist = APP.networthHistory.slice(-n);
+  const direct = hist.map(h => h.cashValue ?? null).filter(v => v !== null);
+  if (direct.length >= 2) return direct;
+  const currNW = calcNetWorth() || 1;
+  const currCash = calcCashTotal();
+  if (currCash <= 0 || hist.length < 2) return [];
+  const ratio = currCash / currNW;
+  return hist.map(h => h.value * ratio);
 }
 
 function _sparkDividendsData(annualDiv, n) {

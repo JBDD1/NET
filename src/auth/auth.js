@@ -13,19 +13,18 @@
  */
 
 const FIREBASE_CONFIG = {
-  apiKey:            'AIzaSyBw0RiwDM-vcqJ_mXDZGz1xXy-rF6JjBqw',
-  authDomain:        'finova-92100.firebaseapp.com',
-  projectId:         'finova-92100',
-  storageBucket:     'finova-92100.firebasestorage.app',
-  messagingSenderId: '387946044101',
-  appId:             '1:387946044101:web:9d6435d177a4b7ad92eeac',
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || '',
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN        || '',
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID         || '',
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET     || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID             || '',
 };
 
 // ─── Correos con rol administrador ───────────────────────────────
-// Añade aquí los correos que tendrán acceso admin (demo, estadísticas, etc.)
-const ADMIN_EMAILS = [
-  'verdpo@gmail.com',
-];
+// La lista maestra se gestiona server-side con FINOVA_ADMIN_EMAILS.
+// Esta lista solo controla el badge de admin en el cliente.
+const ADMIN_EMAILS = ['MyFinova1@gmail.com'];
 
 // ─── Estado interno ───────────────────────────────────────────────
 let _fbAuth          = null;
@@ -47,7 +46,7 @@ async function initAuth() {
   }
 
   // Si Firebase no está configurado → modo local sin auth
-  if (FIREBASE_CONFIG.apiKey === 'PASTE_YOUR_FIREBASE_API_KEY') {
+  if (!FIREBASE_CONFIG.apiKey) {
     console.warn(
       '[Finova Auth] Firebase no configurado.\n' +
       'Edita src/auth/auth.js y pega tu firebaseConfig para activar el login.\n' +
@@ -103,14 +102,32 @@ async function initAuth() {
   }
 }
 
+// ─── Helper global: header de autorización Firebase ──────────
+// Accesible desde cualquier script clásico de la página.
+async function _getAuthHeader() {
+  try {
+    const auth = (typeof _fbAuth !== 'undefined' && _fbAuth) ? _fbAuth
+               : (typeof firebase !== 'undefined' && firebase.auth ? firebase.auth() : null);
+    const user = auth?.currentUser;
+    if (!user) return {};
+    const token = await user.getIdToken(false); // false = no forzar refresh innecesario
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+  } catch (_) { return {}; }
+}
+
 // ─── Guarda metadatos en servidor ────────────────────────────
-function _saveUserMeta(uid, email, displayName) {
+async function _saveUserMeta(uid, email, displayName) {
   if (!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return;
   try {
+    let token = '';
+    try { token = await _fbAuth?.currentUser?.getIdToken() || ''; } catch (_) {}
     fetch('/api/user-meta', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ uid, email: email || '', displayName: displayName || '' }),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ uid, email: email || '', displayName: displayName || '' }),
     }).catch(() => {});
   } catch (_) {}
 }
@@ -120,7 +137,10 @@ async function _loadUserDataFromServer(uid) {
   const key = `finova_${uid}_data_v1`;
   if (localStorage.getItem(key)) return; // ya hay datos locales para este UID
   try {
+    let token = '';
+    try { token = await _fbAuth?.currentUser?.getIdToken() || ''; } catch (_) {}
     const res  = await fetch(`/api/user-data?uid=${encodeURIComponent(uid)}`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       signal: AbortSignal.timeout(8000),
     });
     const json = await res.json();

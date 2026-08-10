@@ -71,23 +71,41 @@ function _pdfBar(doc, x, y, w, pct, fillColor) {
 /* ── Caja de insights automáticos ───────────────────────────── */
 function _pdfInsightBox(doc, items, y) {
   if (!items || !items.length) return y;
-  const W      = doc.internal.pageSize.getWidth();
-  const lineH  = 5.5;
-  const boxH   = 11 + (items.length - 1) * lineH;
+  const W    = doc.internal.pageSize.getWidth();
+  const padX = 19.5;
+  const maxW = W - padX - 16;
+  const lineH = 5.2;
+
+  // Pre-medir para calcular altura real del cuadro
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  const wrapped = items.map(item => doc.splitTextToSize(item, maxW));
+  const totalLines = wrapped.reduce((s, ls) => s + ls.length, 0);
+  const gapH = (items.length - 1) * 1.5;
+  const boxH = 12 + totalLines * lineH + gapH;
+
   doc.setFillColor(..._PDF.kpiBg);
   doc.roundedRect(12, y, W - 24, boxH, 2, 2, 'F');
   doc.setFillColor(..._PDF.gold);
   doc.roundedRect(12, y, 3.5, boxH, 1, 1, 'F');
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6.5);
   doc.setTextColor(..._PDF.goldDim);
-  doc.text('ANÁLISIS AUTOMÁTICO', 19.5, y + 4.5);
+  doc.text('ANALISIS AUTOMATICO', padX, y + 5.5);
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(..._PDF.dark2);
-  items.forEach((item, i) => {
-    doc.text('· ' + item, 19.5, y + 9.5 + i * lineH);
+  let curY = y + 10.5;
+  wrapped.forEach((lines, i) => {
+    lines.forEach((line, j) => {
+      doc.text((j === 0 ? '- ' : '  ') + line, padX, curY);
+      curY += lineH;
+    });
+    if (i < wrapped.length - 1) curY += 1.5;
   });
+
   doc.setTextColor(..._PDF.kpiVal);
   return y + boxH + 6;
 }
@@ -297,14 +315,15 @@ async function exportMonthlyPDF() {
   // ── Insights automáticos ─────────────────────────────────────
   const insights = [];
   if (txMonth.length > 0) {
-    const balLabel = bal >= 0
-      ? `balance positivo de +${formatCurrency(bal)}`
-      : `balance negativo de ${formatCurrency(bal)}`;
-    insights.push(`${monthStr.charAt(0).toUpperCase() + monthStr.slice(1)}: ingresos ${formatCurrency(inc)}, gastos ${formatCurrency(exp)} → ${balLabel}`);
-    insights.push(`Tasa de ahorro: ${saveRate.toFixed(1)}% ${saveRate >= 20 ? '✓ excelente' : saveRate >= 10 ? '· correcta' : '· por debajo del objetivo recomendado (20%)'}`);
+    const balSign  = bal >= 0 ? '+' : '';
+    const balLabel = bal >= 0 ? 'balance positivo' : 'balance negativo';
+    insights.push(`${monthStr.charAt(0).toUpperCase() + monthStr.slice(1)}: ingresos ${formatCurrency(inc)}, gastos ${formatCurrency(exp)}, ${balLabel} de ${balSign}${formatCurrency(bal)}`);
+    const rateTag  = saveRate >= 20 ? 'excelente' : saveRate >= 10 ? 'correcta' : 'por debajo del objetivo recomendado (20%)';
+    insights.push(`Tasa de ahorro: ${saveRate.toFixed(1)}% — ${rateTag}`);
   }
   if (nwDelta !== 0) {
-    insights.push(`Patrimonio ${nwDelta >= 0 ? 'creció' : 'bajó'} ${nwDelta >= 0 ? '+' : ''}${formatCurrency(nwDelta)} respecto al mes anterior`);
+    const sign = nwDelta >= 0 ? '+' : '';
+    insights.push(`Patrimonio ${nwDelta >= 0 ? 'subio' : 'bajo'} ${sign}${formatCurrency(Math.abs(nwDelta))} respecto al mes anterior`);
   }
   if (topCat) {
     insights.push(`Mayor gasto: ${topCat[0]} con ${formatCurrency(topCat[1])} (${exp > 0 ? (topCat[1] / exp * 100).toFixed(0) : 0}% del total de gastos)`);
@@ -318,7 +337,7 @@ async function exportMonthlyPDF() {
       label: 'Patrimonio Neto',
       value: formatCurrency(netWorth),
       color: nwDelta > 0 ? _PDF.gain : undefined,
-      sub:   nwDelta ? (nwDelta >= 0 ? '▲ +' : '▼ ') + formatCurrency(Math.abs(nwDelta)) + ' vs mes ant.' : null,
+      sub:   nwDelta ? (nwDelta >= 0 ? '+ ' : '- ') + formatCurrency(Math.abs(nwDelta)) + ' vs mes ant.' : null,
     },
     { label: 'Efectivo',    value: formatCurrency(cash), pct: netWorth > 0 ? cash / netWorth * 100 : 0 },
     { label: 'Inversiones', value: formatCurrency(inv),  pct: netWorth > 0 ? inv  / netWorth * 100 : 0 },
@@ -742,10 +761,10 @@ async function exportMonthlyBriefingPDF() {
   const invVal = calcPortfolioValue();
 
   const coverKPIs = [
-    { label: 'PATRIMONIO NETO', value: formatCurrency(nw),       delta: nwD ? (nwD >= 0 ? '▲ +' : '▼ ') + formatCurrency(Math.abs(nwD)) : null, pos: nwD >= 0 },
+    { label: 'PATRIMONIO NETO', value: formatCurrency(nw),       delta: nwD ? (nwD >= 0 ? '+ ' : '- ') + formatCurrency(Math.abs(nwD)) : null, pos: nwD >= 0 },
     { label: 'BALANCE DEL MES', value: formatCurrency(bal),      delta: null, pos: bal >= 0 },
     { label: 'INVERSIONES',      value: formatCurrency(invVal),  delta: null, pos: true },
-    { label: 'TASA DE AHORRO',   value: rate.toFixed(1) + '%',   delta: rate >= 20 ? 'Objetivo: 20% ✓' : 'Objetivo: 20%', pos: rate >= 20 },
+    { label: 'TASA DE AHORRO',   value: rate.toFixed(1) + '%',   delta: rate >= 20 ? 'Objetivo: 20% (OK)' : 'Objetivo: 20%', pos: rate >= 20 },
   ];
 
   const startY = H * 0.46;
@@ -806,11 +825,11 @@ async function exportMonthlyBriefingPDF() {
       label: 'Patrimonio actual',
       value: formatCurrency(nw),
       color: nwD > 0 ? _PDF.gain : undefined,
-      sub:   nwD ? (nwD >= 0 ? '▲ +' : '▼ ') + formatCurrency(Math.abs(nwD)) + ' vs mes ant.' : null,
+      sub:   nwD ? (nwD >= 0 ? '+ ' : '- ') + formatCurrency(Math.abs(nwD)) + ' vs mes ant.' : null,
     },
     { label: 'Efectivo',           value: formatCurrency(cashTot), pct: nw > 0 ? cashTot / nw * 100 : 0 },
     { label: 'Inversiones',        value: formatCurrency(invVal),  pct: nw > 0 ? invVal  / nw * 100 : 0 },
-    { label: 'Patrimonio anterior', value: formatCurrency(prevNW), sub: prevPrevNW ? (nw > prevPrevNW ? '▲' : '▼') + ' vs 2 meses ant.' : null },
+    { label: 'Patrimonio anterior', value: formatCurrency(prevNW), sub: prevPrevNW ? (nw > prevPrevNW ? '+ ' : '- ') + 'vs 2 meses ant.' : null },
   ], y);
 
   y = _pdfSection(doc, `Flujo de caja — ${monthTitle}`, y);
@@ -820,7 +839,7 @@ async function exportMonthlyBriefingPDF() {
       label: 'Gastos',
       value: formatCurrency(exp),
       color: _PDF.loss,
-      sub:   prevExp ? (exp <= prevExp ? '▼ ' : '▲ ') + formatCurrency(Math.abs(exp - prevExp)) + ' vs mes ant.' : null,
+      sub:   prevExp ? (exp <= prevExp ? '- ' : '+ ') + formatCurrency(Math.abs(exp - prevExp)) + ' vs mes ant.' : null,
     },
     { label: 'Balance',        value: (bal >= 0 ? '+' : '') + formatCurrency(bal), color: bal >= 0 ? _PDF.gain : _PDF.loss },
     { label: 'Tasa de ahorro', value: rate.toFixed(1) + '%',
@@ -849,7 +868,7 @@ async function exportMonthlyBriefingPDF() {
         styles:  { textColor: a.gain >= 0 ? _PDF.gain : _PDF.loss, fontStyle: 'bold', halign: 'right' },
       },
       {
-        content: a.gain >= 0 ? '▲' : '▼',
+        content: a.gain >= 0 ? '+' : '-',
         styles:  { textColor: a.gain >= 0 ? _PDF.gain : _PDF.loss, fontStyle: 'bold', halign: 'center' },
       },
     ]);
@@ -896,7 +915,7 @@ async function exportMonthlyBriefingPDF() {
           styles:  { halign: 'right', textColor: diff <= 0 ? _PDF.gain : _PDF.loss, fontStyle: 'bold' },
         },
         {
-          content: diff > 0 ? '▲' : diff < 0 ? '▼' : '—',
+          content: diff > 0 ? '+' : diff < 0 ? '-' : '=',
           styles:  { halign: 'center', textColor: diff <= 0 ? _PDF.gain : _PDF.loss, fontStyle: 'bold' },
         },
       ];
@@ -1023,7 +1042,7 @@ async function exportMonthlyBriefingPDF() {
       doc.setFontSize(8);
       doc.setTextColor(..._PDF.dark2);
       ws.advice.forEach((a, i) => {
-        doc.text('↑ ' + a, 19.5, y + 11 + i * 6.5);
+        doc.text('- ' + a, 19.5, y + 11 + i * 6.5);
       });
     }
   }

@@ -9,7 +9,7 @@
 
 var SERVER_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:3000'
-  : 'https://net-production-651a.up.railway.app';
+  : ''; // Producción: el proxy de Vercel enruta /api/* a Railway sin exponer la URL real
 
 let aiHistory = [];
 const AI_MAX_HISTORY = 10; // últimos 5 turnos de conversación enviados a la API
@@ -319,23 +319,38 @@ function _aiLocalFallback(question) {
 }
 
 async function callViaProxy(provider, apiKey, systemPrompt) {
+  const authHeaders = {};
+  try {
+    const user = firebase.auth().currentUser;
+    if (user) { const tok = await user.getIdToken(); if (tok) authHeaders['Authorization'] = 'Bearer ' + tok; }
+  } catch {}
+
   const res = await fetch(`${SERVER_URL}/api/ai`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
     body: JSON.stringify({ provider, apiKey, messages: aiHistory.slice(-AI_MAX_HISTORY), systemPrompt }),
   });
+
   if (res.status === 405 || res.status === 404) {
     return callDirect(provider, apiKey, systemPrompt);
   }
+
+  const data = await res.json().catch(() => ({}));
+
   if (res.status === 429) {
-    showToast('Límite de IA alcanzado, espera 60 s', 'error');
-    setTimeout(() => {
-      const btn = document.getElementById('ai-send-btn');
-      if (btn) { btn.disabled = true; setTimeout(() => { btn.disabled = false; }, 60000); }
-    }, 0);
+    const msg = data.limitReached
+      ? (data.error || 'Has alcanzado el límite diario de consultas del Asesor IA.')
+      : 'Demasiadas peticiones al Asesor IA. Espera un momento.';
+    showToast(msg, 'error');
+    if (!data.limitReached) {
+      setTimeout(() => {
+        const btn = document.getElementById('ai-send-btn');
+        if (btn) { btn.disabled = true; setTimeout(() => { btn.disabled = false; }, 60000); }
+      }, 0);
+    }
     throw new Error('__rate_limited__');
   }
-  const data = await res.json().catch(() => ({}));
+
   if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
   return data.text || '';
 }

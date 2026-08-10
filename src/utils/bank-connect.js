@@ -124,7 +124,7 @@ async function _gcLoadPicker() {
   try {
     if (!_bankInstitutionsList) {
       let r;
-      try { r = await fetch('/api/bank/institutions'); }
+      try { r = await fetch('/api/bank/institutions', { headers: await _getAuthHeader() }); }
       catch { throw new Error('No se pudo contactar con el servidor. ¿Está en marcha?'); }
       const ct = r.headers.get('content-type') || '';
       if (!ct.includes('json')) {
@@ -212,9 +212,10 @@ async function _gcStartConnect(institutionId, bankName, bankLogo) {
   body.innerHTML = '<div class="bank-loading">Preparando conexión con ' + escapeHtml(bankName) + '…</div>';
 
   try {
+    const authH = await _getAuthHeader();
     const r = await fetch('/api/bank/connect', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authH },
       body:    JSON.stringify({ institutionId }),
     });
     const data = await r.json();
@@ -257,7 +258,7 @@ async function _gcFinishConnect() {
   body.innerHTML = '<div class="bank-loading">Verificando autorización…</div>';
 
   try {
-    const sr   = await fetch('/api/bank/requisition?id=' + encodeURIComponent(_gcPendingReqId));
+    const sr   = await fetch('/api/bank/requisition?id=' + encodeURIComponent(_gcPendingReqId), { headers: await _getAuthHeader() });
     const stat = await sr.json();
     if (stat.error) throw new Error(stat.error);
 
@@ -277,9 +278,10 @@ async function _gcFinishConnect() {
 
     body.innerHTML = '<div class="bank-loading">Importando transacciones…</div>';
 
+    const authH2     = await _getAuthHeader();
     const ir         = await fetch('/api/bank/import', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authH2 },
       body:    JSON.stringify({ requisitionId: _gcPendingReqId }),
     });
     const importData = await ir.json();
@@ -397,9 +399,10 @@ async function _bankImportConn(connIdx) {
   }
   showToast('Importando ' + conn.bankName + '…', 'info');
   try {
+    const authH = await _getAuthHeader();
     const r = await fetch('/api/bank/import', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authH },
       body:    JSON.stringify({ requisitionId: conn.requisitionId }),
     });
     const data = await r.json();
@@ -448,9 +451,10 @@ async function _bankAutoSync(silent = true) {
       const conn = connections[ci];
       if (!conn.requisitionId) continue;
       try {
+        const authH = await _getAuthHeader();
         const r = await fetch('/api/bank/import', {
           method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authH },
           body:    JSON.stringify({ requisitionId: conn.requisitionId }),
         });
         const data = await r.json();

@@ -12,9 +12,10 @@ async function renderAdminSection() {
 async function _ensureAdminMeta() {
   if (!APP.uid || !APP.userEmail) return;
   try {
+    const authH = await _getAuthHeader();
     await fetch('/api/user-meta', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authH },
       body:    JSON.stringify({ uid: APP.uid, email: APP.userEmail, displayName: APP.userName || '' }),
       signal:  AbortSignal.timeout(5000),
     });
@@ -23,9 +24,10 @@ async function _ensureAdminMeta() {
 
 async function adminLoadStats() {
   try {
+    const authH = await _getAuthHeader();
     const [statsRes, healthRes] = await Promise.all([
-      fetch(`/api/admin/stats?adminUid=${encodeURIComponent(APP.uid)}`),
-      fetch(`/api/admin/health?adminUid=${encodeURIComponent(APP.uid)}`),
+      fetch('/api/admin/stats',  { headers: authH }),
+      fetch('/api/admin/health', { headers: authH }),
     ]);
     if (statsRes.status === 404 || healthRes.status === 404) {
       const kpis = document.getElementById('admin-kpis');
@@ -83,7 +85,8 @@ async function adminRefreshUsers() {
   if (!el) return;
   el.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0">Cargando…</p>';
   try {
-    const res  = await fetch(`/api/admin/users?adminUid=${encodeURIComponent(APP.uid)}`);
+    const authH = await _getAuthHeader();
+    const res  = await fetch('/api/admin/users', { headers: authH });
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch {
@@ -157,10 +160,11 @@ function _renderUsersTable(users) {
 
 async function adminToggleBlock(targetUid, blocked) {
   try {
+    const authH = await _getAuthHeader();
     const res  = await fetch('/api/admin/block', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ adminUid: APP.uid, targetUid, blocked }),
+      headers: { 'Content-Type': 'application/json', ...authH },
+      body:    JSON.stringify({ targetUid, blocked }),
     });
     const data = await res.json();
     if (data.ok) {
@@ -174,10 +178,11 @@ async function adminToggleBlock(targetUid, blocked) {
 
 async function adminToggleAdminRole(targetEmail, isAdmin) {
   try {
+    const authH = await _getAuthHeader();
     const res  = await fetch('/api/admin/set-admin', {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ adminUid: APP.uid, targetEmail, isAdmin }),
+      headers: { 'Content-Type': 'application/json', ...authH },
+      body:    JSON.stringify({ targetEmail, isAdmin }),
     });
     const data = await res.json();
     if (data.ok) {
@@ -195,7 +200,8 @@ async function adminHealthCheck() {
   el.innerHTML = '<span style="color:var(--text-muted);font-size:13px">Verificando…</span>';
   const t0 = Date.now();
   try {
-    const res  = await fetch(`/api/admin/health?adminUid=${encodeURIComponent(APP.uid)}`);
+    const authH = await _getAuthHeader();
+    const res  = await fetch('/api/admin/health', { headers: authH });
     const data = await res.json();
     const ms   = Date.now() - t0;
     if (data.ok) {

@@ -5,7 +5,7 @@
 
 var SERVER_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:3000'
-  : 'https://net-production-651a.up.railway.app';
+  : ''; // Producción: Vercel proxy enruta /api/* a Railway sin exponer la URL real
 
 function _portSparkDraw(id, rawData, isHero) {
   const canvas = document.getElementById(id);
