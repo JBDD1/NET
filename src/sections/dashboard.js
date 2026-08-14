@@ -4,18 +4,19 @@
 ═══════════════════════════════════════════════════════════════ */
 
 /* ─── Dashboard layout system ────────────────────────────────── */
+const _dbIcon = name => `<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
 const DASH_BLOCK_DEFS = [
-  { id: 'dash-block-kpis',            label: 'Indicadores (KPIs)',        icon: '📊', full: true,  kpis: true },
-  { id: 'dash-block-chart-networth',  label: 'Evolución del patrimonio',  icon: '📈', full: true  },
-  { id: 'dash-block-chart-dist',      label: 'Distribución patrimonio',   icon: '🥧', full: false },
-  { id: 'dash-block-investments',     label: 'Top inversiones',           icon: '🏆', full: false },
-  { id: 'dash-block-activity',        label: 'Actividad reciente',        icon: '🕐', full: false },
-  { id: 'dash-block-goals',           label: 'Objetivos financieros',     icon: '🎯', full: false },
-  { id: 'dash-block-expcats',         label: 'Gastos por categoría',      icon: '💸', full: false },
-  { id: 'dash-block-rule5030',        label: 'Regla 50/30/20',            icon: '⚖',  full: false },
-  { id: 'dash-block-wealth-score',    label: 'Wealth Score',              icon: '◉',  full: false },
-  { id: 'dash-block-timeline',        label: 'Timeline financiero',       icon: '⏳', full: true  },
-  { id: 'dash-block-heatmap',         label: 'Heatmap de gastos',         icon: '◫',  full: true  },
+  { id: 'dash-block-kpis',            label: 'Indicadores (KPIs)',        icon: _dbIcon('dashboard'),    full: true,  kpis: true },
+  { id: 'dash-block-chart-networth',  label: 'Evolución del patrimonio',  icon: _dbIcon('trending-up'),  full: true  },
+  { id: 'dash-block-chart-dist',      label: 'Distribución patrimonio',   icon: _dbIcon('networth'),     full: false },
+  { id: 'dash-block-investments',     label: 'Top inversiones',           icon: _dbIcon('trophy'),       full: false },
+  { id: 'dash-block-activity',        label: 'Actividad reciente',        icon: _dbIcon('clock'),        full: false },
+  { id: 'dash-block-goals',           label: 'Objetivos financieros',     icon: _dbIcon('target'),       full: false },
+  { id: 'dash-block-expcats',         label: 'Gastos por categoría',      icon: _dbIcon('wallet'),       full: false },
+  { id: 'dash-block-rule5030',        label: 'Regla 50/30/20',            icon: _dbIcon('scale'),        full: false },
+  { id: 'dash-block-wealth-score',    label: 'Wealth Score',              icon: _dbIcon('networth'),     full: false },
+  { id: 'dash-block-timeline',        label: 'Timeline financiero',       icon: _dbIcon('clock'),        full: true  },
+  { id: 'dash-block-heatmap',         label: 'Heatmap de gastos',         icon: _dbIcon('grid'),         full: true  },
 ];
 
 const DASH_KPI_DEFS = [
@@ -198,7 +199,7 @@ function _saveDashLayout() {
   applyDashboardLayout();
   renderDashboard();
   closeModal();
-  showToast('Dashboard personalizado ✓', 'success');
+  showToast('Dashboard personalizado', 'success');
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -221,7 +222,7 @@ function loadDemo() {
   saveData();
   markDashboardDirty();
   renderDashboard();
-  showToast('Datos de ejemplo cargados ✓', 'success');
+  showToast('Datos de ejemplo cargados', 'success');
 }
 
 function startFresh() {
@@ -244,7 +245,7 @@ function startFresh() {
   saveData();
   markDashboardDirty();
   renderDashboard();
-  showToast('Listo — empieza a añadir tus datos ✓', 'success');
+  showToast('Listo — empieza a añadir tus datos', 'success');
 }
 
 function resetAllData() {
@@ -258,9 +259,9 @@ function openResetDialog() {
   if (_resetCountdownTimer) { clearInterval(_resetCountdownTimer); _resetCountdownTimer = null; }
   let secs = 5;
 
-  openModal('⚠ Eliminar todos los datos', `
+  openModal('Eliminar todos los datos', `
     <div class="modal-danger-box">
-      <span class="modal-danger-icon">⚠️</span>
+      <span class="modal-danger-icon"><svg class="icon icon-lg" aria-hidden="true"><use href="#icon-alert-triangle"></use></svg></span>
       <div>
         <div class="modal-danger-title">Esta acción es permanente e irreversible</div>
         <div class="modal-danger-body">
@@ -268,7 +269,7 @@ function openResetDialog() {
           Si no tienes un backup descargado, los datos se perderán para siempre.
         </div>
         <div class="modal-note">
-          💡 Si solo quieres ocultar secciones, usa <strong>Personalizar Dashboard</strong> en Ajustes sin borrar nada.
+          <svg class="icon icon-xs" aria-hidden="true"><use href="#icon-info"></use></svg> Si solo quieres ocultar secciones, usa <strong>Personalizar Dashboard</strong> en Ajustes sin borrar nada.
         </div>
       </div>
     </div>
@@ -296,7 +297,7 @@ function openResetDialog() {
         btn.disabled    = false;
         btn.style.opacity = '1';
         btn.style.cursor  = 'pointer';
-        btn.textContent   = '⚠ Eliminar todo';
+        btn.textContent   = 'Eliminar todo';
         const msg = document.getElementById('reset-wait-msg');
         if (msg) msg.style.display = 'none';
       } else {
@@ -807,8 +808,8 @@ function renderRecentActivity() {
           ${isIncome ? '+' : '-'}${formatCurrency(t.amount)}
         </div>
         <div class="activity-actions">
-          <button class="btn-icon-xs" data-action="edit-tx" title="Editar">✏</button>
-          <button class="btn-icon-xs btn-icon-xs-danger" data-action="delete-tx" title="Eliminar">✕</button>
+          <button class="btn-icon-xs" data-action="edit-tx" title="Editar"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-edit"></use></svg></button>
+          <button class="btn-icon-xs btn-icon-xs-danger" data-action="delete-tx" title="Eliminar"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-close"></use></svg></button>
         </div>
       </div>
     `;
@@ -894,7 +895,7 @@ function calcDashboardInsight() {
       if (Math.abs(pct) >= 10) {
         insights.push({
           type:  pct > 0 ? 'warning' : 'positive',
-          icon:  pct > 0 ? '📈' : '📉',
+          icon:  `<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-trending-${pct > 0 ? 'up' : 'down'}"></use></svg>`,
           text:  pct > 0
             ? `Este mes gastas un <strong>${Math.abs(pct).toFixed(0)}% más</strong> que tu media de los últimos 6 meses (media: ${formatCurrency(avg)}/mes)`
             : `Este mes gastas un <strong>${Math.abs(pct).toFixed(0)}% menos</strong> que tu media de los últimos 6 meses — ¡buen ritmo!`,
@@ -931,7 +932,7 @@ function calcDashboardInsight() {
       if (Math.abs(pct) >= 2) {
         insights.push({
           type:  pct > 0 ? 'positive' : 'warning',
-          icon:  '💰',
+          icon:  '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-wallet"></use></svg>',
           text:  pct > 0
             ? `Tu patrimonio creció <strong>${formatCurrency(diff)}</strong> (+${pct.toFixed(1)}%) respecto al mes anterior`
             : `Tu patrimonio bajó <strong>${formatCurrency(Math.abs(diff))}</strong> (${pct.toFixed(1)}%) respecto al mes anterior`,
@@ -951,7 +952,7 @@ function calcDashboardInsight() {
     if (top && top[1] / currentExp >= 0.40) {
       insights.push({
         type:  'neutral',
-        icon:  '💸',
+        icon:  '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-arrow-down-right"></use></svg>',
         text:  `<strong>${escapeHtml(top[0])}</strong> representa el <strong>${((top[1] / currentExp) * 100).toFixed(0)}%</strong> de tus gastos este mes (${formatCurrency(top[1])})`,
         score: (top[1] / currentExp) * 40,
       });
@@ -1035,9 +1036,9 @@ function renderMonthlyRecap() {
   el.innerHTML = `
     <div class="recap-banner">
       <div class="recap-header">
-        <span class="recap-icon">📅</span>
+        <span class="recap-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-calendar"></use></svg></span>
         <span class="recap-title">Estado de ${monthName}</span>
-        <button class="recap-close" onclick="dismissMonthlyRecap('${prevMonth}')" aria-label="Cerrar resumen">✕</button>
+        <button class="recap-close" onclick="dismissMonthlyRecap('${prevMonth}')" aria-label="Cerrar resumen"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-close"></use></svg></button>
       </div>
       <div class="recap-stats">${recapItems}</div>
     </div>
@@ -1126,7 +1127,7 @@ function calcAlerts() {
     if (daysOverdue > 0) {
       const key = `goal-overdue-${g.id}`;
       if (!_isAlertDismissed(key)) {
-        alerts.push({ key, type: 'danger', icon: '⚠️',
+        alerts.push({ key, type: 'danger', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-alert-triangle"></use></svg>',
           text: `El plazo del objetivo <strong>${escapeHtml(g.name)}</strong> venció hace <strong>${daysOverdue} días</strong> — al <strong>${pct.toFixed(0)}%</strong>` });
       }
     }
@@ -1141,7 +1142,7 @@ function calcAlerts() {
     if (balance < 0) {
       const key = `neg-balance-${currentMonth}`;
       if (!_isAlertDismissed(key)) {
-        alerts.push({ key, type: 'danger', icon: '📉',
+        alerts.push({ key, type: 'danger', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-trending-down"></use></svg>',
           text: `Tu balance de este mes es negativo: <strong>${formatCurrency(balance)}</strong> — gastos por encima de ingresos` });
       }
     }
@@ -1151,7 +1152,7 @@ function calcAlerts() {
   if (day >= 15 && income === 0) {
     const key = `no-income-${currentMonth}`;
     if (!_isAlertDismissed(key)) {
-      alerts.push({ key, type: 'info', icon: '💡',
+      alerts.push({ key, type: 'info', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-info"></use></svg>',
         text: `Aún no has registrado ningún ingreso este mes` });
     }
   }
@@ -1165,7 +1166,7 @@ function calcAlerts() {
     const key = `watch-alert-${w.id}-${alertType}`;
     if (!_isAlertDismissed(key)) {
       const dir = alertType === 'below' ? 'por debajo de' : 'por encima de';
-      alerts.push({ key, type: 'warning', icon: '🔔',
+      alerts.push({ key, type: 'warning', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-bell"></use></svg>',
         text: `<strong>${escapeHtml(w.name)} (${escapeHtml(w.ticker)})</strong> está ${dir} tu precio objetivo <strong>${formatCurrency(w.targetPrice)}</strong>` });
     }
   });
@@ -1178,7 +1179,7 @@ function calcAlerts() {
       const total = dueRec.reduce((s, r) => s + r.amount, 0);
       const names = dueRec.slice(0, 2).map(r => escapeHtml(r.description)).join(', ');
       const extra = dueRec.length > 2 ? ` y ${dueRec.length - 2} más` : '';
-      alerts.push({ key, type: 'info', icon: '⟳',
+      alerts.push({ key, type: 'info', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-refresh"></use></svg>',
         text: `Tienes <strong>${dueRec.length} transacción${dueRec.length > 1 ? 'es' : ''} recurrente${dueRec.length > 1 ? 's' : ''}</strong> pendiente${dueRec.length > 1 ? 's' : ''} de registrar: ${names}${extra} — <strong>${formatCurrency(total)}</strong>` });
     }
   }
@@ -1190,7 +1191,7 @@ function calcAlerts() {
     const key = `budget-over-${b.category}-${currentMonth}`;
     if (!_isAlertDismissed(key)) {
       const over = spent - b.monthlyAmount;
-      alerts.push({ key, type: 'warning', icon: '💸',
+      alerts.push({ key, type: 'warning', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-alert-triangle"></use></svg>',
         text: `Presupuesto de <strong>${escapeHtml(b.category)}</strong> superado en <strong>${formatCurrency(over)}</strong> este mes` });
     }
   });
@@ -1216,7 +1217,7 @@ function calcAlerts() {
       if (dropPct >= dropThresh) {
         const alertKey = `savings-drop-${currentMonth}`;
         if (!_isAlertDismissed(alertKey)) {
-          alerts.push({ key: alertKey, type: 'warning', icon: '📉',
+          alerts.push({ key: alertKey, type: 'warning', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-trending-down"></use></svg>',
             text: `Tu tasa de ahorro bajó un <strong>${dropPct.toFixed(0)}%</strong> este mes respecto a tu media de los últimos 6 meses (<strong>${avgRate.toFixed(1)}%</strong> → <strong>${currentRate.toFixed(1)}%</strong>)` });
         }
       }
@@ -1234,7 +1235,7 @@ function calcAlerts() {
       const alertKey = `concentration-${a.id}-${currentMonth}`;
       if (!_isAlertDismissed(alertKey)) {
         const ticker = a.ticker ? ` (${escapeHtml(a.ticker)})` : '';
-        alerts.push({ key: alertKey, type: 'warning', icon: '⚠️',
+        alerts.push({ key: alertKey, type: 'warning', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-alert-triangle"></use></svg>',
           text: `<strong>${escapeHtml(a.name)}${ticker}</strong> representa el <strong>${pct.toFixed(0)}%</strong> de tu cartera — supera tu límite de concentración del <strong>${concentrationLimit}%</strong>` });
       }
     });
@@ -1360,7 +1361,7 @@ function _narrativeNetworth(networth) {
   // All-time high (requires at least 3 data points to be meaningful)
   if (hist.length >= 3) {
     const max = Math.max(...hist.map(h => h.value));
-    if (networth >= max) return '<span class="kpi-narrative-star">✦ Máximo histórico</span>';
+    if (networth >= max) return '<span class="kpi-narrative-star"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-sparkles"></use></svg> Máximo histórico</span>';
   }
 
   // YTD change — compare against first entry of current year
@@ -1473,7 +1474,7 @@ function _narrativeSavings(rate) {
 
   const { es, eu } = _SAVINGS_BENCHMARKS;
   let bench = '';
-  if (rate >= eu)      bench = `<span class="kpi-narrative-star">Superas la media europea (${eu}%) ✦</span>`;
+  if (rate >= eu)      bench = `<span class="kpi-narrative-star">Superas la media europea (${eu}%) <svg class="icon icon-xs" aria-hidden="true"><use href="#icon-sparkles"></use></svg></span>`;
   else if (rate >= es) bench = `Por encima de la media española (${es}%), por debajo de la europea (${eu}%)`;
   else                 bench = `Media española ${es}% · europea ${eu}%`;
 
@@ -1589,7 +1590,7 @@ function renderDashboardAlerts() {
     <div class="dash-alert dash-alert-${a.type}">
       <span class="dash-alert-icon">${a.icon}</span>
       <span class="dash-alert-text">${a.text}</span>
-      <button class="dash-alert-dismiss" onclick="dismissAlert('${escapeHtml(a.key)}')" title="Descartar">✕</button>
+      <button class="dash-alert-dismiss" onclick="dismissAlert('${escapeHtml(a.key)}')" title="Descartar"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-close"></use></svg></button>
     </div>
   `).join('');
 }
@@ -1848,7 +1849,7 @@ function _buildTimelineEvents() {
   (APP.portfolio || []).forEach(a => {
     if (!a.buyDate) return;
     events.push({
-      date: a.buyDate, type: 'investment', icon: '📈',
+      date: a.buyDate, type: 'investment', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-trending-up"></use></svg>',
       title: `Compra: ${escapeHtml(a.name || a.ticker || 'Activo')}`,
       text:  `${a.quantity} uds. a ${formatCurrency(a.buyPrice)}`,
     });
@@ -1863,7 +1864,7 @@ function _buildTimelineEvents() {
     MILESTONES.forEach(m => {
       if (prev < m && curr >= m) {
         events.push({
-          date: hist[i].date + '-01', type: 'milestone', icon: '🏆',
+          date: hist[i].date + '-01', type: 'milestone', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-trophy"></use></svg>',
           title: `Patrimonio supera ${formatCurrency(m)}`,
           text:  `Hito alcanzado en ${hist[i].date}`,
         });
@@ -1875,7 +1876,7 @@ function _buildTimelineEvents() {
   (APP.liabilities || []).forEach(l => {
     if (!l.startDate) return;
     events.push({
-      date: l.startDate, type: 'debt', icon: '💳',
+      date: l.startDate, type: 'debt', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-card"></use></svg>',
       title: `Deuda registrada: ${escapeHtml(l.name || l.type)}`,
       text:  `${formatCurrency(l.originalAmount)} — ${l.type}`,
     });
@@ -1917,7 +1918,7 @@ function renderFinancialTimeline() {
           <div class="tl-date">${formatDate(e.date)}</div>
           <div class="tl-title">${e.title}</div>
           ${e.text ? `<div class="tl-desc">${e.text}</div>` : ''}
-          ${e.manual ? `<button class="tl-del" onclick="deleteTimelineAnnotation('${e.id}')" title="Eliminar">✕</button>` : ''}
+          ${e.manual ? `<button class="tl-del" onclick="deleteTimelineAnnotation('${e.id}')" title="Eliminar"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-close"></use></svg></button>` : ''}
         </div>
       </div>`).join('')
     : `<div class="tl-empty">Añade transacciones e inversiones para ver tu historial financiero aquí.</div>`;
@@ -1947,7 +1948,7 @@ function _addTimelineNote() {
   if (textEl)  textEl.value  = '';
   if (emojiEl) emojiEl.value = '';
   renderFinancialTimeline();
-  showToast('Anotación añadida ✓', 'success');
+  showToast('Anotación añadida', 'success');
 }
 
 function deleteTimelineAnnotation(id) {
@@ -2012,9 +2013,9 @@ function _renderNotifManager() {
         <span class="dash-alert-text">${a.text}</span>
         <button class="dash-alert-dismiss"
           onclick="dismissAlert('${escapeHtml(a.key)}');_renderNotifManager()"
-          title="Descartar">✕</button>
+          title="Descartar"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-close"></use></svg></button>
       </div>`).join('')
-    : '<div class="notif-empty">No hay alertas activas — todo en orden ✓</div>';
+    : '<div class="notif-empty">No hay alertas activas — todo en orden</div>';
 
   const customHtml = custom.length
     ? custom.map(ca => `
@@ -2030,7 +2031,7 @@ function _renderNotifManager() {
           <span class="notif-toggle-track"></span>
         </label>
         <button class="dash-alert-dismiss" style="position:static"
-          onclick="_deleteCustomAlert('${ca.id}')" title="Eliminar">✕</button>
+          onclick="_deleteCustomAlert('${ca.id}')" title="Eliminar"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-close"></use></svg></button>
       </div>`).join('')
     : '<div style="font-size:13px;color:var(--text-muted);padding:6px 0">Aún no hay alertas personalizadas</div>';
 
@@ -2064,15 +2065,15 @@ function _renderNotifManager() {
           <label class="notif-form-label">Tipo de alerta</label>
           <select class="text-input" id="notifTypeSelect" onchange="_renderAlertTypeFields()">
             <option value="">— Selecciona —</option>
-            <option value="price_above">📈 Activo de cartera sube por encima de</option>
-            <option value="price_below">📉 Activo de cartera baja por debajo de</option>
-            <option value="networth_above">🏦 Patrimonio neto supera</option>
-            <option value="networth_below">⚠️ Patrimonio neto baja de</option>
-            <option value="expense_month">💸 Gasto mensual supera</option>
-            <option value="income_below">💰 Ingresos mensuales bajan de</option>
-            <option value="savings_rate_below">📊 Tasa de ahorro mensual baja del</option>
-            <option value="category_spend">🏷️ Gasto en categoría supera</option>
-            <option value="goal_pct">🎯 Objetivo alcanza el</option>
+            <option value="price_above">Activo de cartera sube por encima de</option>
+            <option value="price_below">Activo de cartera baja por debajo de</option>
+            <option value="networth_above">Patrimonio neto supera</option>
+            <option value="networth_below">Patrimonio neto baja de</option>
+            <option value="expense_month">Gasto mensual supera</option>
+            <option value="income_below">Ingresos mensuales bajan de</option>
+            <option value="savings_rate_below">Tasa de ahorro mensual baja del</option>
+            <option value="category_spend">Gasto en categoría supera</option>
+            <option value="goal_pct">Objetivo alcanza el</option>
           </select>
         </div>
         <div id="notifTypeFields"
@@ -2234,7 +2235,7 @@ function _addCustomAlert() {
     createdAt: Date.now(),
   });
   saveData();
-  showToast('Alerta creada ✓', 'success');
+  showToast('Alerta creada', 'success');
   _renderNotifManager();
 }
 
@@ -2273,7 +2274,7 @@ function _saveNotifConfig() {
   if (!APP.smartAlertsConfig) APP.smartAlertsConfig = {};
   APP.smartAlertsConfig.concentrationPct = Math.max(10, Math.min(90, val || 30));
   saveData();
-  showToast('Configuración de alertas guardada ✓', 'success');
+  showToast('Configuración de alertas guardada', 'success');
   _renderNotifManager();
 }
 

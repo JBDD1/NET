@@ -219,7 +219,11 @@ function showToast(message, type = 'success', opts = {}) {
     return;
   }
 
-  const icons = { success: '✓', error: '✕', info: 'ℹ' };
+  const icons = {
+    success: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-check"></use></svg>',
+    error:   '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-close"></use></svg>',
+    info:    '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-info"></use></svg>',
+  };
 
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
@@ -234,7 +238,7 @@ function showToast(message, type = 'success', opts = {}) {
     <span class="toast-icon">${icons[type] || icons.info}</span>
     <span class="toast-undo-msg">${escapeHtml(message)}</span>
     ${actionHtml}
-    <button class="toast-close" aria-label="Cerrar">✕</button>
+    <button class="toast-close" aria-label="Cerrar"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-close"></use></svg></button>
   `;
   toast.querySelector('.toast-close').addEventListener('click', () => toast._toastDismiss?.());
   if (opts.action) {

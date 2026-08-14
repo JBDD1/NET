@@ -2250,7 +2250,7 @@ ul  { list-style: none; }
 .dash-editor-icon   { font-size: 16px; flex-shrink: 0; padding-top: 1px; }
 .dash-editor-info   { flex: 1; min-width: 0; }
 .dash-editor-label  { font-size: 13.5px; font-weight: 500; color: var(--text-primary); line-height: 1.4; }
-.dash-editor-row:hover { box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+.dash-editor-row:hover { box-shadow: var(--shadow-sm); }
 .dash-editor-drag-over { outline: 2px dashed var(--accent) !important; }
 .dash-editor-ghost { border: 1.5px dashed var(--border-default); border-radius: var(--r-sm); background: var(--bg-elevated); opacity: 0.5; margin-bottom: 6px; }
 .ranked-list, .activity-list { display: flex; flex-direction: column; }
@@ -3278,12 +3278,12 @@ body, .kpi-card, .sidebar, .topbar, .modal, .watchlist-card, .alternative-card, 
 /* ── KPI card hover — lift + glow ─────────────────────────── */
 .kpi-card:not(.kpi-hero):hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06);
+  box-shadow: var(--shadow-card-hover);
   border-color: var(--accent-soft) !important;
 }
 .kpi-hero:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 32px rgba(0,0,0,.18);
+  box-shadow: var(--shadow-lg);
 }
 
 /* ── Hero card shimmer ────────────────────────────────────── */
