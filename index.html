@@ -60,6 +60,67 @@
 </head>
 <body>
 
+  <!-- ═══════════════ SISTEMA DE ICONOS SVG (sprite, sin emojis) ═══════════════ -->
+  <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" focusable="false">
+    <defs>
+      <symbol id="icon-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="9.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="1.6"/><rect x="13.5" y="11.5" width="7.5" height="9.5" rx="1.6"/><rect x="3" y="15.5" width="7.5" height="5.5" rx="1.6"/></symbol>
+      <symbol id="icon-swap" viewBox="0 0 24 24"><path d="M4 8h14"/><path d="M15 4l4 4-4 4"/><path d="M20 16H6"/><path d="M9 20l-4-4 4-4"/></symbol>
+      <symbol id="icon-trending-up" viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></symbol>
+      <symbol id="icon-networth" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" opacity=".35"/><circle cx="12" cy="12" r="8" stroke-dasharray="26 50" transform="rotate(-90 12 12)"/></symbol>
+      <symbol id="icon-minus-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="7.5" y1="12" x2="16.5" y2="12"/></symbol>
+      <symbol id="icon-gem" viewBox="0 0 24 24"><path d="M6 4h12l3 6-9 11L3 10Z"/><path d="M3 10h18"/><path d="M9 4l-2 6 5 11 5-11-2-6"/></symbol>
+      <symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="icon-activity" viewBox="0 0 24 24"><polyline points="2 12 7 12 10 20 14 4 17 12 22 12"/></symbol>
+      <symbol id="icon-percent" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.7" cy="6.7" r="2.4"/><circle cx="17.3" cy="17.3" r="2.4"/></symbol>
+      <symbol id="icon-sparkles" viewBox="0 0 24 24"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9Z"/></symbol>
+      <symbol id="icon-crown" viewBox="0 0 24 24"><path d="M4 8l3 3 5-7 5 7 3-3-2 10H6Z"/><path d="M6 21h12"/></symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><line x1="12" y1="2.5" x2="12" y2="5.3"/><line x1="12" y1="18.7" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5.3" y2="12"/><line x1="18.7" y1="12" x2="21.5" y2="12"/><line x1="5.1" y1="5.1" x2="7.1" y2="7.1"/><line x1="16.9" y1="16.9" x2="18.9" y2="18.9"/><line x1="18.9" y1="5.1" x2="16.9" y2="7.1"/><line x1="7.1" y1="16.9" x2="5.1" y2="18.9"/></symbol>
+      <symbol id="icon-chevron-left" viewBox="0 0 24 24"><polyline points="15 4 7 12 15 20"/></symbol>
+      <symbol id="icon-chevron-right" viewBox="0 0 24 24"><polyline points="9 4 17 12 9 20"/></symbol>
+      <symbol id="icon-chevron-down" viewBox="0 0 24 24"><polyline points="4 9 12 17 20 9"/></symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></symbol>
+      <symbol id="icon-menu" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></symbol>
+      <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="15.3" y1="15.3" x2="20.5" y2="20.5"/></symbol>
+      <symbol id="icon-edit" viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3Z"/><path d="M14 6.5l3 3"/></symbol>
+      <symbol id="icon-check" viewBox="0 0 24 24"><polyline points="4 12 9 17 20 6"/></symbol>
+      <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21.5" y2="12"/><line x1="5.1" y1="5.1" x2="6.9" y2="6.9"/><line x1="17.1" y1="17.1" x2="18.9" y2="18.9"/><line x1="18.9" y1="5.1" x2="17.1" y2="6.9"/><line x1="6.9" y1="17.1" x2="5.1" y2="18.9"/></symbol>
+      <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></symbol>
+      <symbol id="icon-eye" viewBox="0 0 24 24"><path d="M2 12s3.8-7 10-7 10 7 10 7-3.8 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="icon-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c6.2 0 10 7 10 7a17.7 17.7 0 0 1-3.4 4.3M6.6 6.6C4 8.3 2 12 2 12s3.8 7 10 7a10.2 10.2 0 0 0 3.4-.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+      <symbol id="icon-download" viewBox="0 0 24 24"><path d="M12 3v12"/><polyline points="7 11 12 16 17 11"/><path d="M4 19h16"/></symbol>
+      <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 21V9"/><polyline points="7 13 12 8 17 13"/><path d="M4 19h16"/></symbol>
+      <symbol id="icon-star" viewBox="0 0 24 24"><path d="M12 3l2.8 5.8 6.2.9-4.5 4.5 1.1 6.3L12 17.8 6.4 20.5l1.1-6.3L3 9.7l6.2-.9Z"/></symbol>
+      <symbol id="icon-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+      <symbol id="icon-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="icon-wallet" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="16.5" cy="14" r="1.2" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="icon-briefcase" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></symbol>
+      <symbol id="icon-arrow-up-right" viewBox="0 0 24 24"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="8 7 17 7 17 16"/></symbol>
+      <symbol id="icon-arrow-down-right" viewBox="0 0 24 24"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 8 17 17 8 17"/></symbol>
+      <symbol id="icon-alert-triangle" viewBox="0 0 24 24"><path d="M12 3.5 22 20H2Z"/><line x1="12" y1="9.5" x2="12" y2="14"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="icon-trophy" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/><path d="M12 14v3"/><path d="M8 21h8"/><path d="M9 21c0-2 1.2-3 3-3s3 1 3 3"/></symbol>
+      <symbol id="icon-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+      <symbol id="icon-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.3" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="icon-building" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 7h1M8 11h1M8 15h1M15 7h1M15 11h1M15 15h1"/><path d="M10 21v-4h4v4"/></symbol>
+      <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4M16 3v4"/></symbol>
+      <symbol id="icon-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6Z"/><polyline points="9 12 11.3 14.3 15.5 9.5"/></symbol>
+      <symbol id="icon-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9S9.5 5.5 12 3Z"/></symbol>
+      <symbol id="icon-file" viewBox="0 0 24 24"><path d="M6 2.5h8l4 4V21a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1Z"/><path d="M14 2.5V7h4"/><path d="M8 13h8M8 17h8"/></symbol>
+      <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5"/><path d="M20 4v4.5h-4.5"/><path d="M20 12a8 8 0 0 1-13.7 5.7L4 15.5"/><path d="M4 20v-4.5h4.5"/></symbol>
+      <symbol id="icon-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></symbol>
+      <symbol id="icon-link" viewBox="0 0 24 24"><path d="M9.5 14.5 14.5 9.5"/><path d="M11 6.5 13 4.5a4 4 0 0 1 5.7 5.7L16.7 12.2"/><path d="M13 17.5 11 19.5a4 4 0 0 1-5.7-5.7L7.3 11.8"/></symbol>
+      <symbol id="icon-scale" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M7 21h10"/><path d="M12 5 5 8l3.5 8h7L19 8Z"/><path d="M5 8h.01M19 8h.01"/></symbol>
+      <symbol id="icon-heart" viewBox="0 0 24 24"><path d="M12 20.5S3.5 15.2 3.5 9.2A4.7 4.7 0 0 1 12 6.5a4.7 4.7 0 0 1 8.5 2.7c0 6-8.5 11.3-8.5 11.3Z"/></symbol>
+      <symbol id="icon-bell" viewBox="0 0 24 24"><path d="M6 10a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+      <symbol id="icon-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="icon-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5V18c0 1.7 3.6 3 8 3s8-1.3 8-3V5.5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></symbol>
+      <symbol id="icon-wrench" viewBox="0 0 24 24"><path d="M14.5 6.5a4.5 4.5 0 0 0-6 5.7L3 17.7l2.3 2.3 5.5-5.5a4.5 4.5 0 0 0 5.7-6l-2.8 2.8-2.3-2.3 2.8-2.8Z"/></symbol>
+      <symbol id="icon-flask" viewBox="0 0 24 24"><path d="M9 2.5h6"/><path d="M10 3v6.5L4.5 19a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 9.5V3"/><path d="M7.5 15h9"/></symbol>
+      <symbol id="icon-ruler" viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="10" rx="1.5" transform="rotate(0 12 12)"/><path d="M6 7v3M10 7v4M14 7v3M18 7v4"/></symbol>
+      <symbol id="icon-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2H17a4 4 0 0 0 4-4c0-4.4-4-7.4-9-7.4Z"/><circle cx="7.5" cy="11" r="1.1" fill="currentColor" stroke="none"/><circle cx="9.5" cy="7.2" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.5" cy="7.2" r="1.1" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="icon-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.7a3.2 3.2 0 0 1 0 6.2"/><path d="M18.5 14.3c2 .7 3.5 2.8 3.5 5.7"/></symbol>
+    </defs>
+  </svg>
+
   <a href="#mainContent" class="skip-link">Saltar al contenido principal</a>
 
   <!-- ═══════════════ PANTALLA DE LOGIN ═══════════════════════════ -->
@@ -73,12 +134,10 @@
       <p class="login-tagline">Tu asistente financiero personal</p>
 
       <div class="login-tabs" role="tablist">
-        <button type="button" class="login-tab active" id="login-tab-signin" role="tab"
-          onclick="_renderLoginForm('signin');document.querySelectorAll('.login-tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">
+        <button type="button" class="login-tab active" id="login-tab-signin" role="tab">
           Iniciar sesión
         </button>
-        <button type="button" class="login-tab" id="login-tab-signup" role="tab"
-          onclick="_renderLoginForm('signup');document.querySelectorAll('.login-tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">
+        <button type="button" class="login-tab" id="login-tab-signup" role="tab">
           Registrarse
         </button>
       </div>
@@ -87,7 +146,7 @@
 
       <div class="login-divider"><span>o continúa con</span></div>
 
-      <button type="button" class="login-btn-google" onclick="signInGoogle()">
+      <button type="button" class="login-btn-google">
         <svg class="login-google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
           <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -120,35 +179,35 @@
         </div>
         <span class="logo-f" aria-hidden="true"><img src="icon.svg" width="34" height="34" alt="" style="display:block;border-radius:9px"></span>
       </div>
-      <button class="sidebar-toggle" id="sidebarToggle"><span>‹</span></button>
+      <button class="sidebar-toggle" id="sidebarToggle" aria-label="Contraer panel lateral"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-chevron-left"/></svg></button>
     </div>
 
     <nav class="sidebar-nav" aria-label="Navegación principal">
 
       <!-- Ítem simple -->
       <button class="nav-item active" data-section="dashboard" aria-keyshortcuts="g" title="Dashboard (G)">
-        <span class="nav-icon">▤</span>
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-dashboard"/></svg></span>
         <span class="nav-label">Dashboard</span>
       </button>
 
       <!-- GRUPO: Ingresos & Gastos (con sub-items) -->
       <div class="nav-group" id="nav-group-transacciones">
-        <button class="nav-item nav-group-header" id="nav-group-toggle-transacciones">
-          <span class="nav-icon">⇄</span>
+        <button class="nav-item nav-group-header" id="nav-group-toggle-transacciones" aria-expanded="false" aria-controls="nav-sub-transacciones">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-swap"/></svg></span>
           <span class="nav-label">Ingresos & Gastos</span>
-          <span class="nav-arrow nav-label">›</span>
+          <span class="nav-arrow nav-label"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-right"/></svg></span>
         </button>
         <div class="nav-sub" id="nav-sub-transacciones">
           <button class="nav-item nav-sub-item" data-section="transactions">
-            <span class="nav-icon">▸</span>
+            <span class="nav-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span>
             <span class="nav-label">Transacciones</span>
           </button>
           <button class="nav-item nav-sub-item" data-section="bizums">
-            <span class="nav-icon">▸</span>
+            <span class="nav-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span>
             <span class="nav-label">Bizums</span>
           </button>
           <button class="nav-item nav-sub-item" data-section="recurring">
-            <span class="nav-icon">▸</span>
+            <span class="nav-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span>
             <span class="nav-label">Recurrentes</span>
             <span class="nav-badge" id="nav-badge-recurring" style="display:none"></span>
           </button>
@@ -157,64 +216,64 @@
 
       <!-- GRUPO: Inversiones (con sub-items) -->
       <div class="nav-group" id="nav-group-inversiones">
-        <button class="nav-item nav-group-header" id="nav-group-toggle-inversiones">
-          <span class="nav-icon">↗</span>
+        <button class="nav-item nav-group-header" id="nav-group-toggle-inversiones" aria-expanded="false" aria-controls="nav-sub-inversiones">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-trending-up"/></svg></span>
           <span class="nav-label">Inversiones</span>
-          <span class="nav-arrow nav-label">›</span>
+          <span class="nav-arrow nav-label"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-right"/></svg></span>
         </button>
         <div class="nav-sub" id="nav-sub-inversiones">
           <button class="nav-item nav-sub-item" data-section="portfolio">
-            <span class="nav-icon">▸</span>
+            <span class="nav-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span>
             <span class="nav-label">Cartera</span>
           </button>
           <button class="nav-item nav-sub-item" data-section="watchlist">
-            <span class="nav-icon">▸</span>
+            <span class="nav-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span>
             <span class="nav-label">Watchlist</span>
           </button>
           <button class="nav-item nav-sub-item" data-section="dividends">
-            <span class="nav-icon">▸</span>
+            <span class="nav-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span>
             <span class="nav-label">Dividendos</span>
           </button>
         </div>
       </div>
 
       <button class="nav-item" data-section="networth">
-        <span class="nav-icon">◐</span>
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-networth"/></svg></span>
         <span class="nav-label">Patrimonio Neto</span>
       </button>
 
       <button class="nav-item" data-section="pasivos">
-        <span class="nav-icon">⊖</span>
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-minus-circle"/></svg></span>
         <span class="nav-label">Pasivos</span>
       </button>
 
       <button class="nav-item" data-section="alternatives">
-        <span class="nav-icon">◇</span>
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-gem"/></svg></span>
         <span class="nav-label">Activos Alt.</span>
       </button>
 
 <button class="nav-item" data-section="goals">
-        <span class="nav-icon">◎</span>
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg></span>
         <span class="nav-label">Objetivos</span>
       </button>
 
       <button class="nav-item" data-section="simulator">
-        <span class="nav-icon">∿</span>
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-activity"/></svg></span>
         <span class="nav-label">Simulador</span>
       </button>
 
       <button class="nav-item" data-section="fiscalidad">
-        <span class="nav-icon">§</span>
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-percent"/></svg></span>
         <span class="nav-label">Fiscalidad</span>
       </button>
 
       <button class="nav-item" data-section="ai">
-        <span class="nav-icon">✦</span>
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-sparkles"/></svg></span>
         <span class="nav-label">Asesor IA</span>
       </button>
 
       <button class="nav-item" data-section="admin" id="nav-admin" style="display:none">
-        <span class="nav-icon">👑</span>
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-crown"/></svg></span>
         <span class="nav-label">Admin</span>
       </button>
 
@@ -222,7 +281,7 @@
 
     <div class="sidebar-footer">
       <button class="nav-item" data-section="settings">
-        <span class="nav-icon">⚙</span>
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg></span>
         <span class="nav-label">Ajustes</span>
       </button>
 
@@ -231,10 +290,10 @@
         <!-- Desplegable de perfil -->
         <div class="profile-dropdown" id="profile-dropdown" style="display:none">
           <div class="profile-dropdown-header">
-            <div class="avatar-change-wrap" onclick="_openPhotoModal();event.stopPropagation()" title="Cambiar foto de perfil">
+            <div class="avatar-change-wrap" id="avatar-change-wrap" title="Cambiar foto de perfil">
               <div class="profile-dropdown-avatar" id="dd-avatar">U</div>
               <div class="avatar-change-overlay">
-                <span style="font-size:16px">📷</span>
+                <svg class="icon icon-sm" aria-hidden="true"><use href="#icon-camera"/></svg>
                 <span class="avatar-change-label">Cambiar foto</span>
               </div>
             </div>
@@ -243,24 +302,24 @@
           </div>
           <div class="profile-dropdown-divider"></div>
           <div class="profile-dropdown-item profile-name-row">
-            <span class="profile-dd-icon">✏</span>
+            <span class="profile-dd-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-edit"/></svg></span>
             <input type="text" id="profile-name-input" class="text-input"
               placeholder="Tu nombre" maxlength="30"
               style="height:28px;font-size:12.5px;flex:1;min-width:0"
-              onkeydown="if(event.key==='Enter')saveProfileName()" />
-            <button type="button" class="btn-primary" style="padding:4px 10px;font-size:11px;flex-shrink:0" data-action="save-profile-name">✓</button>
+              />
+            <button type="button" class="btn-primary" style="padding:4px 10px;font-size:11px;flex-shrink:0" data-action="save-profile-name" aria-label="Guardar nombre"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-check"/></svg></button>
           </div>
           <div class="profile-dropdown-divider"></div>
           <button type="button" class="profile-dropdown-item" data-action="toggle-theme-dropdown">
-            <span class="profile-dd-icon" id="dd-theme-icon">☀</span>
+            <span class="profile-dd-icon" id="dd-theme-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-sun"/></svg></span>
             <span id="dd-theme-label">Modo claro</span>
           </button>
           <button type="button" class="profile-dropdown-item" data-action="toggle-privacy-dropdown">
-            <span class="profile-dd-icon" id="dd-privacy-icon">👁</span>
+            <span class="profile-dd-icon" id="dd-privacy-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-eye"/></svg></span>
             <span id="dd-privacy-label">Activar privacidad</span>
           </button>
           <div class="profile-dd-variant-row">
-            <span class="profile-dd-icon">◑</span>
+            <span class="profile-dd-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-globe"/></svg></span>
             <span class="profile-dd-variant-label">Tema visual</span>
             <div class="dd-variant-swatches" id="dd-variant-swatches">
               <button class="dd-variant-dot" data-variant="obsidian-brass"    title="Obsidian Brass"    style="background:linear-gradient(135deg,#15110c 50%,#a8803e 50%)"></button>
@@ -272,19 +331,19 @@
           </div>
           <div class="profile-dropdown-divider"></div>
           <button type="button" class="profile-dropdown-item" data-action="open-milestones-dropdown">
-            <span class="profile-dd-icon">★</span>
+            <span class="profile-dd-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-star"/></svg></span>
             <span>Mis insignias</span>
             <span id="dd-milestone-count" style="margin-left:auto;font-size:11px;color:var(--text-muted)"></span>
           </button>
           <div class="profile-dropdown-divider"></div>
           <button type="button" class="profile-dropdown-item" data-action="download-backup-dropdown">
-            <span class="profile-dd-icon">↓</span>
+            <span class="profile-dd-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-download"/></svg></span>
             <span>Exportar backup</span>
           </button>
           <label class="profile-dropdown-item" style="cursor:pointer">
-            <span class="profile-dd-icon">↑</span>
+            <span class="profile-dd-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-upload"/></svg></span>
             <span>Importar backup</span>
-            <input type="file" accept=".json" style="display:none" aria-label="Importar backup desde archivo JSON" onchange="handleRestore(this);closeProfileDropdown()" />
+            <input type="file" id="restore-file-header" accept=".json" style="display:none" aria-label="Importar backup desde archivo JSON" />
           </label>
         </div>
 
@@ -294,8 +353,8 @@
           <div class="sidebar-profile-info nav-label">
             <div class="sidebar-profile-name" id="sidebar-username">Usuario</div>
             <div class="sidebar-profile-actions">
-              <button type="button" class="sidebar-profile-btn" id="themeToggle" data-action="toggle-theme-btn" title="Cambiar tema"><span id="themeIcon">☀</span></button>
-              <button type="button" class="sidebar-profile-btn" id="btnBackup" data-action="download-backup-btn" title="Exportar backup">↓</button>
+              <button type="button" class="sidebar-profile-btn" id="themeToggle" data-action="toggle-theme-btn" title="Cambiar tema" aria-label="Cambiar tema"><span id="themeIcon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-sun"/></svg></span></button>
+              <button type="button" class="sidebar-profile-btn" id="btnBackup" data-action="download-backup-btn" title="Exportar backup" aria-label="Exportar backup"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-download"/></svg></button>
             </div>
           </div>
         </div>
@@ -311,21 +370,21 @@
   <main class="main-content" id="mainContent">
 
     <header class="topbar">
-      <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+      <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Abrir menú"><svg class="icon" aria-hidden="true"><use href="#icon-menu"/></svg></button>
       <div class="topbar-title" id="topbarTitle">Dashboard</div>
-      <span id="autosave-indicator" class="autosave-indicator" aria-live="polite" aria-atomic="true" style="display:none">✓ Guardado</span>
+      <span id="autosave-indicator" class="autosave-indicator" aria-live="polite" aria-atomic="true" style="display:none"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-check"/></svg> Guardado</span>
       <button type="button" class="topbar-search-btn" data-action="open-search" title="Búsqueda global (Ctrl+K)">
         <span>⌕</span>
         <span class="topbar-search-label">Buscar</span>
         <kbd class="topbar-kbd">Ctrl K</kbd>
       </button>
       <button type="button" class="topbar-privacy-btn" id="btnPrivacy" data-action="toggle-privacy" aria-keyshortcuts="p" title="Ocultar valores (P)">
-        <span id="privacyIcon">👁</span>
+        <span id="privacyIcon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-eye"/></svg></span>
         <span class="topbar-search-label" id="privacyLabel">Privacidad</span>
       </button>
       <button type="button" class="topbar-kbd-hint" data-action="show-keyboard-help" title="Atajos de teclado (?)">?</button>
       <button type="button" class="topbar-devmode-btn" id="btnDevMode" style="display:none"
-        title="Dev mode" onclick="toggleDevMode()">DEV</button>
+        title="Dev mode">DEV</button>
       <span class="current-date" id="currentDate"></span>
     </header>
 
@@ -400,8 +459,8 @@
       <div class="section-header">
         <h1 id="dash-greeting">Dashboard</h1>
         <div class="btn-row">
-          <button type="button" class="btn-ghost" onclick="openDashboardEditor()" style="font-size:12px;padding:6px 14px" title="Personalizar bloques del dashboard">⚙ Editar</button>
-          <button type="button" class="btn-ghost" data-action="export-monthly-pdf" style="font-size:12px;padding:6px 14px" title="Exportar resumen del mes actual en PDF">📄 PDF</button>
+          <button type="button" id="btn-dashboard-editor" class="btn-ghost" style="font-size:12px;padding:6px 14px" title="Personalizar bloques del dashboard"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-settings"/></svg> Editar</button>
+          <button type="button" class="btn-ghost" data-action="export-monthly-pdf" style="font-size:12px;padding:6px 14px" title="Exportar resumen del mes actual en PDF"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-file"/></svg> PDF</button>
           <button type="button" class="btn-primary" data-action="quick-add-nav" style="font-size:12px;padding:6px 14px">+ Transacción</button>
         </div>
       </div>
@@ -579,15 +638,15 @@
         <h1>Ingresos &amp; Gastos</h1>
         <div class="btn-row">
           <div class="io-dropdown" id="io-dropdown-wrap">
-            <button type="button" class="btn-secondary" data-action="toggle-io-dropdown" title="Importar / Exportar transacciones" style="font-size:15px;padding:6px 12px">⇅</button>
+            <button type="button" class="btn-secondary" data-action="toggle-io-dropdown" title="Importar / Exportar transacciones" style="padding:6px 12px" aria-label="Importar o exportar transacciones"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-swap"/></svg></button>
             <div class="io-dropdown-menu" id="io-dropdown-menu">
-              <button type="button" data-action="export-csv">↓ Exportar CSV</button>
-              <button type="button" data-action="import-csv">↑ Importar CSV</button>
-              <button type="button" data-action="import-ofx">↑ Importar OFX</button>
+              <button type="button" data-action="export-csv"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-download"/></svg> Exportar CSV</button>
+              <button type="button" data-action="import-csv"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Importar CSV</button>
+              <button type="button" data-action="import-ofx"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Importar OFX</button>
             </div>
           </div>
-          <input type="file" id="csv-import-input" accept=".csv,.txt" style="display:none" onchange="handleCSVImportFile(this)" />
-          <input type="file" id="ofx-import-input" accept=".ofx,.qfx,.ofc" style="display:none" onchange="handleOFXImportFile(this)" />
+          <input type="file" id="csv-import-input" accept=".csv,.txt" style="display:none" />
+          <input type="file" id="ofx-import-input" accept=".ofx,.qfx,.ofc" style="display:none" />
           <button type="button" class="btn-primary" id="btnAddTransaction" data-action="add-transaction" aria-keyshortcuts="n" title="Añadir transacción (N)">+ Añadir</button>
           <button type="button" class="btn-secondary" id="btnManageCategories" data-action="manage-categories">Categorías</button>
         </div>
@@ -599,8 +658,7 @@
           <input type="text" id="quick-add-input" class="text-input"
             placeholder="Ej: Mercadona 47€  ·  Nómina 2400  ·  Netflix 12.99€"
             autocomplete="off"
-            oninput="onQuickAddInput()"
-            onkeydown="if(event.key==='Enter')quickAddSubmit()" />
+            />
           <span id="quick-add-type-badge" style="display:none;flex-shrink:0"></span>
           <span id="quick-add-cat-badge" class="cat-ai-badge" style="display:none;flex-shrink:0"></span>
           <button type="button" class="btn-primary" id="quick-add-btn" data-action="quick-add-submit" disabled>+ Añadir</button>
@@ -656,8 +714,8 @@
           </div>
           <span id="tx-result-count" class="tx-result-count" style="display:none"></span>
           <button type="button" id="btn-tx-clear-filters" class="btn-ghost-sm" data-action="clear-tx-filters" title="Limpiar filtros" style="display:none">× Limpiar</button>
-          <button type="button" id="btn-tx-favs" class="btn-secondary btn-sm" data-action="toggle-tx-favorites" title="Mostrar solo favoritos">★ Favoritos</button>
-          <button type="button" class="btn-secondary btn-sm" data-action="export-tx-csv" title="Exportar a CSV">↓ CSV</button>
+          <button type="button" id="btn-tx-favs" class="btn-secondary btn-sm" data-action="toggle-tx-favorites" title="Mostrar solo favoritos"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-star"/></svg> Favoritos</button>
+          <button type="button" class="btn-secondary btn-sm" data-action="export-tx-csv" title="Exportar a CSV"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-download"/></svg> CSV</button>
         </div>
         <div class="table-wrapper tx-virtual-wrap" id="tx-virtual-scroll">
           <table class="data-table">
@@ -784,9 +842,9 @@
       <div class="section-header">
         <h1>Cartera</h1>
         <div class="btn-row">
-          <button type="button" class="btn-secondary" data-action="export-excel" title="Exportar a Excel (4 hojas: Resumen, Cartera, Dividendos, Watchlist)">↓ Excel</button>
+          <button type="button" class="btn-secondary" data-action="export-excel" title="Exportar a Excel (4 hojas: Resumen, Cartera, Dividendos, Watchlist)"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-download"/></svg> Excel</button>
           <button type="button" class="btn-secondary btn-refresh-prices" data-action="refresh-prices">⟳ Precios</button>
-          <button type="button" class="btn-secondary" data-action="refresh-fx" title="Actualizar tipos de cambio desde el BCE">⇄ Divisas</button>
+          <button type="button" class="btn-secondary" data-action="refresh-fx" title="Actualizar tipos de cambio desde el BCE"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-refresh"/></svg> Divisas</button>
           <button type="button" class="btn-primary" id="btnAddAsset" data-action="add-asset" aria-keyshortcuts="i" title="Añadir activo (I)">+ Añadir activo</button>
         </div>
       </div>
@@ -822,12 +880,12 @@
 
       <div class="highlights-row" id="port-widget-highlights">
         <div class="highlight-card highlight-best">
-          <div class="highlight-label">🏆 Mejor inversión</div>
+          <div class="highlight-label"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-trophy"/></svg> Mejor inversión</div>
           <div class="highlight-name" id="best-investment-name">—</div>
           <div class="highlight-value" id="best-investment-val">—</div>
         </div>
         <div class="highlight-card highlight-worst">
-          <div class="highlight-label">⚠ Peor inversión</div>
+          <div class="highlight-label"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-alert-triangle"/></svg> Peor inversión</div>
           <div class="highlight-name" id="worst-investment-name">—</div>
           <div class="highlight-value" id="worst-investment-val">—</div>
         </div>
@@ -841,18 +899,18 @@
             <caption class="sr-only">Cartera de inversión: activo, ticker, país, precio de compra, precio actual, cantidad, valor, rentabilidad y CAGR</caption>
             <thead>
               <tr id="portfolio-thead-row">
-                <th class="sortable" data-col="name" data-action="portfolio-sort">Activo<span class="sort-arrow">⇅</span></th>
-                <th class="sortable" data-col="ticker" data-action="portfolio-sort">Ticker<span class="sort-arrow">⇅</span></th>
-                <th class="sortable" data-col="country" data-action="portfolio-sort">País<span class="sort-arrow">⇅</span></th>
-                <th class="sortable text-right" data-col="buyPrice" data-action="portfolio-sort">P. Compra<span class="sort-arrow">⇅</span></th>
+                <th class="sortable" data-col="name" data-action="portfolio-sort">Activo<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable" data-col="ticker" data-action="portfolio-sort">Ticker<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable" data-col="country" data-action="portfolio-sort">País<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="buyPrice" data-action="portfolio-sort">P. Compra<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
                 <th class="text-right">P. Actual</th>
-                <th class="sortable text-right" data-col="quantity" data-action="portfolio-sort">Cantidad<span class="sort-arrow">⇅</span></th>
-                <th class="sortable text-right" data-col="cost" data-action="portfolio-sort">Coste<span class="sort-arrow">⇅</span></th>
-                <th class="sortable text-right" data-col="value" data-action="portfolio-sort">Valor actual<span class="sort-arrow">⇅</span></th>
-                <th class="sortable text-right" data-col="gain" data-action="portfolio-sort">G/P (€)<span class="sort-arrow">⇅</span></th>
-                <th class="sortable text-right" data-col="gainPct" data-action="portfolio-sort">G/P (%)<span class="sort-arrow">⇅</span></th>
-                <th class="sortable text-right" data-col="concPct" data-action="portfolio-sort">% Cartera<span class="sort-arrow">⇅</span></th>
-                <th class="sortable text-right" data-col="days" data-action="portfolio-sort">Tiempo<span class="sort-arrow">⇅</span></th>
+                <th class="sortable text-right" data-col="quantity" data-action="portfolio-sort">Cantidad<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="cost" data-action="portfolio-sort">Coste<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="value" data-action="portfolio-sort">Valor actual<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="gain" data-action="portfolio-sort">G/P (€)<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="gainPct" data-action="portfolio-sort">G/P (%)<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="concPct" data-action="portfolio-sort">% Cartera<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="days" data-action="portfolio-sort">Tiempo<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
                 <th class="text-right" title="Rentabilidad Anual Compuesta (CAGR)">CAGR</th>
                 <th>Acciones</th>
               </tr>
@@ -869,7 +927,7 @@
       <!-- Análisis de concentración -->
       <div class="card" id="port-widget-analysis">
         <div class="card-title-row">
-          <h3 class="card-title">⚖ Concentración por posición</h3>
+          <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-scale"/></svg> Concentración por posición</h3>
           <div class="btn-row">
             <span style="font-size:12px;color:var(--text-muted)">Límite de alerta:</span>
             <input type="number" id="concentration-limit" class="text-input" value="20" min="1" max="100" style="width:70px;padding:5px 8px" />
@@ -881,7 +939,7 @@
 
       <!-- Correlación entre activos -->
       <div class="card" id="port-widget-correlation">
-        <h3 class="card-title">🔗 Análisis de correlación</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-link"/></svg> Análisis de correlación</h3>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Activos del mismo tipo o sector que pueden estar correlacionados</p>
         <div id="correlation-analysis"></div>
       </div>
@@ -928,13 +986,11 @@
 
       <!-- ── Tab bar ── -->
       <div class="section-tabs" role="tablist">
-        <button id="stk-tab-dividends" class="section-tab section-tab-active" role="tab" aria-selected="true"
-                onclick="switchDivTab('dividends')">
+        <button id="stk-tab-dividends" class="section-tab section-tab-active" role="tab" aria-selected="true">
           <span class="stk-tab-icon">◈</span> Dividendos
         </button>
-        <button id="stk-tab-staking" class="section-tab" role="tab" aria-selected="false"
-                onclick="switchDivTab('staking')">
-          <span class="stk-tab-icon">⬡</span> Crypto Staking
+        <button id="stk-tab-staking" class="section-tab" role="tab" aria-selected="false">
+          <span class="stk-tab-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-gem"/></svg></span> Crypto Staking
         </button>
       </div>
 
@@ -967,7 +1023,7 @@
         </div>
 
         <div class="card">
-          <h3 class="card-title">📅 Próximos cobros</h3>
+          <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-calendar"/></svg> Próximos cobros</h3>
           <div id="div-calendar"></div>
         </div>
 
@@ -1028,7 +1084,7 @@
     <section class="section" id="section-networth">
       <div class="section-header">
         <h1>Patrimonio Neto</h1>
-        <button type="button" class="btn-ghost" data-action="open-milestones" style="font-size:12px;padding:6px 14px" title="Ver hitos del patrimonio">★ Hitos</button>
+        <button type="button" class="btn-ghost" data-action="open-milestones" style="font-size:12px;padding:6px 14px" title="Ver hitos del patrimonio"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-star"/></svg> Hitos</button>
       </div>
 
       <div class="kpi-grid kpi-grid-5" id="nw-widget-kpis">
@@ -1050,7 +1106,7 @@
           <canvas class="kpi-sparkline" id="spark-nw-invest" role="img" aria-label="Evolución de inversiones"></canvas>
         </div>
         <div class="kpi-card">
-          <div class="kpi-label">🏠 Inmuebles</div>
+          <div class="kpi-label"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-building"/></svg> Inmuebles</div>
           <div class="kpi-value" id="nw-real-estate">€0</div>
           <canvas class="kpi-sparkline" id="spark-nw-realestate" role="img" aria-label="Evolución de inmuebles"></canvas>
         </div>
@@ -1085,7 +1141,7 @@
 
       <div class="card" id="nw-widget-properties">
         <div class="card-title-row">
-          <h3 class="card-title">🏠 Inmuebles</h3>
+          <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-building"/></svg> Inmuebles</h3>
           <button type="button" class="btn-ghost-sm" data-action="add-property">+ Añadir inmueble</button>
         </div>
         <div id="properties-list"></div>
@@ -1192,7 +1248,7 @@
       </div>
       <div class="table-toolbar mb-4" id="goals-toolbar" style="display:none">
         <div class="filter-group">
-          <select id="goals-sort-select" class="select-input" onchange="renderGoals()" style="font-size:12px">
+          <select id="goals-sort-select" class="select-input" style="font-size:12px">
             <option value="completion-desc">Mayor % completado</option>
             <option value="completion-asc">Menor % completado</option>
             <option value="name">Nombre</option>
@@ -1247,7 +1303,7 @@
             </div>
             <button type="button" class="btn-secondary full-width mt-12" id="btn-save-scenario"
               data-action="save-scenario" style="display:none">
-              ✦ Guardar escenario
+              <svg class="icon icon-xs" aria-hidden="true"><use href="#icon-sparkles"/></svg> Guardar escenario
             </button>
           </div>
         </div>
@@ -1274,12 +1330,12 @@
         <h1>Fiscalidad</h1>
         <div class="btn-row">
           <div class="nav-tabs-wrap"><div class="nav-tabs" id="fiscal-year-tabs"></div></div>
-          <button type="button" class="btn-ghost" data-action="export-fiscal-pdf" style="font-size:12px;padding:6px 14px" title="Exportar desglose fiscal en PDF">📄 PDF Fiscal</button>
+          <button type="button" class="btn-ghost" data-action="export-fiscal-pdf" style="font-size:12px;padding:6px 14px" title="Exportar desglose fiscal en PDF"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-file"/></svg> PDF Fiscal</button>
           <button type="button" class="btn-primary" id="btnAddSale" data-action="add-sale">+ Registrar venta</button>
         </div>
       </div>
       <p class="section-sub">Gestiona tu declaración de la renta y optimiza tu fiscalidad</p>
-      <p class="section-note">⚠ Los cálculos son una aproximación orientativa. No tienen en cuenta todas las deducciones, reducciones ni situaciones personales. Consulta a un asesor fiscal para tu declaración real.</p>
+      <p class="section-note"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-alert-triangle"/></svg> Los cálculos son una aproximación orientativa. No tienen en cuenta todas las deducciones, reducciones ni situaciones personales. Consulta a un asesor fiscal para tu declaración real.</p>
 
       <!-- KPIs fiscales -->
       <div class="kpi-grid kpi-grid-4" id="fisc-widget-kpis">
@@ -1307,14 +1363,14 @@
 
       <!-- Tramos IRPF del ahorro -->
       <div class="card">
-        <h3 class="card-title">📊 Tramos IRPF — Base del ahorro 2024</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-activity"/></svg> Tramos IRPF — Base del ahorro 2024</h3>
         <div id="fisc-tramos"></div>
       </div>
 
       <!-- Plusvalías y minusvalías -->
       <div class="card">
         <div class="card-title-row">
-          <h3 class="card-title">📈 Plusvalías & Minusvalías realizadas</h3>
+          <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-trending-up"/></svg> Plusvalías & Minusvalías realizadas</h3>
           <div class="btn-row">
             <div class="fisc-pill positive" id="fisc-gains-total">Ganancias: €0</div>
             <div class="fisc-pill negative" id="fisc-losses-total">Pérdidas: €0</div>
@@ -1344,13 +1400,13 @@
 
       <!-- Compensación de pérdidas -->
       <div class="card">
-        <h3 class="card-title">⚖ Compensación de pérdidas — Tax Loss Harvesting</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-scale"/></svg> Compensación de pérdidas — Tax Loss Harvesting</h3>
         <div id="fisc-compensation"></div>
       </div>
 
       <!-- Dividendos fiscales -->
       <div class="card">
-        <h3 class="card-title">💰 Dividendos recibidos (año fiscal)</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-wallet"/></svg> Dividendos recibidos (año fiscal)</h3>
         <div id="fisc-dividends"></div>
       </div>
 
@@ -1365,7 +1421,7 @@
 
       <!-- Simulador de venta -->
       <div class="card">
-        <h3 class="card-title">🔮 Simulador de impacto fiscal de una venta</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-activity"/></svg> Simulador de impacto fiscal de una venta</h3>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:18px">Calcula cuánto pagarías si vendes un activo hoy</p>
         <div class="simulator-layout" style="grid-template-columns:280px 1fr">
           <div>
@@ -1389,7 +1445,7 @@
 
       <!-- Plan de optimización -->
       <div class="card">
-        <h3 class="card-title">💡 Plan de optimización fiscal</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-sparkles"/></svg> Plan de optimización fiscal</h3>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Sugerencias automáticas para reducir tu factura fiscal</p>
         <div id="fisc-optimization"></div>
       </div>
@@ -1407,7 +1463,7 @@
       <!-- ── RENDIMIENTOS DEL TRABAJO ──────────────────────────── -->
       <div class="section-divider">
         <h2 class="section-divider-title">Rendimientos del <em>Trabajo</em></h2>
-        <button type="button" class="btn-secondary" id="btnEditTrabajo" data-action="edit-trabajo">✎ Editar datos</button>
+        <button type="button" class="btn-secondary" id="btnEditTrabajo" data-action="edit-trabajo"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-edit"/></svg> Editar datos</button>
       </div>
 
       <div class="kpi-grid kpi-grid-4">
@@ -1431,18 +1487,18 @@
       </div>
 
       <div class="card">
-        <h3 class="card-title">💼 Detalle rendimientos del trabajo</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-briefcase"/></svg> Detalle rendimientos del trabajo</h3>
         <div id="fisc-trabajo-detail"></div>
       </div>
 
       <!-- ── MÍNIMOS PERSONALES Y FAMILIARES ───────────────────── -->
       <div class="section-divider">
         <h2 class="section-divider-title">Mínimos <em>Personales y Familiares</em></h2>
-        <button type="button" class="btn-secondary" id="btnEditMinimos" data-action="edit-minimos">✎ Editar</button>
+        <button type="button" class="btn-secondary" id="btnEditMinimos" data-action="edit-minimos"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-edit"/></svg> Editar</button>
       </div>
 
       <div class="card">
-        <h3 class="card-title">👤 Configuración personal y familiar</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-users"/></svg> Configuración personal y familiar</h3>
         <div id="fisc-minimos-detail"></div>
       </div>
 
@@ -1475,7 +1531,7 @@
       </div>
 
       <div class="card">
-        <h3 class="card-title">📋 Desglose completo para la declaración</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-file"/></svg> Desglose completo para la declaración</h3>
         <div id="fisc-resumen-completo"></div>
       </div>
 
@@ -1494,7 +1550,7 @@
       <!-- Selector de proveedor -->
       <div class="ai-provider-bar">
         <button type="button" class="ai-provider-btn active" data-provider="claude" data-action="set-ai-provider">
-          <span class="ai-provider-icon">✦</span> Claude
+          <span class="ai-provider-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-sparkles"/></svg></span> Claude
         </button>
         <button type="button" class="ai-provider-btn" data-provider="openai" data-action="set-ai-provider">
           <span class="ai-provider-icon">⊕</span> ChatGPT
@@ -1503,7 +1559,7 @@
           <span class="ai-provider-icon">◆</span> Gemini
         </button>
         <button type="button" class="ai-provider-btn" data-provider="groq" data-action="set-ai-provider">
-          <span class="ai-provider-icon">⚡</span> Groq
+          <span class="ai-provider-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-bolt"/></svg></span> Groq
         </button>
       </div>
 
@@ -1514,7 +1570,7 @@
       <div class="card ai-chat-card" id="ai-chat-card">
         <div class="ai-messages" id="ai-messages">
           <div class="ai-welcome">
-            <div class="ai-welcome-icon">✦</div>
+            <div class="ai-welcome-icon"><svg class="icon icon-lg" aria-hidden="true"><use href="#icon-sparkles"/></svg></div>
             <h3 class="ai-welcome-title">Bienvenido al Asesor IA</h3>
             <p class="ai-welcome-desc">Pregúntame sobre tus finanzas. Tengo acceso completo a todos tus datos de Finova y puedo darte análisis personalizados.</p>
           </div>
@@ -1530,14 +1586,12 @@
         </div>
 
         <div id="ai-ctx-banner" style="display:none;padding:7px 12px;margin-bottom:4px;background:var(--bg-elevated);border-radius:var(--r-sm);font-size:12px;color:var(--text-muted);border:1px solid var(--border-subtle)">
-          🔒 Modo anónimo — no se envían datos financieros a la IA
+          <svg class="icon icon-xs" aria-hidden="true"><use href="#icon-lock"/></svg> Modo anónimo — no se envían datos financieros a la IA
         </div>
         <div class="ai-input-row">
-          <textarea id="ai-input" class="ai-textarea" placeholder="Pregunta sobre tus finanzas..." rows="1"
-            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend();}"
-            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
-          <button type="button" id="ai-ctx-btn" data-action="ai-toggle-ctx" title="Tus datos financieros se envían a la IA — pulsa para desactivar" style="font-size:11px;padding:4px 8px;border-radius:var(--r-xs);background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border-subtle);cursor:pointer;white-space:nowrap;flex-shrink:0">📊 Con datos</button>
-          <button type="button" class="ai-send-btn" id="ai-send-btn" data-action="ai-send">↑</button>
+          <textarea id="ai-input" class="ai-textarea" placeholder="Pregunta sobre tus finanzas..." rows="1"></textarea>
+          <button type="button" id="ai-ctx-btn" data-action="ai-toggle-ctx" title="Tus datos financieros se envían a la IA — pulsa para desactivar" style="font-size:11px;padding:4px 8px;border-radius:var(--r-xs);background:var(--bg-elevated);color:var(--text-muted);border:1px solid var(--border-subtle);cursor:pointer;white-space:nowrap;flex-shrink:0"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-activity"/></svg> Con datos</button>
+          <button type="button" class="ai-send-btn" id="ai-send-btn" data-action="ai-send" aria-label="Enviar mensaje"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-arrow-up-right"/></svg></button>
         </div>
       </div>
     </section>
@@ -1546,14 +1600,14 @@
     <!-- ═══════════════════════════════ ADMIN ═══════════════════ -->
     <section class="section" id="section-admin">
       <div class="section-header">
-        <h1>👑 Panel de administrador</h1>
+        <h1><svg class="icon icon-lg" aria-hidden="true"><use href="#icon-crown"/></svg> Panel de administrador</h1>
       </div>
 
       <!-- Dev Info (solo visible con devMode activo) -->
       <div class="card" id="admin-dev-card" style="display:none;margin-bottom:20px;border-color:#7c3aed">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <h3 class="card-title" style="margin:0;color:#a78bfa">🛠 Dev Info</h3>
-          <button type="button" class="btn-ghost-sm" onclick="_refreshDevCard()" style="color:#a78bfa">↻ Actualizar</button>
+          <h3 class="card-title" style="margin:0;color:#a78bfa"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-wrench"/></svg> Dev Info</h3>
+          <button type="button" id="btn-dev-refresh" class="btn-ghost-sm" style="color:#a78bfa"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-refresh"/></svg> Actualizar</button>
         </div>
         <div id="dev-info-grid" class="admin-health-grid"></div>
       </div>
@@ -1570,15 +1624,15 @@
 
       <!-- Secciones más visitadas -->
       <div class="card" style="margin-bottom:20px">
-        <h3 class="card-title">📊 Secciones más visitadas</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-activity"/></svg> Secciones más visitadas</h3>
         <div id="admin-top-sections" class="admin-sections-chart"></div>
       </div>
 
       <!-- Lista de usuarios -->
       <div class="card" style="margin-bottom:20px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-          <h3 class="card-title" style="margin:0">👥 Usuarios registrados</h3>
-          <button type="button" class="btn-secondary" onclick="adminRefreshUsers()">↻ Actualizar</button>
+          <h3 class="card-title" style="margin:0"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-users"/></svg> Usuarios registrados</h3>
+          <button type="button" id="btn-admin-refresh-users" class="btn-secondary"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-refresh"/></svg> Actualizar</button>
         </div>
         <div id="admin-users-table"></div>
       </div>
@@ -1586,8 +1640,8 @@
       <!-- Datos de ejemplo -->
       <div class="card" style="margin-bottom:20px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <h3 class="card-title" style="margin:0">🎭 Datos de ejemplo</h3>
-          <button type="button" class="btn-primary" onclick="_adminLoadDemoData()">Cargar datos de ejemplo</button>
+          <h3 class="card-title" style="margin:0"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-database"/></svg> Datos de ejemplo</h3>
+          <button type="button" id="btn-admin-load-demo" class="btn-primary">Cargar datos de ejemplo</button>
         </div>
         <p style="font-size:13px;color:var(--text-muted);margin:0">Rellena la app con transacciones, cartera, objetivos y patrimonio ficticios para probar todas las funciones. <strong style="color:var(--danger)">Sobrescribe todos tus datos actuales.</strong></p>
       </div>
@@ -1595,8 +1649,8 @@
       <!-- Health check -->
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <h3 class="card-title" style="margin:0">🩺 Health check</h3>
-          <button type="button" class="btn-primary" onclick="adminHealthCheck()">Verificar servidor</button>
+          <h3 class="card-title" style="margin:0"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-shield"/></svg> Health check</h3>
+          <button type="button" id="btn-admin-health-check" class="btn-primary">Verificar servidor</button>
         </div>
         <div id="admin-health-result" class="admin-health-result"></div>
       </div>
@@ -1611,7 +1665,7 @@
       <!-- Welcome banner — shown only after finishing onboarding -->
       <div id="ob-welcome-banner" class="ob-welcome-banner" style="display:none">
         <div class="ob-welcome-left">
-          <span class="ob-welcome-icon">✓</span>
+          <span class="ob-welcome-icon"><svg class="icon icon-lg" aria-hidden="true"><use href="#icon-check"/></svg></span>
           <div>
             <div class="ob-welcome-title">¡Configuración completada!</div>
             <div class="ob-welcome-sub">Tus datos están guardados. Ya puedes tomar el control de tus finanzas.</div>
@@ -1622,7 +1676,7 @@
 
       <!-- Personalizar -->
       <div class="card">
-        <h3 class="card-title">📐 Personalizar</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-ruler"/></svg> Personalizar</h3>
 
         <div class="settings-section-label">Dashboard</div>
         <div class="settings-row">
@@ -1640,25 +1694,25 @@
 
       <!-- Notificaciones -->
       <div class="card">
-        <h3 class="card-title">🔔 Notificaciones y alertas</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-bell"/></svg> Notificaciones y alertas</h3>
         <div class="settings-row">
           <div class="settings-info">
             <div class="settings-name">Gestionar alertas in-app</div>
             <div class="settings-desc">Revisa, descarta o restaura alertas financieras. Configura umbrales de concentración de cartera.</div>
           </div>
-          <button type="button" class="btn-primary" onclick="openNotificationsManager()">Gestionar</button>
+          <button type="button" id="btn-notifications-manager" class="btn-primary">Gestionar</button>
         </div>
       </div>
 
       <!-- Asesor IA -->
       <div class="card">
-        <h3 class="card-title">✦ Asesor IA — API Keys</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-sparkles"/></svg> Asesor IA — API Keys</h3>
         <div id="settings-server-ai-banner" style="display:none;font-size:12px;border-radius:var(--r-sm);padding:8px 12px;margin-bottom:16px"></div>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:20px">Las claves se guardan solo en tu dispositivo. Configura los proveedores que quieras usar.</p>
 
         <div class="settings-ai-key-row">
           <div class="settings-ai-key-label">
-            <span style="color:#c8a96e;font-weight:700">✦ Claude</span>
+            <span style="color:#c8a96e;font-weight:700"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-sparkles"/></svg> Claude</span>
             <span class="settings-desc" style="display:block;margin-top:2px"><a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a> → API Keys</span>
           </div>
           <div>
@@ -1695,7 +1749,7 @@
 
         <div class="settings-ai-key-row" style="margin-top:12px">
           <div class="settings-ai-key-label">
-            <span style="color:#f55036;font-weight:700">⚡ Groq</span>
+            <span style="color:#f55036;font-weight:700"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-bolt"/></svg> Groq</span>
             <span class="settings-desc" style="display:block;margin-top:2px"><a href="https://console.groq.com" target="_blank" rel="noopener noreferrer">console.groq.com</a> → API Keys <strong>(gratis)</strong></span>
           </div>
           <div>
@@ -1707,14 +1761,14 @@
 
       <!-- Backup -->
       <div class="card">
-        <h3 class="card-title">💾 Copia de seguridad</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-download"/></svg> Copia de seguridad</h3>
         <div id="backup-reminder" style="display:none;font-size:12px;color:var(--down);background:rgba(var(--down-rgb),.08);border:1px solid rgba(var(--down-rgb),.2);border-radius:var(--r-sm);padding:8px 12px;margin-bottom:12px"></div>
         <div class="settings-row">
           <div class="settings-info">
             <div class="settings-name">Descargar backup</div>
             <div class="settings-desc">Exporta todos tus datos en formato JSON</div>
           </div>
-          <button type="button" class="btn-primary" id="btnBackupSettings" data-action="download-backup">↓ Descargar backup</button>
+          <button type="button" class="btn-primary" id="btnBackupSettings" data-action="download-backup"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-download"/></svg> Descargar backup</button>
         </div>
         <div class="settings-row" style="margin-top:12px">
           <div class="settings-info">
@@ -1722,15 +1776,15 @@
             <div class="settings-desc">Importa un backup guardado anteriormente</div>
           </div>
           <label class="btn-secondary" style="cursor:pointer">
-            ↑ Importar
-            <input type="file" id="fileRestore" accept=".json" style="display:none" aria-label="Importar backup desde archivo JSON" onchange="handleRestore(this)" />
+            <svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Importar
+            <input type="file" id="fileRestore" accept=".json" style="display:none" aria-label="Importar backup desde archivo JSON" />
           </label>
         </div>
       </div>
 
       <!-- Historial de versiones local -->
       <div class="card">
-        <h3 class="card-title">🕑 Historial de versiones</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-calendar"/></svg> Historial de versiones</h3>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px">
           Los últimos 5 estados de tu app guardados automáticamente. Puedes restaurar cualquiera.
         </p>
@@ -1739,7 +1793,7 @@
 
       <!-- Conexión bancaria PSD2 -->
       <div class="card">
-        <h3 class="card-title">🏦 Conexión bancaria</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-building"/></svg> Conexión bancaria</h3>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">
           Importa transacciones y saldos directamente desde tu banco vía Open Banking (PSD2).
           Solo lectura — Finova nunca puede mover dinero. Requiere configurar GoCardless en el servidor.
@@ -1749,7 +1803,7 @@
 
       <!-- Sincronización entre dispositivos (solo visible sin autenticación) -->
       <div class="card" id="sync-device-card">
-        <h3 class="card-title">🔄 Sincronización entre dispositivos</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-refresh"/></svg> Sincronización entre dispositivos</h3>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Disponible en modo sin cuenta. Con sesión iniciada, tus datos se sincronizan automáticamente entre dispositivos.</p>
         <div class="settings-row">
           <div class="settings-info">
@@ -1759,7 +1813,7 @@
           </div>
           <div class="btn-row btn-row--col">
             <button type="button" class="btn-secondary" data-action="sync-generate">Generar código</button>
-            <button type="button" class="btn-primary" id="btn-sync-upload" data-action="sync-upload" disabled>↑ Subir datos</button>
+            <button type="button" class="btn-primary" id="btn-sync-upload" data-action="sync-upload" disabled><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Subir datos</button>
           </div>
         </div>
         <div class="settings-row" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-subtle)">
@@ -1769,7 +1823,7 @@
           </div>
           <div class="btn-row btn-row--wrap">
             <input type="text" id="sync-code-input" class="text-input" placeholder="ej: a3f7b2e1" maxlength="16" style="width:140px;font-family:monospace;letter-spacing:2px" />
-            <button type="button" class="btn-secondary" id="btn-sync-download" data-action="sync-download">↓ Restaurar</button>
+            <button type="button" class="btn-secondary" id="btn-sync-download" data-action="sync-download"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-download"/></svg> Restaurar</button>
           </div>
         </div>
       </div>
@@ -1804,19 +1858,19 @@
 
       <!-- Panel de administrador (solo visible para admins) -->
       <div class="card" id="admin-panel-card" style="display:none">
-        <h3 class="card-title">👑 Administrador</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-crown"/></svg> Administrador</h3>
         <div class="settings-row">
           <div class="settings-info">
             <div class="settings-name">Cargar datos de ejemplo</div>
             <div class="settings-desc">Rellena la app con transacciones, inversiones y objetivos de muestra para ver todas las funcionalidades.</div>
           </div>
-          <button type="button" class="btn-primary" onclick="_adminLoadDemoData()">Cargar demo</button>
+          <button type="button" id="btn-load-demo-settings" class="btn-primary">Cargar demo</button>
         </div>
       </div>
 
       <!-- Webhook -->
       <div class="card">
-        <h3 class="card-title">⇢ Exportar vía Webhook</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-link"/></svg> Exportar vía Webhook</h3>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">
           Envía tus datos financieros a cualquier endpoint HTTP (Make, Zapier, n8n, Notion, Google Sheets via Apps Script…).
           El payload es JSON con transacciones, cartera, objetivos y resumen del mes.
@@ -1824,13 +1878,13 @@
         <div class="btn-row mb-3">
           <input type="url" id="settings-webhook-url" class="text-input" style="flex:1"
             placeholder="https://hook.make.com/…  o  https://script.google.com/…"
-            oninput="document.getElementById('btnTestWebhook').disabled=!this.value.trim()" />
+            />
           <button type="button" class="btn-primary" style="white-space:nowrap" data-action="save-webhook">Guardar</button>
         </div>
         <div class="btn-row btn-row--wrap">
           <button type="button" class="btn-secondary" id="btnTestWebhook" disabled data-action="test-webhook">Probar conexión</button>
-          <button type="button" class="btn-secondary" data-action="webhook-export-full">↑ Enviar todo</button>
-          <button type="button" class="btn-secondary" data-action="webhook-export-month">↑ Solo este mes</button>
+          <button type="button" class="btn-secondary" data-action="webhook-export-full"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Enviar todo</button>
+          <button type="button" class="btn-secondary" data-action="webhook-export-month"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Solo este mes</button>
         </div>
         <p style="font-size:11px;color:var(--text-muted);margin-top:10px">
           El endpoint debe aceptar POST con <code>Content-Type: application/json</code> y devolver CORS permisivo.
@@ -1839,7 +1893,7 @@
 
       <!-- Datos -->
       <div class="card">
-        <h3 class="card-title">🗂 Datos</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-database"/></svg> Datos</h3>
         <div class="settings-row">
           <div class="settings-info">
             <div class="settings-name">Repetir configuración inicial</div>
@@ -1856,7 +1910,7 @@
         </div>
         <div class="settings-row" style="margin-top:8px">
           <div class="settings-info">
-            <div class="settings-name">🧪 Tests de verificación</div>
+            <div class="settings-name"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-flask"/></svg> Tests de verificación</div>
             <div class="settings-desc">Comprueba que los cálculos de patrimonio, cartera e IRPF son correctos</div>
           </div>
           <button type="button" class="btn-secondary" data-action="run-tests">Ejecutar tests</button>
@@ -1874,7 +1928,7 @@
 
       <!-- Preferencias -->
       <div class="card">
-        <h3 class="card-title">🎨 Apariencia</h3>
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-palette"/></svg> Apariencia</h3>
         <div class="settings-row">
           <div class="settings-info">
             <div class="settings-name">Tema oscuro</div>
@@ -1908,7 +1962,7 @@
                 <div class="variant-desc">Obsidiana profunda · latón cálido</div>
                 <div class="variant-fonts">Playfair Display · Inter</div>
               </div>
-              <div class="variant-check" aria-hidden="true">✓</div>
+              <div class="variant-check" aria-hidden="true"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-check"/></svg></div>
             </button>
 
             <button type="button" class="variant-card" data-variant="linen-editorial">
@@ -1924,7 +1978,7 @@
                 <div class="variant-desc">Lino crema · tinta · granate</div>
                 <div class="variant-fonts">Playfair Display · Inter</div>
               </div>
-              <div class="variant-check" aria-hidden="true">✓</div>
+              <div class="variant-check" aria-hidden="true"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-check"/></svg></div>
             </button>
 
             <button type="button" class="variant-card" data-variant="midnight-emerald">
@@ -1940,7 +1994,7 @@
                 <div class="variant-desc">Verde bosque · crema · dorado</div>
                 <div class="variant-fonts">Playfair Display · Inter</div>
               </div>
-              <div class="variant-check" aria-hidden="true">✓</div>
+              <div class="variant-check" aria-hidden="true"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-check"/></svg></div>
             </button>
 
             <button type="button" class="variant-card" data-variant="soft-mono">
@@ -1956,7 +2010,7 @@
                 <div class="variant-desc">Negro absoluto · coral eléctrico</div>
                 <div class="variant-fonts">Playfair Display · Inter</div>
               </div>
-              <div class="variant-check" aria-hidden="true">✓</div>
+              <div class="variant-check" aria-hidden="true"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-check"/></svg></div>
             </button>
 
             <button type="button" class="variant-card" data-variant="terracotta-warmth">
@@ -1972,7 +2026,7 @@
                 <div class="variant-desc">Avena · espresso · terracota</div>
                 <div class="variant-fonts">Playfair Display · Inter</div>
               </div>
-              <div class="variant-check" aria-hidden="true">✓</div>
+              <div class="variant-check" aria-hidden="true"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-check"/></svg></div>
             </button>
           </div>
         </div>
@@ -1980,7 +2034,7 @@
 
       <!-- Zona de peligro -->
       <div class="card" style="border-top:2px solid var(--danger)">
-        <h3 class="card-title" style="color:var(--danger)">⚠ Zona de peligro</h3>
+        <h3 class="card-title" style="color:var(--danger)"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-alert-triangle"/></svg> Zona de peligro</h3>
         <div class="settings-row">
           <div class="settings-info">
             <div class="settings-name">Eliminar todos los datos permanentemente</div>
@@ -1999,7 +2053,7 @@
     <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
         <h2 class="modal-title" id="modalTitle">Título</h2>
-        <button type="button" class="modal-close" id="modalClose" data-action="close-modal">✕</button>
+        <button type="button" class="modal-close" id="modalClose" data-action="close-modal" aria-label="Cerrar"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-close"/></svg></button>
       </div>
       <div class="modal-body" id="modalBody"></div>
       <div class="modal-footer">
@@ -2011,13 +2065,13 @@
 
   <div class="toast-container" id="toastContainer" role="status" aria-live="polite" aria-atomic="false"></div>
 
-  <button type="button" id="btn-back-to-top" class="btn-back-to-top" aria-label="Volver arriba" style="display:none" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+  <button type="button" id="btn-back-to-top" class="btn-back-to-top" aria-label="Volver arriba" style="display:none"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-chevron-left" style="transform:rotate(90deg)"/></svg></button>
 
   <div id="pwa-install-banner" class="pwa-install-banner" style="display:none" role="alert">
-    <span class="pwa-install-icon">📲</span>
+    <span class="pwa-install-icon"><svg class="icon" aria-hidden="true"><use href="#icon-download"/></svg></span>
     <span class="pwa-install-text">Instala Finova en tu dispositivo para acceso rápido sin navegador</span>
-    <button class="btn-primary btn-sm" onclick="installPWA()">Instalar</button>
-    <button class="pwa-install-close" onclick="this.closest('.pwa-install-banner').style.display='none'" aria-label="Cerrar">✕</button>
+    <button id="btn-pwa-install" class="btn-primary btn-sm">Instalar</button>
+    <button id="btn-pwa-close" class="pwa-install-close" aria-label="Cerrar"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-close"/></svg></button>
   </div>
 
   <!-- ─── BÚSQUEDA GLOBAL (Ctrl+K) ──────────────────────────── -->
@@ -2032,7 +2086,7 @@
         <div class="search-hint">Escribe para buscar en todos tus datos financieros</div>
       </div>
       <div class="search-footer">
-        <span><kbd>↑</kbd><kbd>↓</kbd> navegar</span>
+        <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> navegar</span>
         <span><kbd>↵</kbd> abrir</span>
         <span><kbd>Esc</kbd> cerrar</span>
         <span class="search-footer-sep">·</span>
@@ -2044,19 +2098,19 @@
   <!-- Navegación inferior móvil -->
   <nav class="mobile-bottom-nav" id="mobileBottomNav">
     <button class="mobile-nav-btn active" data-section="dashboard">
-      <span class="mobile-nav-icon">⬡</span>
+      <span class="mobile-nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-dashboard"/></svg></span>
       <span class="mobile-nav-label">Inicio</span>
     </button>
     <button class="mobile-nav-btn" data-section="transactions">
-      <span class="mobile-nav-icon">⇄</span>
+      <span class="mobile-nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-swap"/></svg></span>
       <span class="mobile-nav-label">Gastos</span>
     </button>
     <button class="mobile-nav-btn" data-section="portfolio">
-      <span class="mobile-nav-icon">↗</span>
+      <span class="mobile-nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-trending-up"/></svg></span>
       <span class="mobile-nav-label">Cartera</span>
     </button>
     <button class="mobile-nav-btn" data-section="settings">
-      <span class="mobile-nav-icon">⚙</span>
+      <span class="mobile-nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg></span>
       <span class="mobile-nav-label">Ajustes</span>
     </button>
     <button class="mobile-nav-btn" id="mobileNavMenuBtn" aria-label="Abrir menú">
@@ -2084,43 +2138,43 @@
     <div class="mobile-menu-list">
 
       <button class="mobile-menu-item" data-section="dashboard">
-        <span class="mmi-icon">▤</span><span class="mmi-label">Dashboard</span>
+        <span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-dashboard"/></svg></span><span class="mmi-label">Dashboard</span>
       </button>
 
       <div class="mobile-menu-group">
-        <button class="mobile-menu-group-hdr" data-group="mmg-transacciones">
-          <span class="mmi-icon">⇄</span>
+        <button class="mobile-menu-group-hdr" data-group="mmg-transacciones" aria-expanded="false" aria-controls="mmg-transacciones">
+          <span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-swap"/></svg></span>
           <span class="mmi-label">Ingresos &amp; Gastos</span>
-          <span class="mmi-arrow">›</span>
+          <span class="mmi-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-right"/></svg></span>
         </button>
         <div class="mobile-menu-subitems" id="mmg-transacciones"><div>
-          <button class="mobile-menu-item mobile-menu-subitem" data-section="transactions"><span class="mmi-icon">▸</span><span class="mmi-label">Transacciones</span></button>
-          <button class="mobile-menu-item mobile-menu-subitem" data-section="bizums"><span class="mmi-icon">▸</span><span class="mmi-label">Bizums</span></button>
-          <button class="mobile-menu-item mobile-menu-subitem" data-section="recurring"><span class="mmi-icon">▸</span><span class="mmi-label">Recurrentes</span></button>
+          <button class="mobile-menu-item mobile-menu-subitem" data-section="transactions"><span class="mmi-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span><span class="mmi-label">Transacciones</span></button>
+          <button class="mobile-menu-item mobile-menu-subitem" data-section="bizums"><span class="mmi-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span><span class="mmi-label">Bizums</span></button>
+          <button class="mobile-menu-item mobile-menu-subitem" data-section="recurring"><span class="mmi-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span><span class="mmi-label">Recurrentes</span></button>
         </div></div>
       </div>
 
       <div class="mobile-menu-group">
-        <button class="mobile-menu-group-hdr" data-group="mmg-inversiones">
-          <span class="mmi-icon">↗</span>
+        <button class="mobile-menu-group-hdr" data-group="mmg-inversiones" aria-expanded="false" aria-controls="mmg-inversiones">
+          <span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-trending-up"/></svg></span>
           <span class="mmi-label">Inversiones</span>
-          <span class="mmi-arrow">›</span>
+          <span class="mmi-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-right"/></svg></span>
         </button>
         <div class="mobile-menu-subitems" id="mmg-inversiones"><div>
-          <button class="mobile-menu-item mobile-menu-subitem" data-section="portfolio"><span class="mmi-icon">▸</span><span class="mmi-label">Cartera</span></button>
-          <button class="mobile-menu-item mobile-menu-subitem" data-section="watchlist"><span class="mmi-icon">▸</span><span class="mmi-label">Watchlist</span></button>
-          <button class="mobile-menu-item mobile-menu-subitem" data-section="dividends"><span class="mmi-icon">▸</span><span class="mmi-label">Dividendos</span></button>
+          <button class="mobile-menu-item mobile-menu-subitem" data-section="portfolio"><span class="mmi-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span><span class="mmi-label">Cartera</span></button>
+          <button class="mobile-menu-item mobile-menu-subitem" data-section="watchlist"><span class="mmi-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span><span class="mmi-label">Watchlist</span></button>
+          <button class="mobile-menu-item mobile-menu-subitem" data-section="dividends"><span class="mmi-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span><span class="mmi-label">Dividendos</span></button>
         </div></div>
       </div>
 
-      <button class="mobile-menu-item" data-section="networth"><span class="mmi-icon">◐</span><span class="mmi-label">Patrimonio Neto</span></button>
-      <button class="mobile-menu-item" data-section="pasivos"><span class="mmi-icon">⊖</span><span class="mmi-label">Pasivos</span></button>
-      <button class="mobile-menu-item" data-section="alternatives"><span class="mmi-icon">◇</span><span class="mmi-label">Activos Alt.</span></button>
-      <button class="mobile-menu-item" data-section="goals"><span class="mmi-icon">◎</span><span class="mmi-label">Objetivos</span></button>
-      <button class="mobile-menu-item" data-section="simulator"><span class="mmi-icon">∿</span><span class="mmi-label">Simulador</span></button>
-      <button class="mobile-menu-item" data-section="fiscalidad"><span class="mmi-icon">§</span><span class="mmi-label">Fiscalidad</span></button>
-      <button class="mobile-menu-item" data-section="ai"><span class="mmi-icon">✦</span><span class="mmi-label">Asesor IA</span></button>
-      <button class="mobile-menu-item" data-section="settings"><span class="mmi-icon">⚙</span><span class="mmi-label">Ajustes</span></button>
+      <button class="mobile-menu-item" data-section="networth"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-networth"/></svg></span><span class="mmi-label">Patrimonio Neto</span></button>
+      <button class="mobile-menu-item" data-section="pasivos"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-minus-circle"/></svg></span><span class="mmi-label">Pasivos</span></button>
+      <button class="mobile-menu-item" data-section="alternatives"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-gem"/></svg></span><span class="mmi-label">Activos Alt.</span></button>
+      <button class="mobile-menu-item" data-section="goals"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg></span><span class="mmi-label">Objetivos</span></button>
+      <button class="mobile-menu-item" data-section="simulator"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-activity"/></svg></span><span class="mmi-label">Simulador</span></button>
+      <button class="mobile-menu-item" data-section="fiscalidad"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-percent"/></svg></span><span class="mmi-label">Fiscalidad</span></button>
+      <button class="mobile-menu-item" data-section="ai"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-sparkles"/></svg></span><span class="mmi-label">Asesor IA</span></button>
+      <button class="mobile-menu-item" data-section="settings"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg></span><span class="mmi-label">Ajustes</span></button>
 
     </div>
   </div>
@@ -2138,7 +2192,7 @@
   <div id="ob-tour-card" class="ob-tour-card" style="display:none" role="dialog" aria-label="Tour de Finova">
     <div class="ob-tour-header">
       <div class="ob-tour-dots-row" id="ob-tour-dots"></div>
-      <button type="button" class="ob-tour-skip-btn" data-action="ob-tour-skip">✕ Saltar</button>
+      <button type="button" class="ob-tour-skip-btn" data-action="ob-tour-skip"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-close"/></svg> Saltar</button>
     </div>
     <div class="ob-tour-body">
       <div class="ob-tour-icon-wrap" id="ob-tour-icon"></div>
@@ -2149,8 +2203,8 @@
       </div>
     </div>
     <div class="ob-tour-footer">
-      <button type="button" class="ob-tour-prev-btn" id="ob-tour-prev" data-action="ob-tour-prev">← Anterior</button>
-      <button type="button" class="ob-tour-next-btn" id="ob-tour-next" data-action="ob-tour-next">Siguiente →</button>
+      <button type="button" class="ob-tour-prev-btn" id="ob-tour-prev" data-action="ob-tour-prev"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-left"/></svg> Anterior</button>
+      <button type="button" class="ob-tour-next-btn" id="ob-tour-next" data-action="ob-tour-next">Siguiente <svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-right"/></svg></button>
     </div>
   </div>
 
@@ -2195,7 +2249,7 @@
       <label class="form-label">Foto / Ticket</label>
       <div class="tx-photo-area">
         <label for="f-tx-photo" class="tx-photo-btn">
-          <span>📷 Adjuntar foto</span>
+          <span><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-camera"/></svg> Adjuntar foto</span>
           <input type="file" id="f-tx-photo" accept="image/*" style="display:none" />
         </label>
         <div id="tx-photo-preview" class="tx-photo-preview"></div>
@@ -2204,7 +2258,7 @@
     <div class="tx-fav-row">
       <label class="tx-fav-label">
         <input type="checkbox" id="f-tx-fav" />
-        <span class="tx-fav-heart">♥</span> Marcar como favorita
+        <span class="tx-fav-heart"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-heart"/></svg></span> Marcar como favorita
       </label>
     </div>
   </template>
@@ -2242,11 +2296,11 @@
       <div class="watch-alert-toggle">
         <label class="watch-alert-opt">
           <input type="radio" name="f-w-alert-type" value="above" />
-          <span>↑ Por encima del precio</span>
+          <span><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-arrow-up-right"/></svg> Por encima del precio</span>
         </label>
         <label class="watch-alert-opt">
           <input type="radio" name="f-w-alert-type" value="below" />
-          <span>↓ Por debajo del precio</span>
+          <span><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-arrow-down-right"/></svg> Por debajo del precio</span>
         </label>
       </div>
     </div>
@@ -2262,7 +2316,7 @@
         <label class="form-label">Ticker / Símbolo</label>
         <div class="btn-row">
           <input type="text" id="f-a-ticker" class="text-input" placeholder="Ej: AAPL" style="text-transform:uppercase;flex:1" />
-          <span id="f-a-ticker-badge" style="font-size:11px;color:var(--accent);white-space:nowrap;display:none">✓ auto</span>
+          <span id="f-a-ticker-badge" style="font-size:11px;color:var(--accent);white-space:nowrap;display:none"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-check"/></svg> auto</span>
         </div>
       </div>
       <div class="form-group">
@@ -2374,6 +2428,7 @@
   <script src="src/utils/premium.js"></script>
   <!-- Core modules — load in dependency order -->
   <script src="src/core/state.js"></script>
+  <script src="src/core/api.js"></script>
   <script src="src/core/utils.js"></script>
   <script src="src/core/charts.js"></script>
   <script src="src/core/calcs.js"></script>
@@ -2394,10 +2449,6 @@
   <script src="src/utils/pdf.js"></script>
   <script src="src/sections/admin.js"></script>
   <script src="src/auth/auth.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    }
-  </script>
+  <script src="src/core/events.js"></script>
 </body>
 </html>

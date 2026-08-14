@@ -314,7 +314,7 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', APP.theme);
   const themeIcon  = document.getElementById('themeIcon');
   const themeLabel = document.querySelector('#themeToggle .nav-label');
-  if (themeIcon)  themeIcon.textContent  = APP.theme === 'dark' ? '☀' : '☾';
+  if (themeIcon)  themeIcon.innerHTML = `<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-${APP.theme === 'dark' ? 'sun' : 'moon'}"></use></svg>`;
   if (themeLabel) themeLabel.textContent = APP.theme === 'dark' ? 'Modo claro' : 'Modo oscuro';
 }
 
@@ -1084,7 +1084,11 @@ function _globalClickDispatch(e) {
 ═══════════════════════════════════════════════════════════════ */
 function downloadCSV(filename, headers, rows) {
   const esc = v => {
-    const s = String(v ?? '');
+    let s = String(v ?? '');
+    // Prevent CSV/formula injection: spreadsheet apps (Excel, LibreOffice) execute
+    // cells that start with =, +, -, @ as formulas. Prefix with a tab so the value
+    // is interpreted as text. The tab is invisible in most spreadsheet views.
+    if (/^[=+\-@]/.test(s)) s = '\t' + s;
     return (s.includes(',') || s.includes('"') || s.includes('\n'))
       ? `"${s.replace(/"/g, '""')}"` : s;
   };
@@ -2300,12 +2304,7 @@ async function syncUpload() {
   if (btn) btn.disabled = true;
   try {
     const { claudeApiKey, openaiApiKey, geminiApiKey, groqApiKey, ...exportable } = APP;
-    const authH = await _getAuthHeader();
-    const res = await fetch('/api/sync-upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authH },
-      body: JSON.stringify({ code, data: JSON.stringify(exportable) }),
-    });
+    const res = await api.sync.upload({ code, data: JSON.stringify(exportable) });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || `Error ${res.status}`);
     APP.lastBackupDate = new Date().toISOString().slice(0, 10);
@@ -2326,8 +2325,7 @@ async function syncDownload() {
   const btn = document.getElementById('btn-sync-download');
   if (btn) btn.disabled = true;
   try {
-    const authH = await _getAuthHeader();
-    const res  = await fetch(`/api/sync-download?code=${encodeURIComponent(code)}`, { headers: authH });
+    const res  = await api.sync.download(code);
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || `Error ${res.status}`);
     const data = JSON.parse(json.data);
@@ -2739,12 +2737,12 @@ function updateProfileDropdown() {
 
   const themeIcon  = document.getElementById('dd-theme-icon');
   const themeLabel = document.getElementById('dd-theme-label');
-  if (themeIcon)  themeIcon.textContent  = APP.theme === 'dark' ? '☀' : '☾';
+  if (themeIcon)  themeIcon.innerHTML = `<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-${APP.theme === 'dark' ? 'sun' : 'moon'}"></use></svg>`;
   if (themeLabel) themeLabel.textContent = APP.theme === 'dark' ? 'Modo claro' : 'Modo oscuro';
 
   const privacyIcon  = document.getElementById('dd-privacy-icon');
   const privacyLabel = document.getElementById('dd-privacy-label');
-  if (privacyIcon)  privacyIcon.textContent  = APP.privacyMode ? '🙈' : '👁';
+  if (privacyIcon)  privacyIcon.innerHTML = `<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-${APP.privacyMode ? 'eye-off' : 'eye'}"></use></svg>`;
   if (privacyLabel) privacyLabel.textContent = APP.privacyMode ? 'Desactivar privacidad' : 'Activar privacidad';
 
   const nw        = calcNetWorth();
@@ -2763,7 +2761,7 @@ function updateProfileDropdown() {
     const pct = totalAll > 0 ? Math.round((doneAll / totalAll) * 100) : 0;
     sbMs.innerHTML = `
       <div class="sidebar-ms-row" onclick="openMilestoneGallery()" title="Ver todas las insignias">
-        <span class="sidebar-ms-label">★ ${doneAll}/${totalAll} insignias</span>
+        <span class="sidebar-ms-label"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-star"></use></svg> ${doneAll}/${totalAll} insignias</span>
         <div class="sidebar-ms-track"><div class="sidebar-ms-fill" style="width:${pct}%"></div></div>
       </div>`;
   }
@@ -3226,17 +3224,13 @@ function hideCatBadge() {
 async function categorizeTxWithAI(description, type, available) {
   const prompt = `Categoriza este ${type === 'expense' ? 'gasto' : 'ingreso'}: "${description}"\nCategorías disponibles: ${available.join(', ')}\nResponde SOLO con el nombre exacto de la categoría, sin explicación.`;
   try {
-    const res = await fetch('/api/ai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        provider: APP.aiProvider || 'claude',
-        apiKey:   (APP[({ claude: 'claudeApiKey', openai: 'openaiApiKey', gemini: 'geminiApiKey', groq: 'groqApiKey' })[APP.aiProvider]] || '').trim(),
-        messages: [{ role: 'user', content: prompt }],
-        systemPrompt: 'Eres un clasificador de transacciones financieras. Responde SOLO con el nombre exacto de la categoría.',
-      }),
+    const res = await api.ai({
+      provider:     APP.aiProvider || 'claude',
+      apiKey:       (APP[({ claude: 'claudeApiKey', openai: 'openaiApiKey', gemini: 'geminiApiKey', groq: 'groqApiKey' })[APP.aiProvider]] || '').trim(),
+      messages:     [{ role: 'user', content: prompt }],
+      systemPrompt: 'Eres un clasificador de transacciones financieras. Responde SOLO con el nombre exacto de la categoría.',
     });
-    if (res.status === 429) { showToast('Límite de IA alcanzado, espera 60 s', 'error'); return null; }
+    if (res.status === 429) return null; // api.ai already shows the toast
     if (!res.ok) return null;
     const data = await res.json();
     const suggested = (data.text || '').trim();
