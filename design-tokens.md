@@ -4,7 +4,7 @@ Documento de referencia del Design System de Finova. Fuente única de verdad par
 
 Metodología: `ui-ux-pro-max-skill` (ver `.claude/skills/ui-ux-pro-max/`). No se ha partido de cero — Finova **ya tenía** una arquitectura de tokens sofisticada (5 variantes de tema, cada una con claro/oscuro) en `style.css:1-617`. Este documento la **audita, verifica y formaliza**, no la reemplaza. Los valores de contraste están **calculados con la fórmula WCAG 2.1** (no estimados a ojo) — script de verificación incluido al final.
 
-**Estado: propuesta para revisión. Ningún token de este documento se ha aplicado todavía a las páginas — `style.css` sigue exactamente igual que antes de este documento.**
+**Estado:** los tokens de este documento (color, contraste, `--neutral`, tipografía interactiva, breakpoints) **ya están aplicados en `style.css`** — confirmados y corregidos en la revisión del 2026-08-14. Lo que sigue pendiente es la propagación página por página (Dashboard, Cartera, Watchlist, Dividendos, Patrimonio Neto, Activos Alternativos, Objetivos, Simulador, Asesor IA, Configuración) y el barrido de emojis en `src/sections/*.js`.
 
 ---
 
@@ -28,8 +28,7 @@ Cada variante define el mismo conjunto de tokens semánticos en dos bloques — 
 
 - **Positivo** → `--up` (alias `--positive`): ganancias, rentabilidad positiva, ingresos, objetivos cumplidos.
 - **Negativo** → `--down` (alias `--negative`, `--danger`): pérdidas, gastos, alertas, acciones destructivas.
-- **Neutral** → **no existe todavía como token dedicado.** Hoy `.badge-pending` reutiliza `--accent-soft`/`--accent` (ver `style.css:2861`), lo que mezcla "estado neutral/pendiente" con "color de marca". Funciona porque el dorado/latón se lee como "atención, en curso" — pero es una decisión implícita, no un token con nombre.
-  **Propuesta:** añadir `--neutral` y `--neutral-soft`, derivados de la rampa de gris de cada variante (`text-secondary`/`border-strong`), para estados verdaderamente neutrales (borrador, sin categorizar, informativo) sin tocar el significado de `--accent`. `--accent` se queda reservado para "pendiente/en curso" tal y como está, que es una lectura correcta para una fintech.
+- **Neutral** → **`--neutral` / `--neutral-soft` (añadidos)**, derivados de `text-secondary` de cada variante (con corrección de contraste propia en `terracotta-warmth · dark`, ver 1.4). `.badge-pending` (`style.css`) ya usa `--neutral-soft`/`--neutral` en vez de `--accent-soft`/`--accent` — el color de marca queda libre para su significado propio (acento, foco, elementos "premium"), sin mezclarse con estados de UI.
   Regla `color-not-only` de la skill: en toda la app, positivo/negativo/neutral **nunca dependen solo del color** — ya se combinan con signo (+/−), flecha (`icon-arrow-up-right`/`down-right`) o texto ("Pagado"/"Pendiente"). Mantener esa disciplina al propagar.
 
 ### 1.3 Paleta recomendada por defecto: **Obsidian & Brass**
@@ -41,30 +40,28 @@ De las 5 variantes existentes, recomiendo mantener **`obsidian-brass`** (ya es l
 
 Las otras 4 variantes (`linen-editorial`, `midnight-emerald`, `soft-mono`, `terracotta-warmth`) se mantienen como personalización opcional del usuario (selector ya existente en el dropdown de perfil) — es una función real de la app y no se elimina, solo se documenta su rol secundario.
 
-### 1.4 Verificación de contraste (WCAG 2.1, calculado)
+### 1.4 Verificación de contraste (WCAG 2.1, calculado) — corregido y aplicado
 
-Pares medidos: `text-primary`/`text-secondary`/`text-muted` sobre `bg-surface`; texto de botón (`accent-ink`) sobre `accent`; `up`/`down` sobre `bg-surface`; `sidebar-text` sobre `sidebar-bg`.
+Pares medidos: `text-primary`/`text-secondary`/`text-muted`/**`neutral`** sobre `bg-surface`; texto de botón (`accent-ink`) sobre `accent`; `up`/`down` sobre `bg-surface`; `sidebar-text` sobre `sidebar-bg`. Valores **ya aplicados** en `style.css`.
 
-| Variante | primary/surface | secondary/surface | **muted/surface** | accent-ink/accent | up/surface | down/surface | sidebar |
-|---|---|---|---|---|---|---|---|
-| obsidian-brass · light | 18.49 AAA | 6.08 AA | **2.66 FAIL** | 3.55 AA-large | 4.89 AA | 6.76 AA | 14.59 AAA |
-| obsidian-brass · dark | 14.26 AAA | 5.40 AA | **2.39 FAIL** | 8.63 AAA | 7.78 AAA | 5.83 AA | 15.91 AAA |
-| linen-editorial · light | 15.64 AAA | 6.33 AA | **2.70 FAIL** | 8.43 AAA | 5.59 AA | 7.89 AAA | 14.04 AAA |
-| linen-editorial · dark | 13.78 AAA | 5.20 AA | **2.25 FAIL** | 4.35 AA-large | 6.86 AA | 4.01 AA-large | 15.84 AAA |
-| midnight-emerald · light | 14.52 AAA | 5.64 AA | **2.63 FAIL** | 5.91 AA | 5.48 AA | 5.91 AA | 12.56 AAA |
-| midnight-emerald · dark | 12.53 AAA | 5.26 AA | **2.75 FAIL** | 9.84 AAA | 7.15 AAA | 5.42 AA | 14.58 AAA |
-| soft-mono · light | 19.80 AAA | 6.91 AA | **2.50 FAIL** | 3.18 AA-large | 5.32 AA | 5.25 AA | 17.81 AAA |
-| soft-mono · dark | 16.85 AAA | 5.41 AA | **2.39 FAIL** | 7.10 AAA | 8.95 AAA | 6.33 AA | 18.89 AAA |
-| terracotta-warmth · light | 15.41 AAA | 6.12 AA | **2.61 FAIL** | 4.19 AA-large | 4.44 AA-large | 5.90 AA | 14.22 AAA |
-| terracotta-warmth · dark | 13.96 AAA | 4.06 AA-large | **2.10 FAIL** | 6.18 AA | 7.71 AAA | 5.78 AA | 16.00 AAA |
+| Variante | primary/surface | secondary/surface | muted/surface | **neutral/surface** | accent-ink/accent | up/surface | down/surface | sidebar |
+|---|---|---|---|---|---|---|---|---|
+| obsidian-brass · light | 18.49 AAA | 6.08 AA | 4.50 AA | 6.08 AA | 5.21 AA | 4.89 AA | 6.76 AA | 14.59 AAA |
+| obsidian-brass · dark | 14.26 AAA | 5.40 AA | 4.51 AA | 5.40 AA | 8.63 AAA | 7.78 AAA | 5.83 AA | 15.91 AAA |
+| linen-editorial · light | 15.64 AAA | 6.33 AA | 4.53 AA | 6.33 AA | 8.43 AAA | 5.59 AA | 7.89 AAA | 14.04 AAA |
+| linen-editorial · dark | 13.78 AAA | 5.20 AA | 4.53 AA | 5.20 AA | 4.86 AA | 6.86 AA | 4.01 AA-large | 15.84 AAA |
+| midnight-emerald · light | 14.52 AAA | 5.64 AA | 4.51 AA | 5.64 AA | 5.91 AA | 5.48 AA | 5.91 AA | 12.56 AAA |
+| midnight-emerald · dark | 12.53 AAA | 5.26 AA | 4.51 AA | 5.26 AA | 9.84 AAA | 7.15 AAA | 5.42 AA | 14.58 AAA |
+| soft-mono · light | 19.80 AAA | 6.91 AA | 4.50 AA | 6.91 AA | 6.22 AA | 5.32 AA | 5.25 AA | 17.81 AAA |
+| soft-mono · dark | 16.85 AAA | 5.41 AA | 4.53 AA | 5.41 AA | 7.10 AAA | 8.95 AAA | 6.33 AA | 18.89 AAA |
+| terracotta-warmth · light | 15.41 AAA | 6.12 AA | 4.52 AA | 6.12 AA | 4.64 AA | 4.44 AA-large | 5.90 AA | 14.22 AAA |
+| terracotta-warmth · dark | 13.96 AAA | 4.06 AA-large | 4.51 AA | **4.61 AA** | 6.18 AA | 7.71 AAA | 5.78 AA | 16.00 AAA |
 
-**Hallazgo 1 — `--text-muted` no pasa WCAG AA en ninguna de las 10 combinaciones** (rango 2.10:1–2.75:1; el mínimo AA para texto normal es 4.5:1, y hasta el umbral más permisivo de "no-texto"/UI es 3:1). `--text-muted` se usa hoy para metadatos, timestamps, ayudas de formulario — texto real, no decoración — a menudo en 11–12px. Es un defecto **preexistente**, no introducido por este rediseño.
-**Propuesta:** oscurecer `--text-muted` en claro / aclarar en oscuro hasta cruzar 4.5:1 en las 10 variantes (ajuste de luminosidad, no de matiz — mismo tono, más contraste). Puedo traer valores concretos calculados variante por variante si confirmas esta dirección.
+**Las 30 combinaciones críticas (muted/surface, accent-ink/accent, neutral/surface) pasan ahora AA (≥4.5:1).** Único resto por debajo de 4.5 en toda la tabla: `down/surface` en `terracotta-warmth·light` (4.44, AA-large) y `secondary/surface` en `terracotta-warmth·dark` (4.06, AA-large) — ambos aceptables porque WCAG permite 3:1 para el rol "no-texto"/texto grande, y ninguno de los dos se usa hoy en texto pequeño crítico; quedan anotados para revisar si aparece un uso de texto normal sobre esos pares en la fase de aplicación.
 
-**Hallazgo 2 — `accent-ink` sobre `accent` falla AA de texto normal en 5 de las 10 combinaciones** (marcadas "AA-large": 3.18–4.35:1, por debajo de 4.5:1). Es el texto de `.btn-primary` (`style.css:1619`), tipografía 13px/600 — no cumple el umbral de "texto grande" de WCAG (18px normal o ~18.7px negrita), así que necesita 4.5:1 completo.
-**Propuesta:** mismo tratamiento — ajustar `accent-ink` o `accent` en las 5 variantes afectadas (`obsidian-brass·light`, `linen-editorial·dark`, `midnight-emerald·light`, `soft-mono·light`, `terracotta-warmth·light`) hasta 4.5:1.
+**Hallazgo 1 (corregido) — `--text-muted` no pasaba WCAG AA en ninguna de las 10 combinaciones** (rango original 2.10:1–2.75:1). Corregido ajustando solo la luminosidad (mismo matiz) hasta 4.50–4.53:1 en las 10 variantes.
 
-Ambos hallazgos son ajustes **de valor de token**, no de layout — bajo impacto visual (misma familia de color, ligero cambio de luminosidad), alto impacto de accesibilidad. Recomiendo aplicarlos junto con el resto de tokens en el siguiente paso, no ahora.
+**Hallazgo 2 (corregido) — `accent-ink` sobre `accent` fallaba AA de texto normal en 4 de las 10 combinaciones** (no 5 — corrijo aquí un error mío: `midnight-emerald·light` ya pasaba a 5.91:1, no forma parte del hallazgo). Las 4 reales (`obsidian-brass·light`, `linen-editorial·dark`, `soft-mono·light`, `terracotta-warmth·light`) están corregidas: en `obsidian-brass·light` y `soft-mono·light` el texto de botón pasa a usar el `text-primary` oscuro de esa variante en vez de un blanco casi puro (el dorado/naranja de esos acentos es demasiado claro para texto blanco a 4.5:1); en `linen-editorial·dark` pasa a negro puro; en `terracotta-warmth·light` se mantiene blanco puro (`#ffffff`, 4.64:1 — el blanco sí funciona ahí).
 
 ---
 
@@ -77,24 +74,24 @@ Ambos hallazgos son ajustes **de valor de token**, no de layout — bajo impacto
 
 Es una pareja deliberada (display serif + UI sans), no un accidente — coincide con el patrón `Minimal Swiss`/`Premium Sans` que la skill recomienda para dashboards financieros. Se mantiene.
 
-### 2.2 Escala (existente, `style.css:96-102`)
+### 2.2 Escala (corregida y aplicada, `style.css`)
 
-| Token | Tamaño | Uso actual |
+**Decisión confirmada:** el texto interactivo (botones, inputs, labels) y las vistas móviles en general **nunca bajan de 16px**. Única excepción: tablas de datos densas de escritorio, con suelo de **14px** (nunca menos). Aplicado:
+
+| Token | Tamaño | Uso |
 |---|---|---|
-| `--fs-xs` | 11px | meta, captions, badges, ALL-CAPS labels |
-| `--fs-sm` | 13px | body, texto UI, filas de tabla, botones |
-| `--fs-md` | 15px | nombres de tarjeta, subtítulos |
+| `--fs-2xs` | 11px | **solo** decorativo: badges, chips, meta ALL-CAPS — nunca labels ni texto de botón/input |
+| `--fs-xs` | 14px | excepción de tabla densa de escritorio (suelo, nunca menos) |
+| `--fs-sm` | 16px | suelo interactivo: botones, inputs, labels, body |
+| `--fs-md` | 16px | nombres de tarjeta, subtítulos |
 | `--fs-lg` | 18px | valores de display, importes pequeños |
 | `--fs-xl` | 24px | KPI secundario, títulos de modal |
 | `--fs-2xl` | 30px | h1 de sección, KPI principal |
 | `--fs-3xl` | 40px | KPI hero (patrimonio neto) |
 
-**Punto a decidir — no lo cambio unilateralmente:** la regla `readable-font-size` de la skill pide mínimo 16px para texto de cuerpo en móvil (evita el auto-zoom de iOS en inputs y mejora legibilidad). Aquí `--fs-sm` (13px) es el tamaño de body/UI. Esto es **intencional**, no descuido — es el patrón "dashboard denso" (Bloomberg Terminal, Mercury, Ramp) que prioriza densidad de información sobre tamaño de texto, algo razonable en una app financiera con muchas cifras en pantalla. Pero es una tensión real con la guía de accesibilidad para móvil.
-**Opciones:**
-1. Mantener 13px en desktop (dashboard denso) pero subir a 16px los `<input>`/`<select>` específicamente en viewport móvil (evita el auto-zoom sin tocar la densidad de las tablas).
-2. Subir `--fs-sm` a 14px como punto intermedio en toda la app.
-3. Dejarlo como está y asumir la tensión conscientemente.
-Te lo dejo para decidir junto con la paleta — no es una corrección de bug, es una decisión de producto.
+Componentes globales ya actualizados a este suelo: `body` (tamaño base del documento, `style.css` — con esto cualquier texto sin tamaño propio hereda 16px automáticamente), `.btn-primary/.btn-secondary/.btn-ghost/.btn-danger` (13→16px; `.btn-sm` ahora solo reduce padding, no tamaño de letra), `.text-input`/`.select-input` (13→16px — de paso corrige el auto-zoom de iOS en formularios), `.form-label` (11→16px), `.nav-item` (13→16px, es un `<button>`), `.data-table`/`.data-table th` (13/11→14px, excepción documentada).
+
+**Nota de interpretación:** no he tocado los cientos de `font-size` específicos de componentes individuales (badges, texto de dropdown de perfil, ayuda de atajos de teclado, captions del hero móvil del Dashboard, etc.) — esos se revisan uno a uno en la fase de aplicación página por página, donde se decide caso a caso si son "texto interactivo/body" (→16px) o "meta/decorativo" (se queda pequeño, categoría `--fs-2xs`). Ejemplo ya evaluado: `.mh-greeting`/`.mh-change` (caption y variación bajo el patrimonio neto en el hero móvil) se tratan como meta/caption, no como body — se quedan en `--fs-xs` (ahora 14px, antes 11px), no suben a 16px, porque no son texto interactivo ni contenido de lectura primaria.
 
 ### 2.3 Pesos
 
@@ -122,18 +119,20 @@ Base 4px, escala `--sp-1`(4) `--sp-2`(8) `--sp-3`(12) `--sp-4`(16) `--sp-5`(20) 
 
 `--icon-xs`(14) `--icon-sm`(16) `--icon-md`(20, default) `--icon-lg`(24) `--icon-xl`(32). Un único sprite SVG (`index.html`, ~46 símbolos), `stroke-width: 1.75` constante vía `.icon`, `currentColor` para heredar color de texto — nunca color fijo. Cubre navegación y chrome global; pendiente el barrido en `src/sections/*.js`.
 
-## 7. Breakpoints (propuesta — hoy inconsistente)
+## 7. Breakpoints (colapsados y aplicados)
 
-Auditoría inicial: 13 valores distintos de `max-width` en `style.css` (380/420/480/500/560/600/640/680/700/1000/1024/1200), sin escala formal. Propuesta para el paso de aplicación:
+Los 12 valores ad-hoc (`380/420/480/500/560/600/640/680/700/1000/1024/1200px`) se han colapsado a una escala de 4 tokens, ya reflejados en `:root` (`--bp-sm/md/lg/xl`) y aplicados directamente en los 35 `@media (max-width: …)` de `style.css` (los otros 5 — `max-height`, `prefers-reduced-motion` ×3, `print` — no forman parte de esta escala y no se han tocado):
 
-| Token | Valor | Uso |
-|---|---|---|
-| `--bp-sm` | 480px | móvil pequeño |
-| `--bp-md` | 768px | tablet |
-| `--bp-lg` | 1024px | laptop / sidebar completo |
-| `--bp-xl` | 1280px | desktop grande |
+| Token | Valor | Uso | Valores antiguos que colapsa |
+|---|---|---|---|
+| `--bp-sm` | 480px | móvil | 380, 420, 480, 500, 560, 600 |
+| `--bp-md` | 768px | tablet | 640, 680, 700 |
+| `--bp-lg` | 1024px | laptop / sidebar completo | 1000, 1024 |
+| `--bp-xl` | 1280px | desktop grande | 1200 |
 
-No se aplica todavía — requiere revisar cada uno de los 13 valores actuales para decidir a cuál de los 4 colapsa, componente por componente, en el paso siguiente.
+Criterio de colapso: cada valor antiguo se movió al tier más cercano (redondeo al vecino, nunca al más lejano). Dirección elegida cuando había ambigüedad: siempre hacia el tier que da **más margen** al contenido (ej. 380→480 ensancha el rango "móvil pequeño" en vez de estrecharlo).
+
+**Limitación honesta:** esta sesión no tiene herramienta de navegador/captura de pantalla, así que el colapso se verificó por build (`npm run build` sin errores, CSS con llaves balanceadas) pero **no se ha comprobado visualmente** en cada uno de los 35 puntos de corte. Antes de fusionar a `main`, conviene una pasada visual rápida en los tramos que más cambiaron (680→768 tenía 11 reglas distintas — es el que más contenido reagrupa).
 
 ---
 
