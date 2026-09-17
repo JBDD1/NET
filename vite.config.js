@@ -1,15 +1,51 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import { resolve } from 'path';
 import fs from 'fs';
 
 // Copia archivos estáticos que no pasan por Rollup al directorio dist/
 // (iconos, manifest, sw.js, páginas HTML simples, etc.)
-function copyStaticAssets(outDir = 'dist') {
+//
+// IMPORTANTE: index.html y landing.html cargan sus scripts con <script src="...">
+// clásico (sin type="module"), a propósito — el HTML usa onclick="fn()" que necesita
+// que las funciones vivan en el scope global, algo que un <script type="module"> no
+// da por defecto. Rollup solo empaqueta <script type="module">, así que estos archivos
+// (landing.js y todo src/**/*.js) NUNCA pasan por su pipeline de bundling/transform:
+// hay que copiarlos a mano, igual que los demás estáticos. Como tampoco pasan por el
+// transform de Vite, hay que sustituir aquí mismo los import.meta.env.VITE_* que usan
+// (auth.js, ai.js, api.js, portfolio.js) por su valor literal del modo de build.
+function copyStaticAssets(outDir = 'dist', mode = 'production') {
   const staticFiles = [
     'manifest.json', 'sw.js', 'robots.txt', 'sitemap.xml',
     'privacidad.html', 'privacy.html', 'terminos.html', 'terms.html',
-    // landing.js NO se copia: Vite lo procesa al tener landing.html como input de Rollup
+    'landing.js',
   ];
+  // Cubre tanto "import.meta.env.VITE_X" como "import.meta.env?.VITE_X" (optional chaining).
+  const envAssignRe = /import\.meta\.env\??\.(VITE_[A-Z0-9_]+)/g;
+  // Cualquier "import.meta" que quede (p.ej. dentro de "typeof import.meta !== 'undefined'")
+  // es un SyntaxError en un <script> clásico, se resuelva o no en tiempo de ejecución — el
+  // parser lo rechaza igual. Se sustituye por "undefined", que preserva la semántica de esos
+  // guards (fuera de un módulo, "import.meta" no existe).
+  const bareImportMetaRe = /import\.meta\b/g;
+
+  function copyJsDir(srcDir, destDir, env) {
+    fs.mkdirSync(destDir, { recursive: true });
+    for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+      // Los tests (src/tests/**) son solo para desarrollo, no se despliegan.
+      if (entry.name === 'tests' && srcDir === 'src') continue;
+      const srcPath  = resolve(srcDir, entry.name);
+      const destPath = resolve(destDir, entry.name);
+      if (entry.isDirectory()) { copyJsDir(srcPath, destPath, env); continue; }
+      if (!entry.name.endsWith('.js')) { fs.copyFileSync(srcPath, destPath); continue; }
+      let code = fs.readFileSync(srcPath, 'utf8');
+      if (/import\.meta/.test(code)) {
+        code = code
+          .replace(envAssignRe, (_, key) => JSON.stringify(env[key] ?? ''))
+          .replace(bareImportMetaRe, 'undefined');
+      }
+      fs.writeFileSync(destPath, code, 'utf8');
+    }
+  }
+
   return {
     name: 'finova-copy-static',
     apply: 'build',
@@ -23,6 +59,9 @@ function copyStaticAssets(outDir = 'dist') {
       fs.readdirSync('.').filter(f => /^icon[-.]/.test(f) || f === 'icon.svg').forEach(f => {
         fs.copyFileSync(f, resolve(outDir, f));
       });
+      // Módulos clásicos de la app (ver comentario arriba de copyStaticAssets)
+      const env = loadEnv(mode, process.cwd(), 'VITE_');
+      copyJsDir('src', resolve(outDir, 'src'), env);
     },
   };
 }
@@ -101,7 +140,7 @@ export default defineConfig(({ mode }) => {
       reportCompressedSize:  true,
     },
 
-    plugins: [copyStaticAssets('dist')],
+    plugins: [copyStaticAssets('dist', mode)],
 
     // Solo exponer al frontend variables con prefijo VITE_
     envPrefix: 'VITE_',

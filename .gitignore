@@ -41,13 +41,19 @@ yarn-debug.log*
 yarn-error.log*
 logs/
 
-# ── Editor ────────────────────────────────────────────────────
+# ── Editor / herramientas locales ──────────────────────────────
 .vscode/settings.json
 .vscode/*.code-workspace
 .idea/
 *.suo
 *.swp
 *.swo
+.claude/settings.local.json
+
+# ── Temporales ──────────────────────────────────────────────────
+tmp/
+.cache/
+*.tmp
 
 # ── Sistema operativo ─────────────────────────────────────────
 .DS_Store

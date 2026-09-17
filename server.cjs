@@ -168,6 +168,33 @@ const _PUBLIC_ROOT_FILES = new Set([
   'icon-1024.png',
 ]);
 
+// ─── import.meta.env en desarrollo local sin Vite ──────────────
+// server.cjs sirve src/**/*.js en crudo (sin pasar por Vite, igual que en
+// producción los sirve vite.config.js ya transformados). Unos pocos archivos
+// (auth.js, ai.js, api.js, portfolio.js) usan import.meta.env.VITE_* — un
+// token que es un SyntaxError fuera de un módulo ES, se llegue a ejecutar o
+// no. Se sustituye aquí por el valor literal de .env.development, igual que
+// hace el plugin de Vite para el build de producción.
+function _parseEnvFile(filePath) {
+  const env = {};
+  try {
+    for (const line of fs.readFileSync(filePath, 'utf8').split('\n')) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+      if (m) env[m[1]] = m[2];
+    }
+  } catch {}
+  return env;
+}
+const _VITE_DEV_ENV = _parseEnvFile(path.join(ROOT, '.env.development'));
+const _IMPORT_META_ENV_RE  = /import\.meta\.env\??\.(VITE_[A-Z0-9_]+)/g;
+const _IMPORT_META_BARE_RE = /import\.meta\b/g;
+function _stripImportMeta(code) {
+  if (!code.includes('import.meta')) return code;
+  return code
+    .replace(_IMPORT_META_ENV_RE, (_, key) => JSON.stringify(_VITE_DEV_ENV[key] ?? ''))
+    .replace(_IMPORT_META_BARE_RE, 'undefined');
+}
+
 /* ═══════════════════════════════════════════════════════════════
    SEGURIDAD — Headers HTTP y CSP
 ═══════════════════════════════════════════════════════════════ */
@@ -2190,7 +2217,7 @@ http.createServer((req, res) => {
     const headers = { 'Content-Type': mime, ..._SEC };
     if (ext === '.html') headers['Content-Security-Policy'] = _CSP;
     res.writeHead(200, headers);
-    res.end(data);
+    res.end(ext === '.js' && normRel.startsWith('src/') ? _stripImportMeta(data.toString('utf8')) : data);
   });
 
 }).listen(PORT, '127.0.0.1', () => {
