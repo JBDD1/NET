@@ -56,6 +56,15 @@ function _pdfGetDoc() {
   return new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 }
 
+/* ── Marca Finova (círculo vectorial, nunca texto — evita glifos
+   no soportados por la fuente helvetica embebida de jsPDF) ──── */
+function _pdfLogoMark(doc, x, y, r) {
+  doc.setFillColor(..._PDF.gold);
+  doc.circle(x, y, r, 'F');
+  doc.setFillColor(..._PDF.dark);
+  doc.circle(x, y, r * 0.42, 'F');
+}
+
 /* ── Barra de progreso horizontal ───────────────────────────── */
 function _pdfBar(doc, x, y, w, pct, fillColor) {
   const p = Math.min(100, Math.max(0, pct || 0));
@@ -128,10 +137,11 @@ function _pdfHeader(doc, title, subtitle) {
   doc.rect(0, 33.7, W, 0.3, 'F');
 
   // Marca FINOVA
+  _pdfLogoMark(doc, 12.6, 8.5, 1.5);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(..._PDF.gold);
-  doc.text('◈  FINOVA', 11, 10);
+  doc.text('FINOVA', 16, 10);
 
   // Título principal
   doc.setFontSize(17);
@@ -371,7 +381,7 @@ async function exportMonthlyPDF() {
           t.description,
           t.category,
           {
-            content: (t.type === 'income' ? '+' : '−') + formatCurrency(t.amount),
+            content: (t.type === 'income' ? '+' : '-') + formatCurrency(t.amount),
             styles:  { textColor: t.type === 'income' ? _PDF.gain : _PDF.loss, fontStyle: 'bold', halign: 'right' },
           },
           {
@@ -717,10 +727,11 @@ async function exportMonthlyBriefingPDF() {
   doc.rect(6, H * 0.44 - 0.5, W - 6, 0.5, 'F');
 
   // Marca FINOVA
+  _pdfLogoMark(doc, 19.8, 22, 1.9);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(..._PDF.gold);
-  doc.text('◈  FINOVA', 18, 24);
+  doc.text('FINOVA', 24, 24);
 
   // Línea decorativa bajo la marca
   doc.setDrawColor(..._PDF.goldDim);
@@ -922,7 +933,7 @@ async function exportMonthlyBriefingPDF() {
     });
     doc.autoTable({
       ...TABLE_OPT, startY: y,
-      head: [['Categoría', 'Este mes', 'Mes ant.', 'Δ', '']],
+      head: [['Categoría', 'Este mes', 'Mes ant.', 'Var.', '']],
       body: catRows,
       foot: [['Total',
         formatCurrency(exp),

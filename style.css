@@ -869,7 +869,8 @@ ul  { list-style: none; }
 .sidebar.collapsed .sidebar-profile-actions,
 .sidebar.collapsed .sidebar-profile-sub,
 .sidebar.collapsed #sidebar-milestone-bar { display: none; }
-.sidebar.collapsed .sidebar-profile { justify-content: center; padding: 6px 0; }
+.sidebar.collapsed .sidebar-profile { padding: 6px 0; }
+.sidebar.collapsed .sidebar-profile-top { justify-content: center; }
 
 .logo-f {
   display: none;
@@ -986,12 +987,18 @@ ul  { list-style: none; }
 /* Sidebar profile section */
 .sidebar-profile {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 6px;
   padding: 8px 10px;
   border-radius: var(--r-xs);
   overflow: hidden;
   margin-top: 4px;
+}
+.sidebar-profile-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 .sidebar-profile-avatar {
   width: 30px;
@@ -1007,22 +1014,20 @@ ul  { list-style: none; }
   flex-shrink: 0;
   user-select: none;
 }
-.sidebar-profile-info {
+.sidebar-profile-name {
   flex: 1;
   min-width: 0;
-}
-.sidebar-profile-name {
   font-size: 13px;
   font-weight: 600;
   color: rgba(255,255,255,0.65);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 4px;
 }
 .sidebar-profile-actions {
   display: flex;
   gap: 2px;
+  margin-left: 40px; /* alinea bajo el nombre: ancho del avatar (30px) + gap (10px) */
 }
 .sidebar-profile-btn {
   background: none;

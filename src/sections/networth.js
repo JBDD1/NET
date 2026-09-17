@@ -702,6 +702,14 @@ function deleteAlternative(id) {
 ═══════════════════════════════════════════════════════════════ */
 
 const LIABILITY_LABELS = { hipoteca: 'Hipoteca', prestamo: 'Préstamo', tarjeta: 'Tarjeta crédito', otro: 'Otro' };
+const LIABILITY_FREQ_LABELS = { monthly: 'Mensual', bimonthly: 'Bimensual', quarterly: 'Trimestral', semiannual: 'Semestral', annual: 'Anual' };
+
+function _liabilityScheduleText(l) {
+  const parts = [];
+  if (l.frequency && LIABILITY_FREQ_LABELS[l.frequency]) parts.push(LIABILITY_FREQ_LABELS[l.frequency]);
+  if (l.paymentDay) parts.push(`día ${l.paymentDay}`);
+  return parts.join(' · ');
+}
 
 function renderPasivos() {
   _delegate('section-pasivos', {
@@ -734,6 +742,7 @@ function renderPasivos() {
     return `
       <tr data-id="${l.id}">
         <td><strong>${escapeHtml(l.name)}</strong>
+          ${_liabilityScheduleText(l) ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${escapeHtml(_liabilityScheduleText(l))}</div>` : ''}
           ${l.notes ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${escapeHtml(l.notes)}</div>` : ''}
         </td>
         <td><span class="ticker-chip">${LIABILITY_LABELS[l.type] || escapeHtml(l.type)}</span></td>
@@ -800,6 +809,22 @@ function openAddLiability(prefill = null) {
         <input type="number" id="f-l-rate" class="text-input" placeholder="Ej: 3.5" value="${l.interestRate || ''}" step="0.01" min="0" />
       </div>
     </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Día de cobro (opcional)</label>
+        <input type="number" id="f-l-day" class="text-input" placeholder="Ej: 5" value="${l.paymentDay || ''}" step="1" min="1" max="31" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Frecuencia</label>
+        <select id="f-l-freq" class="select-input">
+          <option value="monthly"    ${(l.frequency||'monthly')==='monthly'    ? 'selected' : ''}>Mensual</option>
+          <option value="bimonthly"  ${l.frequency==='bimonthly'  ? 'selected' : ''}>Bimensual</option>
+          <option value="quarterly"  ${l.frequency==='quarterly'  ? 'selected' : ''}>Trimestral</option>
+          <option value="semiannual" ${l.frequency==='semiannual' ? 'selected' : ''}>Semestral</option>
+          <option value="annual"     ${l.frequency==='annual'     ? 'selected' : ''}>Anual</option>
+        </select>
+      </div>
+    </div>
     <div class="form-group">
       <label class="form-label">Notas (opcional)</label>
       <input type="text" id="f-l-notes" class="text-input" placeholder="Banco, referencia..." value="${escapeHtml(l.notes || '')}" />
@@ -811,6 +836,9 @@ function openAddLiability(prefill = null) {
     const remainingAmount = parseFloat(document.getElementById('f-l-remaining').value) || 0;
     const monthlyPayment  = parseFloat(document.getElementById('f-l-monthly').value) || 0;
     const interestRate    = parseFloat(document.getElementById('f-l-rate').value) || 0;
+    const rawDay          = parseInt(document.getElementById('f-l-day').value, 10);
+    const paymentDay      = (rawDay >= 1 && rawDay <= 31) ? rawDay : null;
+    const frequency       = document.getElementById('f-l-freq').value;
     const notes           = document.getElementById('f-l-notes').value.trim();
 
     if (!name) return showToast('El nombre es obligatorio', 'error');
@@ -818,10 +846,10 @@ function openAddLiability(prefill = null) {
     if (!APP.liabilities) APP.liabilities = [];
     if (isEdit) {
       const idx = APP.liabilities.findIndex(x => x.id === prefill.id);
-      if (idx >= 0) APP.liabilities[idx] = { ...prefill, name, type, originalAmount, remainingAmount, monthlyPayment, interestRate, notes };
+      if (idx >= 0) APP.liabilities[idx] = { ...prefill, name, type, originalAmount, remainingAmount, monthlyPayment, interestRate, paymentDay, frequency, notes };
       showToast('Pasivo actualizado ✓', 'success');
     } else {
-      APP.liabilities.push({ id: generateId(), name, type, originalAmount, remainingAmount, monthlyPayment, interestRate, notes });
+      APP.liabilities.push({ id: generateId(), name, type, originalAmount, remainingAmount, monthlyPayment, interestRate, paymentDay, frequency, notes });
       showToast('Pasivo añadido ✓', 'success');
     }
 

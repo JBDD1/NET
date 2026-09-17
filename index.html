@@ -10,6 +10,7 @@
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" /></noscript>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="style.css" />
   <link rel="manifest" href="manifest.json" />
 
@@ -355,13 +356,13 @@
 
         <!-- Perfil (trigger) -->
         <div class="sidebar-profile" id="sidebar-profile" data-action="toggle-profile-dropdown" title="Abrir perfil" style="cursor:pointer">
-          <div class="sidebar-profile-avatar" id="sidebar-avatar">U</div>
-          <div class="sidebar-profile-info nav-label">
-            <div class="sidebar-profile-name" id="sidebar-username">Usuario</div>
-            <div class="sidebar-profile-actions">
-              <button type="button" class="sidebar-profile-btn" id="themeToggle" data-action="toggle-theme-btn" title="Cambiar tema" aria-label="Cambiar tema"><span id="themeIcon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-sun"/></svg></span></button>
-              <button type="button" class="sidebar-profile-btn" id="btnBackup" data-action="download-backup-btn" title="Exportar backup" aria-label="Exportar backup"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-download"/></svg></button>
-            </div>
+          <div class="sidebar-profile-top">
+            <div class="sidebar-profile-avatar" id="sidebar-avatar">U</div>
+            <div class="sidebar-profile-name nav-label" id="sidebar-username">Usuario</div>
+          </div>
+          <div class="sidebar-profile-actions nav-label">
+            <button type="button" class="sidebar-profile-btn" id="themeToggle" data-action="toggle-theme-btn" title="Cambiar tema" aria-label="Cambiar tema"><span id="themeIcon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-sun"/></svg></span></button>
+            <button type="button" class="sidebar-profile-btn" id="btnBackup" data-action="download-backup-btn" title="Exportar backup" aria-label="Exportar backup"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-download"/></svg></button>
           </div>
         </div>
         <div id="sidebar-milestone-bar" class="nav-label"></div>
@@ -647,11 +648,11 @@
             <button type="button" class="btn-secondary" data-action="toggle-io-dropdown" title="Importar / Exportar transacciones" style="padding:6px 12px" aria-label="Importar o exportar transacciones"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-swap"/></svg></button>
             <div class="io-dropdown-menu" id="io-dropdown-menu">
               <button type="button" data-action="export-csv"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-download"/></svg> Exportar CSV</button>
-              <button type="button" data-action="import-csv"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Importar CSV</button>
+              <button type="button" data-action="import-csv"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Importar CSV / Excel</button>
               <button type="button" data-action="import-ofx"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Importar OFX</button>
             </div>
           </div>
-          <input type="file" id="csv-import-input" accept=".csv,.txt" style="display:none" />
+          <input type="file" id="csv-import-input" accept=".csv,.txt,.xls,.xlsx,.xlsm,.ods" style="display:none" />
           <input type="file" id="ofx-import-input" accept=".ofx,.qfx,.ofc" style="display:none" />
           <button type="button" class="btn-primary" id="btnAddTransaction" data-action="add-transaction" aria-keyshortcuts="n" title="Añadir transacción (N)">+ Añadir</button>
           <button type="button" class="btn-secondary" id="btnManageCategories" data-action="manage-categories">Categorías</button>
@@ -1090,7 +1091,6 @@
     <section class="section" id="section-networth">
       <div class="section-header">
         <h1>Patrimonio Neto</h1>
-        <button type="button" class="btn-ghost" data-action="open-milestones" style="font-size:12px;padding:6px 14px" title="Ver hitos del patrimonio"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-star"/></svg> Hitos</button>
       </div>
 
       <div class="kpi-grid kpi-grid-5" id="nw-widget-kpis">
@@ -1555,7 +1555,10 @@
 
       <!-- Selector de proveedor -->
       <div class="ai-provider-bar">
-        <button type="button" class="ai-provider-btn active" data-provider="claude" data-action="set-ai-provider">
+        <button type="button" class="ai-provider-btn active" data-provider="groq" data-action="set-ai-provider">
+          <span class="ai-provider-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-bolt"/></svg></span> Groq
+        </button>
+        <button type="button" class="ai-provider-btn" data-provider="claude" data-action="set-ai-provider">
           <span class="ai-provider-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-sparkles"/></svg></span> Claude
         </button>
         <button type="button" class="ai-provider-btn" data-provider="openai" data-action="set-ai-provider">
@@ -1563,9 +1566,6 @@
         </button>
         <button type="button" class="ai-provider-btn" data-provider="gemini" data-action="set-ai-provider">
           <span class="ai-provider-icon">◆</span> Gemini
-        </button>
-        <button type="button" class="ai-provider-btn" data-provider="groq" data-action="set-ai-provider">
-          <span class="ai-provider-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-bolt"/></svg></span> Groq
         </button>
       </div>
 

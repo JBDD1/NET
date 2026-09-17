@@ -1960,12 +1960,30 @@ function _parseOFXSGML(text) {
 let _pendingOFXRows = [];
 let _pendingImportSource = 'OFX/QFX';
 
+// Firma de contenido para filas sin fitid (CSV/Excel no traen un ID estable de
+// banco como OFX). No es perfecta — dos compras idénticas el mismo día por el
+// mismo importe colisionan — pero es el único fallback posible sin un ID real,
+// y el modal de previsualización deja revisar antes de confirmar.
+function _txSignature(t) {
+  // Number(...) en vez de asumir que t.amount ya es numérico: transacciones
+  // antiguas o de otras vías de import pueden tenerlo como string o ausente,
+  // y esta firma no debe poder reventar la importación entera por eso.
+  const amt = Number(t.amount) || 0;
+  return `${t.date}|${amt.toFixed(2)}|${t.type}|${(t.description || '').trim().toLowerCase().slice(0, 40)}`;
+}
+
 function _showOFXPreview(allRows, source = 'OFX/QFX') {
   _pendingImportSource = source;
-  // Deduplicate only by FITID — date+amount dedup silently drops legitimate same-day same-amount transactions
-  const existingFitids = new Set(APP.transactions.map(t => t.fitid).filter(Boolean));
+  // FITID (OFX) es la deduplicación fiable — date+amount por sí solos descartarían
+  // silenciosamente transacciones legítimas del mismo día. Para filas sin fitid
+  // (CSV/Excel) se usa la firma de contenido como fallback.
+  const existingFitids     = new Set(APP.transactions.map(t => t.fitid).filter(Boolean));
+  const existingSignatures = new Set(APP.transactions.map(_txSignature));
 
-  const rows     = allRows.filter(r => !(r.fitid && existingFitids.has(r.fitid)));
+  const rows = allRows.filter(r =>
+    !(r.fitid && existingFitids.has(r.fitid)) &&
+    !(!r.fitid && existingSignatures.has(_txSignature(r)))
+  );
   const dupCount = allRows.length - rows.length;
 
   if (!rows.length) {
@@ -2025,7 +2043,7 @@ function _confirmOFXImport() {
   showToast(`${count} transacciones importadas desde ${_pendingImportSource} ✓`, 'success');
 }
 
-/* ─── Importación CSV bancario (Santander, BBVA, CaixaBank…) ─────── */
+/* ─── Importación CSV / Excel bancario (Santander, BBVA, CaixaBank…) ── */
 
 function importTransactionsCSV() {
   document.getElementById('csv-import-input')?.click();
@@ -2035,19 +2053,53 @@ function handleCSVImportFile(input) {
   const file = input.files[0];
   if (!file) return;
   input.value = '';
+
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (['xls', 'xlsx', 'xlsm', 'ods'].includes(ext)) {
+    return _importExcelBank(file);
+  }
+
   const reader = new FileReader();
   reader.onload = e => {
     try {
       const txs = _parseCSVBank(e.target.result);
-      if (!txs.length) return showToast('No se encontraron transacciones en el CSV. Verifica que es un extracto bancario válido.', 'error');
+      if (!txs.length) return showToast('No se encontraron transacciones en el archivo. Verifica que es un extracto bancario válido.', 'error');
       _showOFXPreview(txs, 'CSV');
     } catch (err) {
       console.error('CSV parse error:', err);
-      showToast('No se pudo leer el CSV. Comprueba que el archivo es un extracto bancario.', 'error');
+      showToast('No se pudo leer el archivo. Comprueba que es un extracto bancario válido.', 'error');
     }
   };
   reader.onerror = () => showToast('Error al leer el archivo.', 'error');
   reader.readAsText(file, 'UTF-8');
+}
+
+// Requiere la librería SheetJS (global `XLSX`, cargada vía <script> en index.html).
+function _importExcelBank(file) {
+  if (typeof XLSX === 'undefined') {
+    return showToast('No se pudo cargar el lector de Excel. Recarga la página e inténtalo de nuevo.', 'error');
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const workbook  = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+      const sheet     = workbook.Sheets[workbook.SheetNames[0]];
+      // header:1 → array de arrays, la misma forma que las líneas de un CSV ya
+      // separadas por columnas: así se reutiliza el mismo detector de bancos.
+      const rows = XLSX.utils.sheet_to_json(sheet, {
+        header: 1, raw: false, defval: '', blankrows: false, dateNF: 'yyyy-mm-dd',
+      });
+      if (rows.length < 2) return showToast('No se encontraron transacciones en el archivo. Verifica que es un extracto bancario válido.', 'error');
+      const txs = _rowsToBankTransactions(rows[0], rows.slice(1));
+      if (!txs.length) return showToast('No se encontraron transacciones en el archivo. Verifica que es un extracto bancario válido.', 'error');
+      _showOFXPreview(txs, 'Excel');
+    } catch (err) {
+      console.error('Excel parse error:', err);
+      showToast('No se pudo leer el archivo Excel. Comprueba que es un extracto bancario válido.', 'error');
+    }
+  };
+  reader.onerror = () => showToast('Error al leer el archivo.', 'error');
+  reader.readAsArrayBuffer(file);
 }
 
 function _parseCSVDate(str) {
@@ -2077,19 +2129,13 @@ function _csvSplit(line, sep) {
   return result;
 }
 
-function _parseCSVBank(text) {
-  const raw   = text.replace(/^﻿/, ''); // strip BOM
-  const lines = raw.split(/\r?\n/).filter(l => l.trim());
-  if (lines.length < 2) return [];
+// Detecta qué columnas son fecha/descripción/importe según el fingerprint de
+// cabeceras de los bancos españoles más comunes. Recibe la fila de cabeceras
+// ya separada en columnas (venga de un CSV o de una hoja de Excel).
+function _detectBankCols(rawHdrs) {
+  const hdrs = rawHdrs.map(h => String(h ?? '').replace(/"/g, '').toLowerCase().trim());
+  const col  = name => hdrs.findIndex(h => h.includes(name));
 
-  // Detect separator (semicolon wins if more splits)
-  const h1  = lines[0];
-  const sep = h1.split(';').length >= h1.split(',').length ? ';' : ',';
-  const hdrs = _csvSplit(h1, sep).map(h => h.replace(/"/g, '').toLowerCase().trim());
-
-  const col = name => hdrs.findIndex(h => h.includes(name));
-
-  // Bank detection by header fingerprint
   const hasFechaValor = hdrs.some(h => h.includes('fecha valor') || h === 'fecha valor');
   const hasConcepto   = hdrs.some(h => h === 'concepto');
   const hasDivisa     = hdrs.some(h => h.includes('divisa'));
@@ -2121,33 +2167,54 @@ function _parseCSVBank(text) {
     amtCol  = hdrs.findIndex(h => /importe|import|amount/.test(h));
   }
 
-  if (dateCol < 0 || amtCol < 0) return [];
+  if (dateCol < 0 || amtCol < 0) return null;
   if (descCol < 0) descCol = (dateCol === 0 ? 1 : 0); // last-resort fallback
+  return { dateCol, descCol, amtCol };
+}
+
+// Convierte filas ya separadas en columnas (de CSV o de Excel) en transacciones
+// de Finova, con la misma categorización automática que el resto de la app.
+function _rowsToBankTransactions(rawHdrs, dataRows) {
+  const cols = _detectBankCols(rawHdrs);
+  if (!cols) return [];
+  const { dateCol, descCol, amtCol } = cols;
 
   const txs = [];
   const skippedRows = [];
-  for (let i = 1; i < lines.length; i++) {
+  dataRows.forEach((row, i) => {
     try {
-      const cols = _csvSplit(lines[i], sep);
-      if (cols.length <= Math.max(dateCol, descCol, amtCol)) continue;
-      const date   = _parseCSVDate(cols[dateCol] || '');
-      const desc   = (cols[descCol] || '').replace(/"/g, '').trim() || 'Transacción bancaria';
-      const amount = _parseCSVAmt(cols[amtCol] || '0');
-      if (!date || amount === 0) continue;
+      if (row.length <= Math.max(dateCol, descCol, amtCol)) return;
+      const date   = _parseCSVDate(String(row[dateCol] ?? ''));
+      const desc   = String(row[descCol] ?? '').replace(/"/g, '').trim() || 'Transacción bancaria';
+      const amount = _parseCSVAmt(String(row[amtCol] ?? '0'));
+      if (!date || amount === 0) return;
       const type    = amount > 0 ? 'income' : 'expense';
       const cats    = type === 'expense' ? APP.categories.expense : APP.categories.income;
       const learned = APP.categoryPatterns && _patCat(APP.categoryPatterns[txPatternKey(desc)]);
       const local   = typeof matchLocalKeywords === 'function' ? matchLocalKeywords(desc, type) : null;
       txs.push({ date, description: desc, category: learned || local || cats[0] || 'Otros', type, amount: Math.abs(amount) });
     } catch (e) {
-      skippedRows.push(i + 1); // 1-based line number for user display
+      skippedRows.push(i + 2); // +2: 1-based, y la fila 1 es la cabecera
     }
-  }
+  });
   if (skippedRows.length > 0) {
     const rowList = skippedRows.slice(0, 5).join(', ') + (skippedRows.length > 5 ? '…' : '');
     setTimeout(() => showToast(`Se ignoraron ${skippedRows.length} fila${skippedRows.length > 1 ? 's' : ''} por error (fila${skippedRows.length > 1 ? 's' : ''} ${rowList})`, 'error'), 500);
   }
   return txs;
+}
+
+function _parseCSVBank(text) {
+  const raw   = text.replace(/^﻿/, ''); // strip BOM
+  const lines = raw.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) return [];
+
+  // Detect separator (semicolon wins if more splits)
+  const h1  = lines[0];
+  const sep = h1.split(';').length >= h1.split(',').length ? ';' : ',';
+  const hdrs     = _csvSplit(h1, sep);
+  const dataRows = lines.slice(1).map(line => _csvSplit(line, sep));
+  return _rowsToBankTransactions(hdrs, dataRows);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -3559,7 +3626,9 @@ function toggleSectionWidget(sectionId, widgetId, visible) {
 }
 
 function injectCustomizerButtons() {
-  Object.keys(SECTION_WIDGETS).forEach(sectionId => {
+  // Objetivos solo tiene un bloque ("Mis objetivos") — un personalizador de un
+  // único interruptor no aporta nada y descuadraba la cabecera de la sección.
+  Object.keys(SECTION_WIDGETS).filter(id => id !== 'section-goals').forEach(sectionId => {
     const section = document.getElementById(sectionId);
     if (!section) return;
     const header = section.querySelector('.section-header');
