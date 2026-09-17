@@ -93,11 +93,11 @@ async function adminRefreshUsers() {
       el.innerHTML = `<p style="color:var(--danger);font-size:12px">Respuesta inesperada del servidor (${res.status}). Reinicia el servidor con <code>node server.js</code> y recarga.</p>`;
       return;
     }
-    if (!data.ok) { el.innerHTML = `<p style="color:var(--danger)">${data.error}</p>`; return; }
+    if (!data.ok) { el.innerHTML = `<p style="color:var(--danger)">${escapeHtml(data.error)}</p>`; return; }
     _setAdminKpi('akpi-users', data.users.length);
     el.innerHTML = _renderUsersTable(data.users);
   } catch (e) {
-    el.innerHTML = `<p style="color:var(--danger)">Error: ${e.message}</p>`;
+    el.innerHTML = `<p style="color:var(--danger)">Error: ${escapeHtml(e.message)}</p>`;
   }
 }
 
@@ -115,7 +115,7 @@ function _renderUsersTable(users) {
       <tr class="admin-user-row${u.blocked ? ' admin-user-blocked' : ''}">
         <td class="admin-td">
           <div style="display:flex;align-items:center;gap:8px">
-            <div class="admin-user-avatar">${(u.email[0] || '?').toUpperCase()}</div>
+            <div class="admin-user-avatar">${escapeHtml((u.email[0] || '?').toUpperCase())}</div>
             <div>
               <div style="font-size:13px;font-weight:500;color:var(--text-primary)">${escapeHtml(u.email)}</div>
               <div style="font-size:11px;color:var(--text-muted)">${escapeHtml(u.displayName || '')}</div>
@@ -217,9 +217,9 @@ async function adminHealthCheck() {
           <div class="admin-health-item"><span>🕰</span><strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleTimeString('es-ES')}</div>
         </div>`;
     } else {
-      el.innerHTML = `<span style="color:var(--danger)">Error: ${data.error}</span>`;
+      el.innerHTML = `<span style="color:var(--danger)">Error: ${escapeHtml(data.error)}</span>`;
     }
   } catch (e) {
-    el.innerHTML = `<span style="color:var(--danger)">Sin respuesta del servidor (${e.message})</span>`;
+    el.innerHTML = `<span style="color:var(--danger)">Sin respuesta del servidor (${escapeHtml(e.message)})</span>`;
   }
 }

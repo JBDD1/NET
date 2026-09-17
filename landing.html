@@ -508,6 +508,11 @@ h1.lp-headline {
   color:var(--text-primary); margin-bottom:18px; letter-spacing:-.012em;
 }
 h1.lp-headline em { font-style:italic; color:var(--accent); }
+.lp-hero-tagline {
+  font-family:var(--font-serif); font-size:17px; font-weight:500;
+  color:var(--text-secondary); margin-bottom:18px; letter-spacing:-.005em;
+}
+.lp-hero-tagline em { font-style:italic; color:var(--accent); }
 .lp-sub {
   font-size:15px; color:var(--text-secondary);
   line-height:1.72; margin-bottom:24px; max-width:450px;
@@ -734,6 +739,7 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 .csv-bank-ing       { background:#ff6200; }
 .csv-bank-sabadell  { background:#00467f; }
 .csv-bank-revolut   { background:#191c1f; }
+.csv-bank-traderepublic { background:#000000; }
 .csv-tip { background:color-mix(in srgb,var(--accent) 8%,transparent); border:1px solid color-mix(in srgb,var(--accent) 20%,transparent); border-radius:var(--r-sm); padding:10px 14px; font-size:13px; color:var(--text-secondary); }
 .csv-checklist { list-style:none; padding:0; margin:12px 0 0; display:flex; flex-direction:column; gap:6px; }
 .csv-checklist li { font-size:13.5px; color:var(--text-secondary); }
@@ -964,6 +970,19 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 }
 .lp-input:focus { border-color:var(--accent); }
 .lp-input::placeholder { color:var(--text-muted); }
+.lp-pw-wrap { position:relative; }
+.lp-pw-wrap .lp-input { padding-right:42px; }
+.lp-pw-toggle {
+  position:absolute; right:6px; top:50%; transform:translateY(-50%);
+  width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+  background:none; border:none; border-radius:var(--r-xs);
+  color:var(--text-muted); cursor:pointer; transition:color .15s,background .15s;
+}
+.lp-pw-toggle:hover { color:var(--text-secondary); background:var(--bg-hover); }
+.lp-pw-toggle svg { width:18px; height:18px; }
+.lp-pw-toggle .lp-pw-eye-off { display:none; }
+.lp-pw-toggle.is-visible .lp-pw-eye    { display:none; }
+.lp-pw-toggle.is-visible .lp-pw-eye-off { display:block; }
 .lp-form-error {
   padding:8px 11px; border-radius:var(--r-sm); font-size:12px;
   margin-bottom:12px; display:none;
@@ -1329,6 +1348,24 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
   .modal-tabs { margin:0 16px; }
   .modal-body { padding:16px 16px 22px; }
 }
+
+/* ── Accesibilidad: prefers-reduced-motion ──────────────────────
+   Detiene los movimientos ambientales continuos (orbes, gradientes,
+   bob de las trust cards) y revela el contenido de scroll-reveal
+   directamente, sin desplazamiento ni animación de entrada. ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .js .lp-ani, .js .lp-ani-left, .js .lp-ani-right {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .lp-orb, .lp-orb-1, .lp-orb-2, .lp-orb-3 { animation: none !important; opacity: .7; }
+}
 </style>
 </head>
 <body>
@@ -1347,11 +1384,11 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
     <a href="#features">Funcionalidades</a>
     <a href="#csv-guide">Importar CSV</a>
     <a href="#spain">IRPF &amp; España</a>
+    <a href="#themes">Temas</a>
     <a href="#trust">Privacidad</a>
     <a href="#pricing">Precio</a>
     <a href="#faq">FAQ</a>
     <a href="#roadmap">Roadmap</a>
-    <a href="#themes">Temas</a>
   </nav>
   <div class="lp-header-btns">
     <button class="btn-ghost" id="headerLoginBtn" onclick="lpOpenModal('signin')">Iniciar sesión</button>
@@ -1372,11 +1409,11 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 <div class="lp-mobile-menu" id="lpMobileMenu">
   <a href="#features"    onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Funcionalidades</a>
   <a href="#spain"       onclick="document.getElementById('lpMobileMenu').classList.remove('open')">IRPF &amp; España</a>
+  <a href="#themes"      onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Temas</a>
   <a href="#trust"       onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Privacidad</a>
   <a href="#pricing"     onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Precio</a>
   <a href="#faq"         onclick="document.getElementById('lpMobileMenu').classList.remove('open')">FAQ</a>
   <a href="#roadmap"     onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Roadmap</a>
-  <a href="#themes"      onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Temas</a>
   <div class="lp-mobile-menu-btns">
     <button class="btn-ghost" onclick="lpOpenModal('signin');document.getElementById('lpMobileMenu').classList.remove('open')">Iniciar sesión</button>
     <a href="index.html" class="btn-accent">Ir a la app →</a>
@@ -1395,6 +1432,7 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
       <h1 class="lp-headline lp-ani" style="animation-delay:.08s">
         Tus finanzas,<br><em>bajo control total</em>
       </h1>
+      <p class="lp-hero-tagline lp-ani" style="animation-delay:.11s">Todo tu patrimonio. <em>Una visión completa.</em></p>
       <p class="lp-sub lp-ani" style="animation-delay:.14s">
         Finova reúne patrimonio, inversiones, transacciones, fiscalidad IRPF y un asesor con IA en una sola app. Elegante. Privado. Gratuito.
       </p>
@@ -1425,16 +1463,16 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
       </div>
       <div class="lp-stats lp-ani" style="animation-delay:.30s">
         <div>
-          <div class="lp-stat-n" data-count="5">5</div>
-          <div class="lp-stat-l">Temas visuales</div>
+          <div class="lp-stat-n" data-count="100" data-suffix="%">100%</div>
+          <div class="lp-stat-l">Privado</div>
         </div>
         <div>
-          <div class="lp-stat-n" data-count="6">6</div>
-          <div class="lp-stat-l">Módulos completos</div>
+          <div class="lp-stat-n" data-count="10" data-suffix="+">10+</div>
+          <div class="lp-stat-l">Herramientas financieras</div>
         </div>
         <div>
           <div class="lp-stat-n" data-count="0" data-suffix=" €">0 €</div>
-          <div class="lp-stat-l">Precio</div>
+          <div class="lp-stat-l">Para empezar</div>
         </div>
       </div>
     </div>
@@ -1471,11 +1509,13 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 <div class="lp-hr"></div>
 
 <!-- FEATURES -->
-<section class="lp-section" id="features">
+<section class="lp-section" id="features" style="padding-top:56px">
   <div class="lp-inner">
-    <div class="lp-tag lp-ani"><span class="lp-chip-icon"></span>Funcionalidades</div>
-    <h2 class="lp-h2 lp-ani" style="animation-delay:.06s">Todo lo que necesitas para<br><em>gestionar tu dinero</em></h2>
-    <p class="lp-lead lp-ani" style="animation-delay:.12s">Desde el día a día hasta la estrategia a largo plazo. Finova cubre el ciclo completo de tus finanzas.</p>
+    <div style="text-align:center;margin-top:-16px">
+    <div class="lp-tag lp-ani" style="justify-content:center"><span class="lp-chip-icon"></span>Funcionalidades</div>
+    <h2 class="lp-h2 lp-ani" style="animation-delay:.06s;text-align:center;margin:0 auto 12px">Todo lo que necesitas para<br><em>gestionar tu dinero</em></h2>
+    <p class="lp-lead lp-ani" style="animation-delay:.12s;text-align:center;margin:0 auto 44px">Desde el día a día hasta la estrategia a largo plazo. Finova cubre el ciclo completo de tus finanzas.</p>
+    </div>
     <div class="lp-feats">
       <div class="lp-feat lp-ani" onclick="lpOpenFeat('dashboard')">
         <div class="lp-feat-ic"><svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="12" width="5" height="8" rx="1.5" fill="currentColor"/><rect x="8.5" y="7" width="5" height="13" rx="1.5" fill="currentColor"/><rect x="15" y="3" width="5" height="17" rx="1.5" fill="currentColor"/></svg></div><h3>Dashboard</h3>
@@ -1514,11 +1554,13 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 <div class="lp-hr"></div>
 
 <!-- ANTES / DESPUÉS -->
-<section class="lp-section" id="before-after">
+<section class="lp-section" id="before-after" style="padding-top:56px">
   <div class="lp-inner">
-    <div class="lp-tag lp-ani"><span class="lp-chip-icon"></span>El cambio real</div>
-    <h2 class="lp-h2 lp-ani" style="animation-delay:.06s">La diferencia entre <em>intuir</em><br>y saber con datos</h2>
-    <p class="lp-lead lp-ani" style="animation-delay:.12s">Muchos gestionan sus finanzas con Excel disperso y sin una imagen clara. Finova lo cambia por completo.</p>
+    <div style="text-align:center;margin-top:-16px">
+    <div class="lp-tag lp-ani" style="justify-content:center"><span class="lp-chip-icon"></span>El cambio real</div>
+    <h2 class="lp-h2 lp-ani" style="animation-delay:.06s;text-align:center;margin:0 auto 12px">La diferencia entre <em>intuir</em><br>y saber con datos</h2>
+    <p class="lp-lead lp-ani" style="animation-delay:.12s;text-align:center;margin:0 auto 44px">Muchos gestionan sus finanzas con Excel disperso y sin una imagen clara. Finova lo cambia por completo.</p>
+    </div>
     <div class="lp-vs-grid lp-ani" style="animation-delay:.18s">
       <div class="lp-vs-col bad">
         <div class="lp-vs-head">
@@ -1554,8 +1596,9 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 <div class="lp-hr"></div>
 
 <!-- TRUST & PRIVACY -->
-<section class="lp-section lp-trust-section" id="trust">
+<section class="lp-section lp-trust-section" id="trust" style="padding-top:56px">
   <div class="lp-inner">
+    <div style="text-align:center;margin-top:-16px">
     <div class="lp-tag lp-ani" style="justify-content:center"><span class="lp-chip-icon"></span>Tu privacidad, primero</div>
     <h2 class="lp-h2 lp-ani" style="animation-delay:.06s;text-align:center;margin:0 auto 12px">
       Tus números son <em>tuyos</em>
@@ -1563,6 +1606,7 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
     <p class="lp-lead lp-ani" style="animation-delay:.10s;text-align:center;margin:0 auto 44px">
       Para una app financiera la confianza no es opcional.<br>Aquí tienes exactamente cómo protegemos tu información.
     </p>
+    </div>
 
     <div class="lp-trust-grid">
       <div class="lp-trust-card lp-ani-left">
@@ -1667,11 +1711,13 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 <div class="lp-hr"></div>
 
 <!-- THEMES -->
-<section class="lp-section" id="themes">
+<section class="lp-section" id="themes" style="padding-top:56px">
   <div class="lp-inner">
-    <div class="lp-tag lp-ani"><span class="lp-chip-icon"></span>Temas visuales</div>
-    <h2 class="lp-h2 lp-ani" style="animation-delay:.06s">Cinco estéticas.<br><em>Un solo estándar.</em></h2>
-    <p class="lp-lead lp-ani" style="animation-delay:.12s">Cada tema es un sistema de diseño completo. No es un cambio de color — es una experiencia visual diferente construida desde cero.</p>
+    <div style="text-align:center;margin-top:-16px">
+    <div class="lp-tag lp-ani" style="justify-content:center"><span class="lp-chip-icon"></span>Temas visuales</div>
+    <h2 class="lp-h2 lp-ani" style="animation-delay:.06s;text-align:center;margin:0 auto 12px">Cinco estéticas.<br><em>Un solo estándar.</em></h2>
+    <p class="lp-lead lp-ani" style="animation-delay:.12s;text-align:center;margin:0 auto 44px">Cada tema es un sistema de diseño completo. No es un cambio de color — es una experiencia visual diferente construida desde cero.</p>
+    </div>
     <div class="lp-themes-row lp-ani" style="animation-delay:.16s">
 
       <div class="lp-theme-card active" onclick="lpSetTheme('obsidian-brass','dark',this)">
@@ -1741,11 +1787,13 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 <div class="lp-hr"></div>
 
 <!-- CSV GUIDE -->
-<section class="lp-section" id="csv-guide">
+<section class="lp-section" id="csv-guide" style="padding-top:56px">
   <div class="lp-inner">
+    <div style="text-align:center;margin-top:-16px">
     <div class="lp-tag lp-ani" style="justify-content:center"><span class="lp-chip-icon"></span>Importar tus datos</div>
     <h2 class="lp-h2 lp-ani" style="animation-delay:.06s;text-align:center;margin:0 auto 12px">De tu banco a Finova<br><em>en 2 minutos</em></h2>
     <p class="lp-lead lp-ani" style="animation-delay:.10s;text-align:center;margin:0 auto 48px;max-width:600px">Finova <strong>nunca accede a tu banco</strong>. Tú exportas el CSV desde tu banca online y lo subes aquí. Sin contraseñas, sin Open Banking, sin permisos.</p>
+    </div>
 
     <div class="csv-steps lp-ani" style="animation-delay:.14s">
 
@@ -1814,6 +1862,16 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
                 <li>Pulsa el icono de compartir / exportar (esquina sup.)</li>
                 <li>Elige <strong>Excel o CSV</strong> y el rango</li>
                 <li>Descarga o envíate por email</li>
+              </ol>
+            </details>
+            <details class="csv-bank-item">
+              <summary><span class="csv-bank-logo csv-bank-traderepublic"></span><strong>Trade Republic</strong></summary>
+              <ol>
+                <li>Abre la app Trade Republic en tu móvil</li>
+                <li>Ve a <strong>Perfil</strong> → <strong>Actividad</strong></li>
+                <li>Pulsa el icono de exportar (esquina superior)</li>
+                <li>Elige el rango de fechas que quieres importar</li>
+                <li>Descarga el PDF/CSV o recíbelo por email</li>
               </ol>
             </details>
           </div>
@@ -1949,11 +2007,13 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 <div class="lp-hr"></div>
 
 <!-- PRÓXIMAMENTE / ROADMAP -->
-<section class="lp-section" id="roadmap">
+<section class="lp-section" id="roadmap" style="padding-top:56px">
   <div class="lp-inner">
+    <div style="text-align:center;margin-top:-16px">
     <div class="lp-tag lp-ani" style="justify-content:center"><span class="lp-chip-icon"></span>En el horno</div>
     <h2 class="lp-h2 lp-ani" style="animation-delay:.06s;text-align:center;margin:0 auto 12px">Lo que viene <em>a continuación</em></h2>
     <p class="lp-lead lp-ani" style="animation-delay:.10s;text-align:center;margin:0 auto 44px">Finova está en desarrollo activo. Este es el mapa de lo que está en camino — y tú puedes influir en el orden.</p>
+    </div>
 
     <div class="lp-roadmap-grid">
       <div class="lp-rm-item lp-ani-left">
@@ -2204,8 +2264,14 @@ async function lpJoinWaitlist(e) {
       </div>
       <div class="lp-field">
         <label class="lp-label">Contraseña</label>
-        <input type="password" id="lpPasswordInput" class="lp-input" placeholder="••••••••"
-          autocomplete="current-password" onkeydown="if(event.key==='Enter')lpSubmit()" />
+        <div class="lp-pw-wrap">
+          <input type="password" id="lpPasswordInput" class="lp-input" placeholder="••••••••"
+            autocomplete="current-password" onkeydown="if(event.key==='Enter')lpSubmit()" />
+          <button type="button" class="lp-pw-toggle" id="lpPasswordToggle" onclick="lpTogglePasswordVisibility()" aria-label="Mostrar contraseña" aria-pressed="false">
+            <svg class="lp-pw-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.8-7 10-7 10 7 10 7-3.8 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="lp-pw-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c6.2 0 10 7 10 7a17.7 17.7 0 0 1-3.4 4.3M6.6 6.6C4 8.3 2 12 2 12s3.8 7 10 7a10.2 10.2 0 0 0 3.4-.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+          </button>
+        </div>
       </div>
       <div class="lp-form-error" id="lpFormError"></div>
       <button class="lp-submit" id="lpSubmitBtn" onclick="lpSubmit()">Iniciar sesión</button>

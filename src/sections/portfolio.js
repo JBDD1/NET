@@ -3,9 +3,11 @@
    Secciones 8 y 25: Cartera de inversión + Análisis de cartera
 ═══════════════════════════════════════════════════════════════ */
 
-var SERVER_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:3000'
-  : ''; // Producción: Vercel proxy enruta /api/* a Railway sin exponer la URL real
+// import.meta.env.VITE_SERVER_URL viene de .env.development / .env.production.
+// En producción queda vacío — Vercel hace el proxy a Railway sin exponer la URL del servidor.
+var SERVER_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SERVER_URL != null)
+  ? (import.meta.env.VITE_SERVER_URL || '')
+  : (window.location.hostname === 'localhost' ? 'http://localhost:3000' : '');
 
 function _portSparkDraw(id, rawData, isHero) {
   const canvas = document.getElementById(id);
@@ -849,7 +851,7 @@ async function applyTickerLookup(rawTicker, silent = false) {
   if (!needsCountry && !needsSector) return;
 
   try {
-    const r = await fetch(`${SERVER_URL}/api/yahoo-info?ticker=${encodeURIComponent(ticker)}`);
+    const r = await api.yahooInfo(ticker);
     if (!r.ok) return;
     const data = await r.json();
     if (data.error) return;
@@ -993,7 +995,7 @@ function openAssetPriceChart(id) {
 
     if (asset.ticker) {
       try {
-        const r    = await fetch(`${SERVER_URL}/api/yahoo?ticker=${encodeURIComponent(asset.ticker)}&range=1y`);
+        const r    = await api.yahoo(asset.ticker, '1y');
         const data = await r.json().catch(() => null);
         if (data?.error) {
           showToast('Precio no disponible: ' + data.error, 'error');
@@ -1300,6 +1302,8 @@ function renderCorrelationAnalysis() {
    WATCHLIST
 ═══════════════════════════════════════════════════════════════ */
 
+const _wlPrevPrices = {};
+
 function renderWatchlist() {
   _delegate('section-watchlist', {
     'edit-watch':   id => editWatchlistItem(id),
@@ -1383,6 +1387,21 @@ function renderWatchlist() {
       </div>
     `;
   }).join('');
+
+  // Flash sutil solo cuando el precio cambió realmente entre este render y el anterior
+  // (nunca en la primera carga, nunca si el valor es idéntico).
+  APP.watchlist.forEach(w => {
+    const prev = _wlPrevPrices[w.id];
+    if (prev !== undefined && prev !== w.currentPrice) {
+      const el = grid.querySelector(`.watchlist-card[data-id="${w.id}"] .watchlist-price`);
+      if (el) {
+        el.classList.remove('price-flash-up', 'price-flash-down');
+        void el.offsetWidth; // reinicia la animación si ya estaba en curso
+        el.classList.add(w.currentPrice > prev ? 'price-flash-up' : 'price-flash-down');
+      }
+    }
+    _wlPrevPrices[w.id] = w.currentPrice;
+  });
 }
 
 function _watchlistModalFill(w) {
@@ -1440,12 +1459,16 @@ function editWatchlistItem(id) {
 function deleteWatchlistItem(id) {
   const item = APP.watchlist.find(w => w.id === id);
   if (!item) return;
-  APP.watchlist = APP.watchlist.filter(w => w.id !== id);
-  renderWatchlist();
-  softDelete(`"${item.name}" eliminado de watchlist`, () => {
-    APP.watchlist.push(item);
-    saveData();
+  const card = document.querySelector(`.watchlist-card[data-id="${id}"]`);
+
+  animateRowRemoval(card, () => {
+    APP.watchlist = APP.watchlist.filter(w => w.id !== id);
     renderWatchlist();
+    softDelete(`"${item.name}" eliminado de watchlist`, () => {
+      APP.watchlist.push(item);
+      saveData();
+      renderWatchlist();
+    });
   });
 }
 

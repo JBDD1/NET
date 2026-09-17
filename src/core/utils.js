@@ -9,6 +9,47 @@
 /* Modo demo: ?demo en la URL carga datos ficticios sin tocar localStorage */
 const _isDemoMode = new URLSearchParams(location.search).has('demo');
 
+/* ─── Scroll reveal — fade-in sutil al entrar en viewport ──────────
+   Marca cualquier elemento con [data-reveal] (o [data-reveal-group]
+   para un conjunto con [data-reveal-item] hijos) y llama a
+   initScrollReveal() tras renderizar. Idempotente: solo observa
+   elementos nuevos, no vuelve a animar los ya revelados. Sin soporte
+   de IntersectionObserver o con reduced-motion, revela todo al instante
+   (el contenido nunca depende de JS para ser legible). ─────────────── */
+const _revealMotionOK = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+let _revealObserver = null;
+
+function initScrollReveal(root = document) {
+  const targets = root.querySelectorAll('[data-reveal]:not(.reveal-observed), [data-reveal-group]:not(.reveal-observed)');
+  if (!targets.length) return;
+
+  if (!_revealMotionOK || typeof IntersectionObserver === 'undefined') {
+    targets.forEach(el => { el.classList.add('reveal-observed', 'is-visible'); });
+    return;
+  }
+
+  if (!_revealObserver) {
+    _revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-visible');
+        _revealObserver.unobserve(entry.target);
+      });
+    }, { root: null, rootMargin: '0px 0px -8% 0px', threshold: 0.1 });
+  }
+
+  targets.forEach(el => {
+    el.classList.add('reveal-observed');
+    // Ya visible en el viewport inicial (p. ej. above-the-fold) → mostrar sin esperar al scroll
+    const r = el.getBoundingClientRect();
+    if (r.top < window.innerHeight && r.bottom > 0) {
+      requestAnimationFrame(() => el.classList.add('is-visible'));
+    } else {
+      _revealObserver.observe(el);
+    }
+  });
+}
+
 /* Carga dinámica de scripts de secciones no críticas */
 const _lazyLoaded = new Set();
 function _lazyLoad(src) {
@@ -124,24 +165,14 @@ async function fetchTickerData(ticker) {
     };
   };
   try {
-    const res  = await fetch(`/api/yahoo?ticker=${encodeURIComponent(t)}`);
+    const res  = await api.yahoo(t);
     const json = await res.json().catch(() => null);
     if (json?.error) throw new Error(json.error);
     if (res.ok && json) { const r = parse(json); if (r) return r; }
   } catch (e) {
     if (e.message && !e.message.includes('Failed to fetch') && !e.message.includes('NetworkError')) throw e;
   }
-  try {
-    const res = await fetch(
-      `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(t)}?interval=1d&range=1d`,
-      { headers: { Accept: 'application/json' } }
-    );
-    if (!res.ok) { console.warn(`Yahoo Finance ${res.status} para ${t}`); return null; }
-    return parse(await res.json());
-  } catch (e) {
-    console.warn(`Error obteniendo precio de ${t}:`, e.message);
-    return null;
-  }
+  return null;
 }
 
 async function autoFillTicker(tickerId, nameId, priceId, badgeId, buyPriceId) {
@@ -167,9 +198,9 @@ async function _fetchPricesDirect(tickers) {
   const out = {};
   await Promise.all(tickers.map(async ticker => {
     try {
-      const url  = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d&includePrePost=false&corsDomain=finance.yahoo.com`;
-      const res  = await fetch(url, { signal: AbortSignal.timeout(7000) });
-      const json = await res.json();
+      const res  = await api.yahoo(ticker);
+      const json = await res.json().catch(() => null);
+      if (!json || json.error) return;
       const meta = json?.chart?.result?.[0]?.meta;
       if (!meta?.regularMarketPrice) return;
       const price = meta.regularMarketPrice;
@@ -201,7 +232,7 @@ async function refreshAllPrices(silent = false) {
   let   fetchError = '';
 
   try {
-    const res  = await fetch(`/api/quotes?symbols=${tickers.join(',')}`, { signal: AbortSignal.timeout(8000) });
+    const res  = await api.quotes(tickers);
     const json = await res.json().catch(() => ({}));
     if (json && !json.error) quotes = json;
     else if (json?.error) fetchError = json.error;
@@ -290,7 +321,7 @@ async function refreshExchangeRates(silent = false) {
 
   if (!silent) showToast('Actualizando tipos de cambio…', 'success');
   try {
-    const res  = await fetch('https://open.er-api.com/v6/latest/EUR');
+    const res  = await api.exchange();
     const data = await res.json();
     if (!data.rates) throw new Error('Sin datos');
 
@@ -376,6 +407,21 @@ function _setupFormValidation(fields) {
   });
 
   _updateSubmit();
+}
+
+/* ─── Salida animada antes de eliminar ──────────────────────────
+   Aplica un fundido/encogido muy sutil al elemento (fila, card) y
+   espera a que termine antes de ejecutar la mutación real de datos
+   + re-render, para que el usuario vea la salida en vez de un corte
+   instantáneo. Si el elemento no existe o reduced-motion está
+   activo, ejecuta la mutación al instante (nunca bloquea el borrado). */
+function animateRowRemoval(el, onDone) {
+  if (!el || !_revealMotionOK) { onDone(); return; }
+  el.classList.add('row-removing');
+  let done = false;
+  const finish = () => { if (done) return; done = true; onDone(); };
+  el.addEventListener('transitionend', finish, { once: true });
+  setTimeout(finish, 220); // fallback si transitionend no llega (display cambiado antes, etc.)
 }
 
 /* ─── Soft-delete with undo toast ────────────────────────────── */

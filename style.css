@@ -31,6 +31,51 @@
 
   --transition: 200ms cubic-bezier(.16,1,.3,1);
 
+  /* ── Animation tokens — para animaciones NUEVAS. Las ya existentes
+     (stagger de cards/tablas, hover, toasts, modales, milestones...)
+     tienen su propia duración/easing afinados a mano; no se tocan. ── */
+  --dur-instant: 80ms;
+  --dur-fast:    150ms;
+  --dur-normal:  250ms;
+  --dur-slow:    400ms;
+  --ease-out:    cubic-bezier(0, 0, .2, 1);
+  --ease-in:     cubic-bezier(.4, 0, 1, 1);
+  --ease-inout:  cubic-bezier(.4, 0, .2, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SCROLL REVEAL — fade + desplazamiento sutil al entrar en viewport
+   Marcado vía [data-reveal] en el HTML; activado por JS (IntersectionObserver)
+   añadiendo .is-visible una sola vez. Sin JS o con reduced-motion, el
+   contenido es visible desde el principio (no depende de JS para leerse).
+───────────────────────────────────────────────────────────── */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out);
+  will-change: opacity, transform;
+}
+[data-reveal].is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  will-change: auto;
+}
+/* Jerarquía: los elementos hijos de un grupo revelado entran con un desfase mínimo */
+[data-reveal-group].is-visible > [data-reveal-item]:nth-child(1) { transition-delay: 0ms; }
+[data-reveal-group].is-visible > [data-reveal-item]:nth-child(2) { transition-delay: 60ms; }
+[data-reveal-group].is-visible > [data-reveal-item]:nth-child(3) { transition-delay: 120ms; }
+[data-reveal-group].is-visible > [data-reveal-item]:nth-child(4) { transition-delay: 180ms; }
+[data-reveal-group] > [data-reveal-item] { opacity: 0; transform: translateY(14px); transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out); }
+[data-reveal-group].is-visible > [data-reveal-item] { opacity: 1; transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal], [data-reveal-group] > [data-reveal-item] { opacity: 1; transform: none; transition: none; }
+}
+/* JS no cargado / falla el observer: no dejar contenido invisible */
+.no-js [data-reveal], [data-reveal].reveal-fallback { opacity: 1; transform: none; }
+
+:root {
   /* ── Spacing — single source of truth ───────────────────────
      All distances are multiples of --space (4px).
      Change --space and the entire grid rescales.
@@ -1040,6 +1085,18 @@ ul  { list-style: none; }
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
   z-index: var(--z-sidebar-overlay);
   overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(6px) scale(.97);
+  transform-origin: bottom left;
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), visibility var(--dur-fast);
+}
+.profile-dropdown.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
 }
 .profile-dropdown-header {
   display: flex;
@@ -2769,7 +2826,6 @@ ul  { list-style: none; }
 /* ── Import/Export dropdown ─────────────────────────────── */
 .io-dropdown { position: relative; display: inline-block; }
 .io-dropdown-menu {
-  display: none;
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
@@ -2780,8 +2836,19 @@ ul  { list-style: none; }
   z-index: var(--z-dropdown);
   min-width: 170px;
   overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-6px) scale(.97);
+  transform-origin: top right;
+  transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), visibility var(--dur-fast);
 }
-.io-dropdown-menu.open { display: block; }
+.io-dropdown-menu.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
 .io-dropdown-menu button {
   display: block;
   width: 100%;
@@ -3168,6 +3235,31 @@ ul  { list-style: none; }
   100%   { box-shadow: none;                border-color: var(--border-subtle); color: var(--text-primary); }
 }
 
+/* ── Flash de cambio de precio — genérico, direccional (subida/bajada) ──
+   Aplicado vía JS solo cuando el valor realmente cambia entre renders
+   (nunca en cada refresco). Un único pulso de color, sin parpadeo. ── */
+.price-flash-up   { animation: priceFlashUp   1.6s var(--ease-out) forwards; }
+.price-flash-down { animation: priceFlashDown 1.6s var(--ease-out) forwards; }
+@keyframes priceFlashUp {
+  0%, 25% { color: var(--up); }
+  100%    { color: inherit; }
+}
+@keyframes priceFlashDown {
+  0%, 25% { color: var(--down); }
+  100%    { color: inherit; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .price-flash-up, .price-flash-down { animation: none; }
+}
+
+/* ── Salida animada al eliminar (filas de tabla, cards) ──────── */
+.row-removing {
+  opacity: 0 !important;
+  transform: scale(.97);
+  transition: opacity var(--dur-normal) var(--ease-in), transform var(--dur-normal) var(--ease-in);
+  pointer-events: none;
+}
+
 /* ─────────────────────────────────────────────────────────────
    TICKER CHIP
 ───────────────────────────────────────────────────────────── */
@@ -3369,11 +3461,52 @@ body, .kpi-card, .sidebar, .topbar, .modal, .watchlist-card, .alternative-card, 
 .section.active .data-table tbody tr:nth-child(10) { animation-delay: 285ms; }
 .section.active .data-table tbody tr:nth-child(n+11) { animation-delay: 300ms; }
 
-/* ── Button press feedback ────────────────────────────────── */
-.btn-primary:active   { transform: scale(.95); transition: transform .08s; }
-.btn-secondary:active { transform: scale(.95); transition: transform .08s; }
-.btn-ghost:active     { transform: scale(.95); transition: transform .08s; }
+/* ── Button press feedback — fuente única, misma física en los 4 ── */
+.btn-primary:active,
+.btn-secondary:active,
+.btn-ghost:active,
+.btn-danger:active {
+  transform: scale(.97);
+  transition: transform var(--dur-instant) var(--ease-out);
+}
 .nav-item:active      { transform: scale(.97); }
+
+/* ── Estado disabled — universal en los 4 tipos de botón ─────── */
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-ghost:disabled,
+.btn-danger:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── Estado loading — data-loading="true" en cualquier botón ──
+   Oculta el texto (sin colapsar el ancho) y muestra un spinner
+   heredando currentColor, para no depender de una variante extra. */
+[data-loading="true"] {
+  color: transparent !important;
+  pointer-events: none;
+  position: relative;
+}
+[data-loading="true"]::after {
+  content: '';
+  position: absolute; top: 50%; left: 50%;
+  width: 15px; height: 15px;
+  margin: -7.5px 0 0 -7.5px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  color: var(--accent-ink, var(--text-primary));
+  animation: btnSpin .6s linear infinite;
+}
+.btn-secondary[data-loading="true"]::after,
+.btn-ghost[data-loading="true"]::after,
+.btn-danger[data-loading="true"]::after { color: var(--text-secondary); }
+@keyframes btnSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  [data-loading="true"]::after { animation-duration: 1.2s; }
+}
 
 /* ── Nav item — active accent line ───────────────────────── */
 .nav-item::before {
@@ -3605,10 +3738,6 @@ body, .kpi-card, .sidebar, .topbar, .modal, .watchlist-card, .alternative-card, 
 
 /* Indicador activo en sidebar */
 .nav-item.active { box-shadow: inset 3px 0 0 var(--sidebar-accent-bar); }
-
-/* Micro-interacción botones */
-.btn-primary:active,
-.btn-secondary:active { transform: scale(0.97); transition-duration: 80ms; }
 
 /* Watchlist cards — entrada en grid */
 @keyframes watchCardIn {

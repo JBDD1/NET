@@ -527,8 +527,8 @@ function _refreshDevCard() {
   const lsSize = (() => { try { return (JSON.stringify(localStorage).length / 1024).toFixed(1) + ' KB'; } catch { return '?'; } })();
   const quota  = navigator.storage?.estimate ? '—' : '—';
   grid.innerHTML = `
-    <div class="admin-health-item"><span>🔑</span><strong>UID:</strong> <code style="font-size:11px;word-break:break-all">${APP.uid || '—'}</code></div>
-    <div class="admin-health-item"><span>📧</span><strong>Email:</strong> <code>${APP.userEmail || '—'}</code></div>
+    <div class="admin-health-item"><span>🔑</span><strong>UID:</strong> <code style="font-size:11px;word-break:break-all">${escapeHtml(APP.uid || '—')}</code></div>
+    <div class="admin-health-item"><span>📧</span><strong>Email:</strong> <code>${escapeHtml(APP.userEmail || '—')}</code></div>
     <div class="admin-health-item"><span>📍</span><strong>Sección activa:</strong> <code>${APP.activeSection || '—'}</code></div>
     <div class="admin-health-item"><span>💾</span><strong>LocalStorage:</strong> <code>${lsSize}</code></div>
     <div class="admin-health-item"><span>💳</span><strong>Transacciones:</strong> <code>${APP.transactions?.length || 0}</code></div>
@@ -2183,7 +2183,11 @@ function exportTransactionsCSV() {
   };
   const fmtAmt = v => String(v.toFixed(2)).replace('.', ',');
   const esc    = v => {
-    const s = String(v ?? '');
+    let s = String(v ?? '');
+    // Prevent CSV/formula injection: spreadsheet apps (Excel, LibreOffice) execute
+    // cells that start with =, +, -, @ as formulas. Prefix with a tab so the value
+    // is interpreted as text. The tab is invisible in most spreadsheet views.
+    if (/^[=+\-@]/.test(s)) s = '\t' + s;
     return (s.includes(';') || s.includes('"') || s.includes('\n'))
       ? `"${s.replace(/"/g, '""')}"` : s;
   };
@@ -2693,13 +2697,14 @@ function saveUserName() {
 function toggleProfileDropdown() {
   const dd = document.getElementById('profile-dropdown');
   if (!dd) return;
-  dd.style.display === 'none' ? openProfileDropdown() : closeProfileDropdown();
+  dd.classList.contains('open') ? closeProfileDropdown() : openProfileDropdown();
 }
 
 function openProfileDropdown() {
   const dd = document.getElementById('profile-dropdown');
   if (!dd) return;
-  dd.style.display = 'block';
+  dd.style.display = '';
+  dd.classList.add('open');
   updateProfileDropdown();
   const input = document.getElementById('profile-name-input');
   if (input) input.value = APP.userName || '';
@@ -2710,7 +2715,7 @@ function openProfileDropdown() {
 
 function closeProfileDropdown() {
   const dd = document.getElementById('profile-dropdown');
-  if (dd) dd.style.display = 'none';
+  if (dd) dd.classList.remove('open');
   document.removeEventListener('click', _profileDropdownClickAway);
 }
 

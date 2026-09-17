@@ -7,9 +7,11 @@
    28. ASESOR IA — MULTI-PROVEEDOR
 ═══════════════════════════════════════════════════════════════ */
 
-var SERVER_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:3000'
-  : ''; // Producción: el proxy de Vercel enruta /api/* a Railway sin exponer la URL real
+// import.meta.env.VITE_SERVER_URL viene de .env.development / .env.production (ver ambos archivos).
+// Nunca contiene la URL de Railway directamente — en producción queda vacío y Vercel hace el proxy.
+var SERVER_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SERVER_URL != null)
+  ? (import.meta.env.VITE_SERVER_URL || '')
+  : (window.location.hostname === 'localhost' ? 'http://localhost:3000' : '');
 
 let aiHistory = [];
 const AI_MAX_HISTORY = 10; // últimos 5 turnos de conversación enviados a la API
@@ -186,6 +188,64 @@ async function aiSaveInlineKey() {
   renderAI();
 }
 
+const _AI_CONSENT_KEY = 'finova_ai_consent_v1';
+
+// Returns a structured snapshot of the user's financial state for server-side prompt
+// construction. Numeric fields are plain numbers; string fields are raw (server sanitizes).
+function buildFinancialSnapshot() {
+  const cash  = calcCashTotal();
+  const inv   = calcPortfolioValue();
+  const alt   = calcAlternativesTotal();
+  const prop  = calcPropertiesTotal();
+
+  const m   = getCurrentMonth();
+  const txs = APP.transactions.map(({ photo, photoId, ...rest }) => rest);
+  const txMonth = txs.filter(t => (t.date || m).startsWith(m));
+  const inc = txMonth.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const exp = txMonth.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+
+  const byCat = {};
+  txMonth.filter(t => t.type === 'expense').forEach(t => {
+    byCat[t.category] = (byCat[t.category] || 0) + t.amount;
+  });
+  const topCats = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 5)
+    .map(([name, amount]) => ({ name, amount }));
+
+  const portfRaw = [...APP.portfolio]
+    .map(a => ({ ticker: a.ticker || a.name, sector: a.sector || '', value: a.currentPrice * a.quantity, gain: (a.currentPrice - a.buyPrice) * a.quantity }))
+    .sort((a, b) => b.value - a.value).slice(0, 5);
+
+  const divAnual = APP.dividends.reduce((s, d) =>
+    s + d.dividendPerShare * d.shares * ({ annual: 1, semiannual: 2, quarterly: 4, monthly: 12 }[d.frequency] || 1), 0);
+
+  const goals = APP.goals.slice(0, 4).map(g => ({
+    name:    g.name,
+    current: typeof _calcGoalProgress === 'function' ? _calcGoalProgress(g) : (g.currentAmount || 0),
+    target:  g.targetAmount,
+  }));
+
+  return {
+    date:           new Date().toLocaleDateString('es-ES'),
+    month:          m,
+    patrimony:      cash + inv + alt + prop,
+    cashTotal:      cash,
+    investTotal:    inv,
+    altTotal:       alt,
+    propTotal:      prop,
+    propCount:      (APP.properties || []).length,
+    portfolioCount: APP.portfolio.length,
+    monthlyIncome:  inc,
+    monthlyExpenses: exp,
+    topCats,
+    portfolio:      portfRaw,
+    divAnual,
+    goals,
+    txCount:        txs.length,
+    watchlistCount: APP.watchlist.length,
+    pendingBizums:  APP.bizums.filter(b => b.status === 'pending').length,
+  };
+}
+
 function buildFinancialContext() {
   const cash  = calcCashTotal();
   const inv   = calcPortfolioValue();
@@ -318,7 +378,22 @@ function _aiLocalFallback(question) {
   return `**Asistente IA no disponible en este momento**\n\n${tip}\n\n_Todos los proveedores configurados están saturados o sin crédito. Comprueba tus claves en **Ajustes → IA**._`;
 }
 
-async function callViaProxy(provider, apiKey, systemPrompt) {
+// Fetch wrapper that reads Retry-After and shows a toast on 429.
+async function _fetchWithRateLimit(url, options = {}) {
+  const res = await fetch(url, options);
+  if (res.status === 429) {
+    const retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
+    let msg = `Demasiadas peticiones. Espera ${retryAfter < 120 ? retryAfter + 's' : Math.ceil(retryAfter / 60) + ' min'}.`;
+    try { const d = await res.clone().json(); if (d.error) msg = d.error; } catch {}
+    showToast(msg, 'error');
+  }
+  return res;
+}
+
+// anonMode: boolean — if true, server builds an anonymous system prompt (no financial data).
+// snapshot: object from buildFinancialSnapshot() — server validates and sanitizes every field.
+// The systemPrompt is never sent to the proxy; the server always constructs it server-side.
+async function callViaProxy(provider, apiKey, anonMode, snapshot) {
   const authHeaders = {};
   try {
     const user = firebase.auth().currentUser;
@@ -328,25 +403,28 @@ async function callViaProxy(provider, apiKey, systemPrompt) {
   const res = await fetch(`${SERVER_URL}/api/ai`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders },
-    body: JSON.stringify({ provider, apiKey, messages: aiHistory.slice(-AI_MAX_HISTORY), systemPrompt }),
+    body: JSON.stringify({ provider, apiKey, messages: aiHistory.slice(-AI_MAX_HISTORY), anonMode, snapshot }),
   });
 
   if (res.status === 405 || res.status === 404) {
-    return callDirect(provider, apiKey, systemPrompt);
+    // Proxy unavailable — fall back to direct call with a locally-built system prompt
+    return callDirect(provider, apiKey, buildSystemPrompt());
   }
 
   const data = await res.json().catch(() => ({}));
 
   if (res.status === 429) {
+    const retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
     const msg = data.limitReached
       ? (data.error || 'Has alcanzado el límite diario de consultas del Asesor IA.')
-      : 'Demasiadas peticiones al Asesor IA. Espera un momento.';
+      : (data.error || `Demasiadas peticiones al Asesor IA. Espera ${retryAfter < 120 ? retryAfter + 's' : Math.ceil(retryAfter / 60) + ' min'}.`);
     showToast(msg, 'error');
     if (!data.limitReached) {
-      setTimeout(() => {
-        const btn = document.getElementById('ai-send-btn');
-        if (btn) { btn.disabled = true; setTimeout(() => { btn.disabled = false; }, 60000); }
-      }, 0);
+      const btn = document.getElementById('ai-send-btn');
+      if (btn) {
+        btn.disabled = true;
+        setTimeout(() => { if (btn) btn.disabled = false; }, Math.max(retryAfter * 1000, 5000));
+      }
     }
     throw new Error('__rate_limited__');
   }
@@ -448,45 +526,48 @@ async function callGeminiDirect(apiKey, systemPrompt) {
   return text;
 }
 
-async function callClaude(systemPrompt) {
+async function callClaude() {
   const apiKey = (APP.claudeApiKey || '').trim();
   if (!apiKey) throw new Error('No hay API Key de Claude. Configúrala arriba.');
-  return callViaProxy('claude', apiKey, systemPrompt);
+  return callViaProxy('claude', apiKey, !_aiSendContext, _aiSendContext ? buildFinancialSnapshot() : null);
 }
 
-async function callOpenAI(systemPrompt) {
+async function callOpenAI() {
   const apiKey = (APP.openaiApiKey || '').trim();
   if (!apiKey) throw new Error('No hay API Key de ChatGPT. Configúrala arriba.');
-  return callViaProxy('openai', apiKey, systemPrompt);
+  return callViaProxy('openai', apiKey, !_aiSendContext, _aiSendContext ? buildFinancialSnapshot() : null);
 }
 
-async function callGemini(systemPrompt) {
+async function callGemini() {
   const apiKey = (APP.geminiApiKey || '').trim();
   if (!apiKey) throw new Error('No hay API Key de Gemini. Configúrala en Ajustes.');
-  return callViaProxy('gemini', apiKey, systemPrompt);
+  return callViaProxy('gemini', apiKey, !_aiSendContext, _aiSendContext ? buildFinancialSnapshot() : null);
 }
 
-async function callGroq(systemPrompt) {
+async function callGroq() {
   const apiKey = (APP.groqApiKey || '').trim();
   if (!apiKey) throw new Error('No hay API Key de Groq. Configúrala arriba.');
-  return callViaProxy('groq', apiKey, systemPrompt);
+  return callViaProxy('groq', apiKey, !_aiSendContext, _aiSendContext ? buildFinancialSnapshot() : null);
 }
 
-async function _callProvider(provider, systemPrompt, onChunk = null) {
+// anonMode + snapshot → proxy path (server builds system prompt).
+// onChunk → direct streaming path (system prompt built locally, never leaves proxy).
+async function _callProvider(provider, anonMode, snapshot, onChunk = null) {
   const meta   = AI_PROVIDERS[provider];
   if (!meta) throw new Error(`Proveedor desconocido: ${provider}`);
   const apiKey = (APP[meta.keyField] || '').trim();
   if (!apiKey) throw new Error(`Sin API Key — ${meta.label}`);
-  if (onChunk) return _callDirectStream(provider, apiKey, systemPrompt, onChunk);
-  return callViaProxy(provider, apiKey, systemPrompt);
+  if (onChunk) return _callDirectStream(provider, apiKey, buildSystemPrompt(), onChunk);
+  return callViaProxy(provider, apiKey, anonMode, snapshot);
 }
 
 async function callAI(onChunk = null) {
-  const sys = buildSystemPrompt();
+  const anonMode = !_aiSendContext;
+  const snapshot = _aiSendContext ? buildFinancialSnapshot() : null;
 
   // Server-side key — delegate to proxy (no streaming support on proxy path)
   if (_serverAI === true && !getActiveProviderKey()) {
-    return callViaProxy(_serverProvider, '', sys);
+    return callViaProxy(_serverProvider, '', anonMode, snapshot);
   }
 
   const primary   = APP.aiProvider || 'claude';
@@ -508,7 +589,7 @@ async function callAI(onChunk = null) {
       if (i > 0) {
         showToast(`${AI_PROVIDERS[toTry[0]]?.label || 'Proveedor'} no disponible — usando ${AI_PROVIDERS[provider].label}`, 'info');
       }
-      return await _callProvider(provider, sys, onChunk);
+      return await _callProvider(provider, anonMode, snapshot, onChunk);
     } catch (err) {
       errors.push({ provider, err });
       if (i < toTry.length - 1) continue;
@@ -671,10 +752,56 @@ function aiAsk(question) {
   aiSend();
 }
 
+// Shows a one-time consent dialog when the user is about to send financial data to a
+// third-party AI provider. Resolves true when the user accepts (consent stored in
+// localStorage) or declines (anon mode activated automatically).
+function _checkAiConsent() {
+  return new Promise(resolve => {
+    if (!_aiSendContext || localStorage.getItem(_AI_CONSENT_KEY)) { resolve(); return; }
+    const providerLabel = AI_PROVIDERS[APP.aiProvider]?.label || 'el proveedor de IA seleccionado';
+    let settled = false;
+    const settle = () => { if (!settled) { settled = true; resolve(); } };
+    openModal(
+      '🔒 Privacidad — datos enviados a la IA',
+      `<p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:var(--text-secondary)">
+        Para personalizar las respuestas, Finova enviará un resumen de tus finanzas
+        (patrimonio total, transacciones del mes, cartera e inversiones) a
+        <strong>${escapeHtml(providerLabel)}</strong>, que lo procesa bajo su propia política de privacidad.
+      </p>
+      <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:var(--text-secondary)">
+        Puedes desactivarlo en cualquier momento con el botón
+        <strong>📊 Con datos</strong> para usar el modo anónimo.
+      </p>
+      <p style="margin:0;font-size:12px;color:var(--text-muted)">
+        Pulsando «Entendido, continuar» aceptas el envío de estos datos a ${escapeHtml(providerLabel)}.
+      </p>`,
+      () => {
+        localStorage.setItem(_AI_CONSENT_KEY, '1');
+        settle();
+      },
+      () => {
+        const btn = document.getElementById('modalConfirm');
+        if (btn) btn.textContent = 'Entendido, continuar';
+      }
+    );
+    // If the user cancels (closes without confirming), activate anon mode and then continue
+    _modalOnClose = () => {
+      if (!localStorage.getItem(_AI_CONSENT_KEY)) {
+        if (_aiSendContext) toggleAiContext();
+        showToast('Modo anónimo activado — no se enviarán datos financieros a la IA.', 'info');
+      }
+      settle();
+    };
+  });
+}
+
 async function aiSend() {
   const input   = document.getElementById('ai-input');
   const message = (input?.value || '').trim();
   if (!message) return;
+
+  // AI-02: request consent before the first call that would share financial data
+  await _checkAiConsent();
 
   input.value = '';
   input.style.height = 'auto';
@@ -780,6 +907,13 @@ function renderAIMessages() {
   container.scrollTop = container.scrollHeight;
 }
 
+// SECURITY: HTML-encode FIRST, then construct tags only from hard-coded strings.
+// Never interpolate user/AI content into href, src, or event attributes here —
+// doing so would reintroduce XSS. Keep the allowed tag set minimal: strong, code,
+// ul/ol/li, br, p. Any new markdown feature must follow the same encode-first rule.
+// Security: HTML-encode ALL input first, then construct tags only from hard-coded strings.
+// Never interpolate user/AI content into href, src, or event attributes.
+// Allowed tag set is intentionally minimal: strong, code, ul, ol, li, br, p.
 function renderMarkdown(text) {
   let html = text
     .replace(/&/g, '&amp;')

@@ -10,12 +10,15 @@
    Anima el valor numérico de un elemento desde su valor anterior
    hasta el nuevo. Usa easeOutCubic para sensación de peso físico.
    El valor anterior se guarda en data-anim-raw para el siguiente ciclo.
+   Respeta prefers-reduced-motion: salta directo al valor final.
 ─────────────────────────────────────────────────────────────────── */
+const _reducedMotionMQ = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+
 function _animNum(el, rawTarget, formatter, duration) {
   if (!el) return;
   const prev = parseFloat(el.dataset.animRaw ?? 0) || 0;
   el.dataset.animRaw = rawTarget;
-  if (Math.abs(prev - rawTarget) < 0.005) {
+  if (Math.abs(prev - rawTarget) < 0.005 || _reducedMotionMQ?.matches) {
     el.textContent = formatter(rawTarget);
     return;
   }

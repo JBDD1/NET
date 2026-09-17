@@ -1,0 +1,43 @@
+#!/bin/sh
+# ══════════════════════════════════════════════════════════════
+# FINOVA — Pre-commit hook: detectar secretos antes del commit
+# Activar: npx husky init  (instala husky que usa este archivo)
+# ══════════════════════════════════════════════════════════════
+echo "[FINOVA] Verificando secretos antes del commit..."
+
+FOUND=0
+
+check_pattern() {
+  LABEL="$1"; PATTERN="$2"
+  MATCHES=$(git diff --cached --diff-filter=A -U0 | grep "^+" | grep -E "$PATTERN" 2>/dev/null || true)
+  if [ -n "$MATCHES" ]; then
+    echo "[FINOVA] POSIBLE SECRETO: $LABEL"
+    echo "$MATCHES" | head -3
+    FOUND=1
+  fi
+}
+
+check_pattern "Claude API Key"       "sk-ant-api"
+check_pattern "OpenAI API Key"       "sk-proj-"
+check_pattern "Groq API Key"         "gsk_[A-Za-z0-9]"
+check_pattern "Google API Key"       "AIzaSy[A-Za-z0-9_-]"
+check_pattern "Firebase Private Key" "BEGIN PRIVATE KEY"
+check_pattern "Railway URL expuesta" "railway\.app"
+
+FORBIDDEN=$(git diff --cached --name-only | grep -E \
+  "\.env\.local$|\.env\.[^.]+\.local$|service.account|serviceAccount" 2>/dev/null || true)
+
+if [ -n "$FORBIDDEN" ]; then
+  echo "[FINOVA] ERROR: Archivo de secretos en staging:"
+  echo "$FORBIDDEN"
+  FOUND=1
+fi
+
+if [ "$FOUND" = "1" ]; then
+  echo ""
+  echo "[FINOVA] Commit bloqueado. Falso positivo? usa: git commit --no-verify"
+  exit 1
+fi
+
+echo "[FINOVA] Sin secretos detectados."
+exit 0

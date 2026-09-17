@@ -1,3 +1,20 @@
+# ══════════════════════════════════════════════════════════════
+# FINOVA — .gitignore
+# ══════════════════════════════════════════════════════════════
+
+# ── Secretos — NUNCA subir ────────────────────────────────────
+.env.local
+.env.*.local
+.env.server
+firebase-service-account.json
+*-service-account.json
+*serviceAccount*.json
+*service_account*.json
+*.pem
+*.p12
+*.key
+*.cert
+
 # ── Dependencias ──────────────────────────────────────────────
 node_modules/
 
@@ -6,39 +23,37 @@ dist/
 dist-ssr/
 .vite/
 
-# ── Variables de entorno con secretos ─────────────────────────
-# .env sin sufijo y .env.local contienen secrets reales → nunca al repo
-.env
-.env.local
-.env.*.local
-# .env.development y .env.production SÍ se committean
-# (solo contienen Firebase client keys, públicas por diseño)
-
-# ── Datos de usuarios (Railway los tiene en su propio disco) ──
-# Se excluye data/ completo para evitar subir datos privados
-data/
+# ── Datos de usuarios (Railway los guarda en su disco) ────────
+# data/ completo excluido para no subir datos privados
+data/sync/
+data/users/
+data/analytics.json
+data/ratelimit.json
+data/roles.json
+data/waitlist.json
+data/extra_admins.json
+data/bank_requisitions.json
 
 # ── Logs ──────────────────────────────────────────────────────
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+logs/
 
 # ── Editor ────────────────────────────────────────────────────
 .vscode/settings.json
 .vscode/*.code-workspace
 .idea/
+*.suo
+*.swp
+*.swo
 
 # ── Sistema operativo ─────────────────────────────────────────
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# ── Certificados locales ──────────────────────────────────────
-*.pem
-*.key
-*.cert
-
-# ── Firebase service account — NUNCA subir al repo ────────────
-firebase-service-account.json
-*service-account*.json
+# ── Tests ─────────────────────────────────────────────────────
+coverage/
+.nyc_output/

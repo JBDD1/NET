@@ -234,7 +234,6 @@ function _stkRenderChart() {
   if (totalStaked <= 0) { if (wrapper) wrapper.style.display = 'none'; return; }
   if (wrapper) wrapper.style.display = '';
 
-  Charts.destroy('stk-rewards');
   const months = 13;
   const labels = [], compound = [], simple = [];
   const now    = new Date();
@@ -248,6 +247,27 @@ function _stkRenderChart() {
   }
 
   const { gridColor, textColor, fontFamily, accent } = getChartDefaults();
+
+  // Reutiliza la instancia existente (sin repetir la animación de entrada en cada
+  // render) igual que el resto de gráficos de la app; solo crea una nueva si no existía.
+  const stkChart = Charts.get('stk-rewards');
+  if (stkChart) {
+    stkChart.data.labels = labels;
+    stkChart.data.datasets[0].data = compound;
+    stkChart.data.datasets[0].borderColor = accent;
+    stkChart.data.datasets[0].backgroundColor = accent + '22';
+    stkChart.data.datasets[1].data = simple;
+    stkChart.data.datasets[1].borderColor = textColor + '55';
+    stkChart.options.scales.x.grid.color = gridColor;
+    stkChart.options.scales.x.ticks.color = textColor;
+    stkChart.options.scales.y.grid.color = gridColor;
+    stkChart.options.scales.y.ticks.color = textColor;
+    stkChart.options.plugins.legend.labels.color = textColor;
+    stkChart.update('none');
+    return;
+  }
+
+  Charts.destroy('stk-rewards');
   Charts.set('stk-rewards', new Chart(ctx, {
     type: 'line',
     data: {
@@ -573,7 +593,6 @@ function _stkCalcUpdate() {
 
   const ctx = document.getElementById('stk-c-chart');
   if (!ctx) return;
-  Charts.destroy('stk-calc');
 
   const labels = [], values = [];
   for (let i = 0; i <= months; i++) {
@@ -582,6 +601,24 @@ function _stkCalcUpdate() {
   }
 
   const { gridColor, textColor, fontFamily, accent } = getChartDefaults();
+
+  // La calculadora recalcula en cada cambio de input — reutilizar la instancia
+  // evita destruir/crear (y repetir la animación de entrada) en cada tecleo.
+  const calcChart = Charts.get('stk-calc');
+  if (calcChart) {
+    calcChart.data.labels = labels;
+    calcChart.data.datasets[0].data = values;
+    calcChart.data.datasets[0].borderColor = accent;
+    calcChart.data.datasets[0].backgroundColor = accent + '22';
+    calcChart.options.scales.x.grid.color = gridColor;
+    calcChart.options.scales.x.ticks.color = textColor;
+    calcChart.options.scales.y.grid.color = gridColor;
+    calcChart.options.scales.y.ticks.color = textColor;
+    calcChart.update('none');
+    return;
+  }
+
+  Charts.destroy('stk-calc');
   Charts.set('stk-calc', new Chart(ctx, {
     type: 'line',
     data: {

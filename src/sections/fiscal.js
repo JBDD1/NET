@@ -536,7 +536,7 @@ function populateFiscalSimAssets() {
   const sel = document.getElementById('sim-fisc-asset');
   if (!sel) return;
   sel.innerHTML = '<option value="">Selecciona un activo</option>' +
-    APP.portfolio.map(a => `<option value="${a.id}">${escapeHtml(a.name)} (${escapeHtml(a.ticker)})</option>`).join('');
+    APP.portfolio.map(a => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.name)} (${escapeHtml(a.ticker)})</option>`).join('');
 }
 
 function runFiscalSimulator() {

@@ -45,18 +45,34 @@ if (!fs.existsSync(USERS_DIR)) fs.mkdirSync(USERS_DIR, { recursive: true });
 
 // ─── Admin ────────────────────────────────────────────────────
 // Configura con variable de entorno: FINOVA_ADMIN_EMAILS=correo1@x.com,correo2@x.com
-const ADMIN_EMAILS = (process.env.FINOVA_ADMIN_EMAILS || 'MyFinova1@gmail.com')
+// No hay valor por defecto — el email de admin no debe estar en el código fuente.
+const ADMIN_EMAILS = (process.env.FINOVA_ADMIN_EMAILS || '')
   .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+
+// ─── Proxy secret ─────────────────────────────────────────────
+// When FINOVA_PROXY_SECRET is set, all /api/* requests must carry the
+// x-finova-proxy header with the matching value. This ensures traffic
+// arrives through the Vercel proxy and not directly from the internet.
+const _PROXY_SECRET = process.env.FINOVA_PROXY_SECRET || '';
+const _EXTRA_ADMINS_FILE = path.join(ROOT, 'data', 'extra_admins.json');
+let _extraAdminsCache    = { emails: [], mtime: 0 };
+function _extraAdmins() {
+  try {
+    const mtime = fs.statSync(_EXTRA_ADMINS_FILE).mtimeMs;
+    if (mtime !== _extraAdminsCache.mtime) {
+      const parsed = JSON.parse(fs.readFileSync(_EXTRA_ADMINS_FILE, 'utf8'));
+      _extraAdminsCache = { emails: Array.isArray(parsed) ? parsed : [], mtime };
+    }
+  } catch { _extraAdminsCache = { emails: [], mtime: 0 }; }
+  return _extraAdminsCache.emails;
+}
+
 function _isAdminUid(uid) {
   if (!uid || !_UID_RE.test(uid)) return false;
   const meta = _readMeta(uid);
   if (!meta) return false;
   const email = (meta.email || '').toLowerCase();
-  if (ADMIN_EMAILS.includes(email)) return true;
-  try {
-    const extra = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'extra_admins.json'), 'utf8'));
-    return Array.isArray(extra) && extra.includes(email);
-  } catch { return false; }
+  return ADMIN_EMAILS.includes(email) || _extraAdmins().includes(email);
 }
 function _metaPath(uid) { return path.join(USERS_DIR, `${uid}.meta.json`); }
 function _readMeta(uid) {
@@ -124,7 +140,7 @@ const _ALLOWED_ORIGINS = new Set([
 
 function _corsOrigin(req) {
   const o = req?.headers?.origin || '';
-  return _ALLOWED_ORIGINS.has(o) ? o : `http://localhost:${PORT}`;
+  return _ALLOWED_ORIGINS.has(o) ? o : null;
 }
 
 const MIME = {
@@ -139,16 +155,31 @@ const MIME = {
   '.woff2': 'font/woff2',
 };
 
+// Archivos públicos servibles desde la raíz del proyecto (whitelist estricta).
+// Cualquier otra ruta (server.cjs, .env*, data/, .git/, node_modules/, scripts/,
+// package.json, vercel.json, *.md, etc.) responde 404 aunque exista en disco.
+const _PUBLIC_ROOT_FILES = new Set([
+  'index.html', 'landing.html', 'privacy.html', 'privacidad.html',
+  'terms.html', 'terminos.html', 'style.css', 'landing.js',
+  'manifest.json', 'robots.txt', 'sitemap.xml', 'sw.js', 'icon.svg',
+  'icon-16.png', 'icon-32.png', 'icon-48.png', 'icon-64.png',
+  'icon-120.png', 'icon-128.png', 'icon-152.png', 'icon-167.png',
+  'icon-180.png', 'icon-192.png', 'icon-256.png', 'icon-512.png',
+  'icon-1024.png',
+]);
+
 /* ═══════════════════════════════════════════════════════════════
    SEGURIDAD — Headers HTTP y CSP
 ═══════════════════════════════════════════════════════════════ */
 const _SEC = {
   'X-Content-Type-Options':       'nosniff',
   'X-Frame-Options':              'DENY',
-  'X-XSS-Protection':             '1; mode=block',
+  // X-XSS-Protection omitted: deprecated, can introduce vulnerabilities in some browsers.
+  // Strict-Transport-Security omitted: this server runs plain HTTP on localhost (TLS is
+  // terminated by Railway/Vercel). Browsers ignore HSTS over HTTP, and including it here
+  // would be misleading. HSTS is configured in vercel.json for the Vercel-hosted frontend.
   'Referrer-Policy':              'strict-origin-when-cross-origin',
   'Permissions-Policy':           'camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=(), fullscreen=(self), picture-in-picture=(), interest-cohort=()',
-  'Strict-Transport-Security':    'max-age=31536000; includeSubDomains; preload',
   'Cross-Origin-Resource-Policy': 'same-origin',
   'Cross-Origin-Opener-Policy':   'same-origin',
 };
@@ -156,7 +187,7 @@ const _SEC = {
 // Content Security Policy — aplicado a respuestas HTML
 const _CSP = [
   "default-src 'none'",
-  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com https://apis.google.com",
+  "script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com https://apis.google.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https://lh3.googleusercontent.com https://jbdd1.github.io",
@@ -183,9 +214,10 @@ function _apiHeaders(reqOrExtra, extra) {
   const isReq = reqOrExtra != null && typeof reqOrExtra.socket !== 'undefined';
   const req   = isReq ? reqOrExtra : null;
   const e     = isReq ? (extra || null) : (reqOrExtra || null);
+  const origin = _corsOrigin(req);
   return {
     'Content-Type':                'application/json',
-    'Access-Control-Allow-Origin': _corsOrigin(req),
+    ...(origin ? { 'Access-Control-Allow-Origin': origin } : {}),
     'Vary':                        'Origin',
     'Cache-Control':               'no-store, no-cache, must-revalidate, private',
     'Pragma':                      'no-cache',
@@ -196,82 +228,261 @@ function _apiHeaders(reqOrExtra, extra) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   RATE LIMITER — in-memory, por ruta+IP
+   RATE LIMITER — Token Bucket multi-dimensional
+   Unifica: IP burst, UID daily quota, Groq global, anti-bruteforce
 ═══════════════════════════════════════════════════════════════ */
-const _rlMap = new Map(); // `${ruta}:${ip}` → { count, resetAt }
 
-function _rateOk(route, ip, maxPerMin) {
-  const key = route + ':' + ip;
-  const now  = Date.now();
-  let e = _rlMap.get(key);
-  if (!e || e.resetAt <= now) {
-    e = { count: 0, resetAt: now + 60_000 };
-    _rlMap.set(key, e);
-  }
-  e.count++;
-  return e.count <= maxPerMin;
-}
+// ─── Core: Token Bucket ─────────────────────────────────────────
+const _buckets = new Map(); // key → { tokens, lastRefill }
 
-// Token bucket — permite bursts cortos pero penaliza el abuso sostenido.
-// maxTokens: capacidad máxima del bucket | refillPerSec: tokens que se regeneran por segundo
-const _tbMap = new Map(); // key → { tokens, lastRefill }
-
-function _tokenBucketOk(key, maxTokens, refillPerSec) {
+// Returns { ok, remaining, resetIn }. Consumes `cost` tokens if ok.
+function _tokenBucket(key, capacity, refillRate, cost = 1) {
   const nowSec = Date.now() / 1000;
-  let b = _tbMap.get(key);
-  if (!b) { b = { tokens: maxTokens, lastRefill: nowSec }; _tbMap.set(key, b); }
+  let b = _buckets.get(key);
+  if (!b) { b = { tokens: capacity, lastRefill: nowSec }; _buckets.set(key, b); }
   const elapsed = nowSec - b.lastRefill;
-  b.tokens = Math.min(maxTokens, b.tokens + elapsed * refillPerSec);
+  b.tokens = Math.min(capacity, b.tokens + elapsed * refillRate);
   b.lastRefill = nowSec;
-  if (b.tokens < 1) return false;
-  b.tokens -= 1;
-  return true;
-}
-
-// Global Groq counter — tracks total server-key usage across all IPs.
-// Free plan: 30 req/min, 14 400 req/day for llama-3.3-70b-versatile.
-// We cap at 25/min and 12 000/day to leave headroom for bursts.
-const _groqGlobal = { min: 0, minReset: 0, day: 0, dayReset: 0 };
-function _groqGlobalOk() {
-  const now = Date.now();
-  if (now >= _groqGlobal.minReset) { _groqGlobal.min = 0; _groqGlobal.minReset = now + 60_000; }
-  if (now >= _groqGlobal.dayReset) { _groqGlobal.day = 0; _groqGlobal.dayReset = now + 86_400_000; }
-  if (_groqGlobal.min >= 25 || _groqGlobal.day >= 12_000) return false;
-  _groqGlobal.min++;
-  _groqGlobal.day++;
-  return true;
-}
-
-// Per-UID daily AI quota: free=5/day, premium=50/day, admin=unlimited
-const _aiUidMap = new Map(); // uid → { count, resetAt }
-const _AI_DAILY_LIMITS = { free: 5, premium: 50 };
-
-function _aiUidRateOk(uid, role) {
-  if (role === 'admin') return true;
-  const limit = _AI_DAILY_LIMITS[role] || _AI_DAILY_LIMITS.free;
-  const now   = Date.now();
-  let e = _aiUidMap.get(uid);
-  if (!e || e.resetAt <= now) {
-    e = { count: 0, resetAt: now + 86_400_000 };
-    _aiUidMap.set(uid, e);
+  if (b.tokens < cost) {
+    return { ok: false, remaining: 0, resetIn: Math.ceil((cost - b.tokens) / refillRate) };
   }
-  if (e.count >= limit) return false;
+  b.tokens -= cost;
+  return { ok: true, remaining: Math.floor(b.tokens), resetIn: 0 };
+}
+
+// ─── Limit configuration ────────────────────────────────────────
+const _LIMITS = {
+  ai:           { byIP: { capacity: 15, refillRate: 0.25  }, byUID: { free: 5, premium: 50 }, global: { groqMinute: 25, groqDay: 12_000 } },
+  quotes:       { byIP: { capacity: 60, refillRate: 1     } },
+  userData:     { byIP: { capacity: 30, refillRate: 0.5   } },
+  userDataPost: { byIP: { capacity: 30, refillRate: 0.5   } },
+  syncDownload: { byIP: { capacity: 10, refillRate: 0.167 } },
+  syncUpload:   { byIP: { capacity: 10, refillRate: 0.167 } },
+  waitlist:     { byIP: { capacity: 5,  refillRate: 0.083 } },
+  session:      { byIP: { capacity: 5,  refillRate: 0.083 } },
+  admin:        { byIP: { capacity: 30, refillRate: 0.5   } },
+  bank:         { byIP: { capacity: 10, refillRate: 0.167 } },
+};
+
+// ─── Anti-bruteforce ────────────────────────────────────────────
+const _failedAttempts = new Map(); // ip → { count, lastAt, blockedUntil }
+const _BRUTE_THRESHOLD  = 10;
+const _BRUTE_WINDOW_MS  = 60_000;
+const _BRUTE_BLOCK_BASE = 3_600_000; // 1h base, doubles per threshold overflow
+
+function _recordFailedAttempt(ip) {
+  const now = Date.now();
+  let e = _failedAttempts.get(ip);
+  if (!e || now - e.lastAt > _BRUTE_WINDOW_MS) {
+    e = { count: 0, lastAt: now, blockedUntil: 0 };
+    _failedAttempts.set(ip, e);
+  }
   e.count++;
+  e.lastAt = now;
+  if (e.count >= _BRUTE_THRESHOLD) {
+    const overflows = Math.floor(e.count / _BRUTE_THRESHOLD);
+    const blockMs   = Math.min(_BRUTE_BLOCK_BASE * Math.pow(2, overflows - 1), 86_400_000);
+    e.blockedUntil  = now + blockMs;
+    console.warn(`[FINOVA/RateLimit] IP bloqueada: ${ip} (${e.count} intentos, ${Math.round(blockMs / 3600000)}h)`);
+  }
+}
+
+function _isIPBlocked(ip) {
+  const e = _failedAttempts.get(ip);
+  if (!e || !e.blockedUntil) return false;
+  if (Date.now() >= e.blockedUntil) { _failedAttempts.delete(ip); return false; }
   return true;
 }
 
-// Limpieza de entradas expiradas cada 5 minutos
+function _clearFailedAttempts(ip) { _failedAttempts.delete(ip); }
+
+// ─── General rate limit check — RFC 6585 headers ────────────────
+// Returns true if the request should proceed; false if 429 was sent.
+function _checkRateLimit(req, res, endpoint) {
+  const ip = _clientIp(req);
+  if (_isIPBlocked(ip)) {
+    res.writeHead(429, _apiHeaders(req, { 'Retry-After': '3600' }));
+    res.end(JSON.stringify({ error: 'IP temporalmente bloqueada por exceso de errores. Inténtalo en 1 hora.' }));
+    return false;
+  }
+  const cfg = _LIMITS[endpoint];
+  if (!cfg?.byIP) return true;
+  const { capacity, refillRate } = cfg.byIP;
+  const result = _tokenBucket(`rl:${endpoint}:${ip}`, capacity, refillRate);
+  if (!result.ok) {
+    const retryAfter = Math.max(result.resetIn, 1);
+    res.writeHead(429, _apiHeaders(req, {
+      'X-RateLimit-Limit':     String(capacity),
+      'X-RateLimit-Remaining': '0',
+      'X-RateLimit-Reset':     String(Math.floor(Date.now() / 1000) + result.resetIn),
+      'Retry-After':           String(retryAfter),
+    }));
+    res.end(JSON.stringify({ error: 'Demasiadas peticiones. Espera unos segundos.' }));
+    return false;
+  }
+  return true;
+}
+
+// ─── Groq global check (server key, atomic min+day) ─────────────
+function _groqGlobalOk() {
+  const lim  = _LIMITS.ai.global;
+  const minR = _tokenBucket('groq:global:min', lim.groqMinute, lim.groqMinute / 60);
+  if (!minR.ok) return false;
+  const dayR = _tokenBucket('groq:global:day', lim.groqDay, lim.groqDay / 86400);
+  if (!dayR.ok) {
+    // Refund the minute token already consumed
+    const b = _buckets.get('groq:global:min');
+    if (b) b.tokens = Math.min(lim.groqMinute, b.tokens + 1);
+    return false;
+  }
+  return true;
+}
+
+// ─── Persistence: AI daily quotas survive server restarts ────────
+const RATELIMIT_FILE = path.join(ROOT, 'data', 'ratelimit.json');
+
+function _saveRateLimits() {
+  try {
+    const aiUidBuckets = {};
+    for (const [k, v] of _buckets) {
+      if (k.startsWith('ai-uid:')) aiUidBuckets[k] = { tokens: v.tokens, lastRefill: v.lastRefill };
+    }
+    fs.writeFileSync(RATELIMIT_FILE, JSON.stringify({ aiUidBuckets, savedAt: Date.now() }), 'utf8');
+  } catch {}
+}
+
+function _loadRateLimits() {
+  try {
+    const data = JSON.parse(fs.readFileSync(RATELIMIT_FILE, 'utf8'));
+    if (Date.now() - (data.savedAt || 0) < 86_400_000) {
+      for (const [k, v] of Object.entries(data.aiUidBuckets || {})) {
+        _buckets.set(k, { tokens: Number(v.tokens) || 0, lastRefill: Number(v.lastRefill) || (Date.now() / 1000) });
+      }
+    }
+  } catch {}
+}
+_loadRateLimits();
+
+// ─── Cleanup: stale buckets + brute-force entries every 5 min ───
 setInterval(() => {
   const now    = Date.now();
   const nowSec = now / 1000;
-  for (const [k, v] of _rlMap)    if (v.resetAt <= now)                _rlMap.delete(k);
-  for (const [k, v] of _aiUidMap) if (v.resetAt <= now)                _aiUidMap.delete(k);
-  for (const [k, v] of _tbMap)    if (v.lastRefill < nowSec - 3600)    _tbMap.delete(k);
+  for (const [k, v] of _buckets) {
+    if (k.startsWith('ai-uid:')) { if (nowSec - v.lastRefill > 86400 * 7) _buckets.delete(k); }
+    else                         { if (nowSec - v.lastRefill > 3600)       _buckets.delete(k); }
+  }
+  for (const [ip, e] of _failedAttempts) {
+    if (now > Math.max(e.blockedUntil || 0, e.lastAt + _BRUTE_WINDOW_MS * 10)) _failedAttempts.delete(ip);
+  }
 }, 300_000).unref();
+
+// ─── Persist AI daily quotas every 5 minutes ───────────────────
+setInterval(_saveRateLimits, 300_000).unref();
 
 function _clientIp(req) {
   return ((req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1')
     .split(',')[0].trim());
+}
+
+// ─── AI prompt helpers ────────────────────────────────────────
+// Strip newlines and control chars from user-supplied strings before embedding
+// them in the system prompt. Prevents indirect prompt injection (AI-03).
+function _sanitizePromptStr(s, maxLen) {
+  if (typeof s !== 'string') return '';
+  return s.replace(/[\r\n\t\x00-\x1F\x7F]/g, ' ').trim().slice(0, maxLen || 80);
+}
+function _sanitizeNum(n) {
+  const v = Number(n);
+  return Number.isFinite(v) ? v : 0;
+}
+function _fmtEuro(n) {
+  return '€' + _sanitizeNum(n).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Builds the complete system prompt server-side from a validated structured snapshot.
+// The instruction text is always server-controlled — clients can never inject instructions.
+function _buildServerSystemPrompt(anonMode, snapshot) {
+  let contextBlock;
+  if (anonMode || !snapshot || typeof snapshot !== 'object') {
+    contextBlock = `El usuario ha activado el modo anónimo: no tienes acceso a sus datos financieros. Responde preguntas generales de finanzas personales sin hacer referencia a cifras concretas del usuario.\n`;
+  } else {
+    const date      = _sanitizePromptStr(snapshot.date,  20) || new Date().toLocaleDateString('es-ES');
+    const month     = _sanitizePromptStr(snapshot.month, 10);
+    const patrimony = _sanitizeNum(snapshot.patrimony);
+    const cash      = _sanitizeNum(snapshot.cashTotal);
+    const inv       = _sanitizeNum(snapshot.investTotal);
+    const alt       = _sanitizeNum(snapshot.altTotal);
+    const prop      = _sanitizeNum(snapshot.propTotal);
+    const propCount = Math.max(0, Math.floor(_sanitizeNum(snapshot.propCount)));
+    const inc       = _sanitizeNum(snapshot.monthlyIncome);
+    const exp       = _sanitizeNum(snapshot.monthlyExpenses);
+    const divAnual  = _sanitizeNum(snapshot.divAnual);
+    const txCount   = Math.max(0, Math.floor(_sanitizeNum(snapshot.txCount)));
+    const wlCount   = Math.max(0, Math.floor(_sanitizeNum(snapshot.watchlistCount)));
+    const bizums    = Math.max(0, Math.floor(_sanitizeNum(snapshot.pendingBizums)));
+
+    const cats = Array.isArray(snapshot.topCats) ? snapshot.topCats.slice(0, 5) : [];
+    const topCatsStr = cats.length
+      ? cats.map(c => `${_sanitizePromptStr(c?.name, 40)}:${_fmtEuro(c?.amount)}`).join(', ')
+      : 'ninguno';
+
+    const portf = Array.isArray(snapshot.portfolio) ? snapshot.portfolio.slice(0, 5) : [];
+    const portfLen = Math.max(0, Math.floor(_sanitizeNum(snapshot.portfolioCount ?? portf.length)));
+    const portfStr = portf.length
+      ? portf.map(a => {
+          const t = _sanitizePromptStr(a?.ticker, 20);
+          const sc = a?.sector ? '[' + _sanitizePromptStr(a.sector, 20) + ']' : '';
+          const v = _sanitizeNum(a?.value);
+          const g = _sanitizeNum(a?.gain);
+          return `${t}${sc}:${_fmtEuro(v)}(${g >= 0 ? '+' : ''}${_fmtEuro(g)})`;
+        }).join(', ')
+      : 'Sin activos';
+
+    const goals = Array.isArray(snapshot.goals) ? snapshot.goals.slice(0, 4) : [];
+    const goalsStr = goals.length
+      ? goals.map(g => `${_sanitizePromptStr(g?.name, 40)}:${_fmtEuro(g?.current)}/${_fmtEuro(g?.target)}`).join(', ')
+      : 'Sin objetivos';
+
+    const propsCtx = propCount > 0 ? `, inmuebles:${_fmtEuro(prop)}(${propCount})` : '';
+    contextBlock = `Tienes acceso en tiempo real a los datos financieros del usuario.\n\n[FINOVA ${date}]\nPatrimonio: ${_fmtEuro(patrimony)} (efectivo:${_fmtEuro(cash)}, inversión:${_fmtEuro(inv)}, alt:${_fmtEuro(alt)}${propsCtx})\nMes ${month}: ingresos ${_fmtEuro(inc)}, gastos ${_fmtEuro(exp)}, balance ${_fmtEuro(inc - exp)}\nTop gastos: ${topCatsStr}\nCartera (${portfLen}): ${portfStr}\nDividendos anuales: ${_fmtEuro(divAnual)}\nObjetivos: ${goalsStr}\nTransacciones: ${txCount} | Watchlist: ${wlCount} | Bizums pendientes: ${bizums}\n`;
+  }
+
+  return `Eres Finova AI, el asesor financiero personal integrado en la app Finova.\n${contextBlock}\nInstrucciones:\n- Responde siempre en español\n- Usa los datos reales del usuario para dar consejos personalizados con números concretos\n- Usa formato markdown básico (negritas con **, listas con -, saltos de línea) para estructurar respuestas\n- Usa el formato europeo de moneda (€1.234,56)\n- Si el usuario no tiene datos en alguna categoría, díselo\n- No garantices rentabilidades ni des consejos de inversión ilegales`;
+}
+
+// Respuesta genérica para errores internos — log completo en servidor, mensaje opaco al cliente.
+function _serverError(req, res, e, status = 500) {
+  console.error('[FINOVA/Error]', {
+    route:  req.url,
+    method: req.method,
+    msg:    e?.message?.slice(0, 300),
+    stack:  e?.stack?.split('\n').slice(0, 3).join(' | '),
+  });
+  res.writeHead(status, _apiHeaders(req));
+  res.end(JSON.stringify({ error: 'Error interno del servidor. Inténtalo de nuevo.' }));
+}
+
+// Returns true if the x-finova-proxy header matches FINOVA_PROXY_SECRET (when configured).
+// If the secret is not set, every request is allowed (backward-compatible dev mode).
+function _checkProxySecret(req, res) {
+  if (!_PROXY_SECRET) return true;
+  if (req.headers['x-finova-proxy'] === _PROXY_SECRET) return true;
+  console.warn('[FINOVA/Proxy] Request missing proxy secret — IP:', _clientIp(req), 'URL:', req.url);
+  res.writeHead(403, _apiHeaders(req));
+  res.end(JSON.stringify({ error: 'Acceso no autorizado.' }));
+  return false;
+}
+
+// Returns true if the request Content-Type is application/json; otherwise sends
+// 415 and returns false. Call this before buffering the body on POST endpoints.
+function _requireJson(req, res) {
+  const ct = (req.headers['content-type'] || '').split(';')[0].trim();
+  if (ct !== 'application/json') {
+    res.writeHead(415, _apiHeaders(req));
+    res.end(JSON.stringify({ error: 'Content-Type debe ser application/json.' }));
+    return false;
+  }
+  return true;
 }
 
 /* ─── Proxy helpers ──────────────────────────────────────────── */
@@ -478,6 +689,9 @@ async function proxyGroq(apiKey, messages, systemPrompt) {
 const _qCache = new Map(); // ticker → { price, previousClose, change, changePct, name, currency, ts }
 const _Q_TTL  = 5 * 60 * 1000;
 
+// Valid ticker: 1–15 chars, uppercase letters/digits plus . - ^ = (covers indices like ^GSPC, BRK.B)
+const _TICKER_RE = /^[A-Z0-9.\-^=]{1,15}$/i;
+
 async function _batchFetchYf(tickers) {
   const session = await _ensureYfSession().catch(() => null);
   const crumb   = session?.crumb ? `&crumb=${encodeURIComponent(session.crumb)}` : '';
@@ -516,13 +730,14 @@ async function _batchFetchYf(tickers) {
 }
 
 async function handleBatchQuotes(req, res) {
+  if (!_checkRateLimit(req, res, 'quotes')) return;
   try {
     const urlObj  = new URL(req.url, 'http://localhost');
     const symbols = (urlObj.searchParams.get('symbols') || '')
-      .split(',').map(s => s.trim().toUpperCase()).filter(Boolean).slice(0, 50);
+      .split(',').map(s => s.trim().toUpperCase()).filter(s => s && _TICKER_RE.test(s)).slice(0, 50);
     if (!symbols.length) {
       res.writeHead(400, _apiHeaders(req));
-      return res.end(JSON.stringify({ error: 'Parámetro symbols requerido' }));
+      return res.end(JSON.stringify({ error: 'Parámetro symbols requerido o todos los símbolos son inválidos.' }));
     }
     const result  = {};
     const toFetch = [];
@@ -553,6 +768,7 @@ async function handleBatchQuotes(req, res) {
 
 /* ─── Yahoo Finance proxy (multi-endpoint fallback) ─────────── */
 async function handleYahooProxy(req, res) {
+  if (!_checkRateLimit(req, res, 'quotes')) return;
   try {
     const urlObj = new URL(req.url, 'http://localhost');
     const ticker = urlObj.searchParams.get('ticker');
@@ -560,7 +776,11 @@ async function handleYahooProxy(req, res) {
       res.writeHead(400, _apiHeaders(req));
       return res.end(JSON.stringify({ error: 'Missing ticker' }));
     }
-    const t     = ticker.trim().toUpperCase();
+    const t = ticker.trim().toUpperCase();
+    if (!_TICKER_RE.test(t)) {
+      res.writeHead(400, _apiHeaders(req));
+      return res.end(JSON.stringify({ error: 'Ticker inválido.' }));
+    }
     const range = urlObj.searchParams.get('range') || '1d';
 
     // Obtain a valid Yahoo Finance session (crumb + cookie) — required since early 2024
@@ -622,6 +842,7 @@ async function handleYahooProxy(req, res) {
 
 /* ─── Yahoo Finance quoteSummary proxy ──────────────────────── */
 async function handleYahooInfo(req, res) {
+  if (!_checkRateLimit(req, res, 'quotes')) return;
   try {
     const urlObj = new URL(req.url, 'http://localhost');
     const ticker = urlObj.searchParams.get('ticker');
@@ -629,7 +850,12 @@ async function handleYahooInfo(req, res) {
       res.writeHead(400, _apiHeaders(req));
       return res.end(JSON.stringify({ error: 'Missing ticker' }));
     }
-    const apiPath = `/v10/finance/quoteSummary/${encodeURIComponent(ticker.trim().toUpperCase())}?modules=assetProfile`;
+    const t = ticker.trim().toUpperCase();
+    if (!_TICKER_RE.test(t)) {
+      res.writeHead(400, _apiHeaders(req));
+      return res.end(JSON.stringify({ error: 'Ticker inválido.' }));
+    }
+    const apiPath = `/v10/finance/quoteSummary/${encodeURIComponent(t)}?modules=assetProfile`;
     const r = await httpsGet('query1.finance.yahoo.com', apiPath, {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       'Accept': 'application/json',
@@ -647,8 +873,31 @@ async function handleYahooInfo(req, res) {
       country:  profile.country  || '',
     }));
   } catch (err) {
-    res.writeHead(500, _apiHeaders(req));
-    res.end(JSON.stringify({ error: err.message }));
+    _serverError(req, res, err);
+  }
+}
+
+/* ─── Exchange rates proxy (open.er-api.com) ─────────────────── */
+async function handleExchangeRates(req, res) {
+  if (!_checkRateLimit(req, res, 'quotes')) return;
+  try {
+    const r = await httpsGet('open.er-api.com', '/v6/latest/EUR', {
+      'Accept':     'application/json',
+      'User-Agent': 'Finova/1.0',
+    });
+    if (r.status !== 200) {
+      res.writeHead(r.status, _apiHeaders(req));
+      return res.end(JSON.stringify({ error: `Proveedor de cambio devolvió ${r.status}` }));
+    }
+    const data = JSON.parse(r.body);
+    if (!data.rates) {
+      res.writeHead(502, _apiHeaders(req));
+      return res.end(JSON.stringify({ error: 'Respuesta inválida del proveedor de tipos de cambio' }));
+    }
+    res.writeHead(200, _apiHeaders(req));
+    res.end(JSON.stringify({ rates: data.rates, time_last_update_utc: data.time_last_update_utc }));
+  } catch (err) {
+    _serverError(req, res, err);
   }
 }
 
@@ -673,29 +922,30 @@ async function handleAIProxy(req, res) {
     }
   }
 
-  // 2. Per-UID daily quota (free: 5/day, premium: 50/day, admin: unlimited)
+  // 2. IP-based token bucket (burst protection)
+  if (!_checkRateLimit(req, res, 'ai')) return;
+
+  // 3. Per-UID daily quota (free: 5/day, premium: 50/day, admin: unlimited)
   const role = _getUserRole(uid);
-  if (uid && !_aiUidRateOk(uid, role)) {
-    const limit = _AI_DAILY_LIMITS[role] || _AI_DAILY_LIMITS.free;
-    res.writeHead(429, _apiHeaders(req, { 'Retry-After': '86400' }));
-    return res.end(JSON.stringify({
-      error: `Has alcanzado el límite diario de ${limit} consultas (plan ${role === 'premium' ? 'Premium' : 'Gratuito'}).${role !== 'premium' ? ' Mejora a Premium para 50 consultas/día.' : ' Vuelve mañana.'}`,
-      limitReached: true, role, limit,
-    }));
+  if (_AUTH_ENABLED && uid && role !== 'admin') {
+    const dailyLimit = _LIMITS.ai.byUID[role] || _LIMITS.ai.byUID.free;
+    const uidResult  = _tokenBucket(`ai-uid:${uid}`, dailyLimit, dailyLimit / 86400);
+    if (!uidResult.ok) {
+      res.writeHead(429, _apiHeaders(req, { 'Retry-After': '86400' }));
+      return res.end(JSON.stringify({
+        error: `Has alcanzado el límite diario de ${dailyLimit} consultas (plan ${role === 'premium' ? 'Premium' : 'Gratuito'}).${role !== 'premium' ? ' Mejora a Premium para 50 consultas/día.' : ' Vuelve mañana.'}`,
+        limitReached: true, role, limit: dailyLimit,
+      }));
+    }
   }
 
-  // 3. Per-IP token bucket (15 tokens, refill 0.25/s = ~15/min sostenido, burst de 15)
-  const ip = _clientIp(req);
-  if (!_tokenBucketOk(`ai:${ip}`, 15, 0.25)) {
-    res.writeHead(429, _apiHeaders(req, { 'Retry-After': '60' }));
-    return res.end(JSON.stringify({ error: 'Demasiadas peticiones al Asesor IA. Espera un minuto e inténtalo de nuevo.' }));
-  }
-
+  if (!_requireJson(req, res)) return;
   let body = '';
   req.on('data', c => body += c);
   req.on('end', async () => {
     try {
-      const { provider, apiKey, messages, systemPrompt } = JSON.parse(body);
+      const { provider, apiKey, messages, anonMode, snapshot } = JSON.parse(body);
+      const systemPrompt = _buildServerSystemPrompt(!!anonMode, snapshot);
       const userKey      = (apiKey || '').trim();
       const serverKey    = FINOVA_GROQ_KEY || FINOVA_AI_KEY;
       const effectiveKey = userKey || serverKey;
@@ -719,8 +969,7 @@ async function handleAIProxy(req, res) {
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ text }));
     } catch (err) {
-      res.writeHead(err.status || 500, _apiHeaders(req));
-      res.end(JSON.stringify({ error: err.message || 'Error desconocido' }));
+      _serverError(req, res, err, err.status || 500);
     }
   });
 }
@@ -745,7 +994,7 @@ async function _requireAuth(req, res) {
     res.end(JSON.stringify({
       error: isExpired ? 'Sesión expirada. Vuelve a iniciar sesión.' :
              isRevoked ? 'Sesión revocada. Vuelve a iniciar sesión.'  :
-                         'No autorizado: ' + e.message,
+                         'Token inválido.',
     }));
     return null;
   }
@@ -766,6 +1015,32 @@ let _gcTokenExpMs   = 0;
 let _gcInstCache    = null;
 let _gcInstCacheTs  = 0;
 const _GC_INST_TTL  = 24 * 60 * 60 * 1000;
+
+// ─── Propiedad de requisitions (IDOR fix) ──────────────────────
+// GoCardless no conoce el concepto de "usuario Finova": el requisitionId que
+// devuelve es opaco y, si no se ata a un uid, cualquier usuario autenticado
+// podría leer la conexión bancaria (IBAN, saldo, movimientos) de otro con solo
+// adivinar/obtener su requisitionId. Se persiste el propietario al crearla y
+// se exige que coincida con el uid verificado en cualquier lectura/importación.
+const _BANK_REQ_FILE = path.join(ROOT, 'data', 'bank_requisitions.json');
+
+function _getBankReqOwners() {
+  try { return JSON.parse(fs.readFileSync(_BANK_REQ_FILE, 'utf8')); }
+  catch { return {}; }
+}
+
+function _recordBankReqOwner(requisitionId, uid) {
+  const owners = _getBankReqOwners();
+  owners[requisitionId] = { uid, createdAt: Date.now() };
+  try { fs.writeFileSync(_BANK_REQ_FILE, JSON.stringify(owners, null, 2), 'utf8'); }
+  catch (e) { console.error('[FINOVA/GoCardless] No se pudo persistir la propiedad de la requisition:', e.message); }
+}
+
+function _bankReqBelongsTo(requisitionId, uid) {
+  const owners = _getBankReqOwners();
+  const entry  = owners[requisitionId];
+  return !!entry && entry.uid === uid;
+}
 
 function _gcRaw(method, apiPath, bodyObj, token) {
   const bodyStr = bodyObj ? JSON.stringify(bodyObj) : null;
@@ -826,17 +1101,21 @@ async function handleBankInstitutions(req, res) {
     _gcInstCache = list; _gcInstCacheTs = Date.now();
     res.writeHead(200, _apiHeaders(req)); res.end(JSON.stringify(list));
   } catch (e) {
-    res.writeHead(e.message.includes('timeout') ? 504 : 500, _apiHeaders(req));
-    res.end(JSON.stringify({ error: e.message }));
+    const _gcS = e.message.includes('timeout') ? 504 : 500;
+    console.error('[FINOVA/GoCardless] institutions:', e.message?.slice(0, 100));
+    res.writeHead(_gcS, _apiHeaders(req));
+    res.end(JSON.stringify({ error: _gcS === 504 ? 'Tiempo de espera agotado.' : 'Error al obtener entidades bancarias.' }));
   }
 }
 
 async function handleBankCreateRequisition(req, res) {
-  if ((await _requireAuth(req, res)) === null) return;
+  const uid = await _requireAuth(req, res);
+  if (uid === null) return;
   if (!GC_SECRET_ID || !GC_SECRET_KEY) {
     res.writeHead(503, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'GoCardless no configurado.' }));
   }
+  if (!_requireJson(req, res)) return;
   let body = '';
   req.on('data', c => body += c);
   req.on('end', async () => {
@@ -860,17 +1139,21 @@ async function handleBankCreateRequisition(req, res) {
         reference:      ref,
         user_language:  'ES',
       });
+      _recordBankReqOwner(req2.id, uid);
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ requisitionId: req2.id, link: req2.link }));
     } catch (e) {
-      res.writeHead(e.message.includes('timeout') ? 504 : 500, _apiHeaders(req));
-      res.end(JSON.stringify({ error: e.message }));
+      const _gcS = e.message.includes('timeout') ? 504 : 500;
+      console.error('[FINOVA/GoCardless] createRequisition:', e.message?.slice(0, 100));
+      res.writeHead(_gcS, _apiHeaders(req));
+      res.end(JSON.stringify({ error: _gcS === 504 ? 'Tiempo de espera agotado.' : 'Error al iniciar la conexión bancaria.' }));
     }
   });
 }
 
 async function handleBankGetRequisition(req, res) {
-  if ((await _requireAuth(req, res)) === null) return;
+  const uid = await _requireAuth(req, res);
+  if (uid === null) return;
   if (!GC_SECRET_ID || !GC_SECRET_KEY) {
     res.writeHead(503, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'GoCardless no configurado.' }));
@@ -878,21 +1161,29 @@ async function handleBankGetRequisition(req, res) {
   try {
     const id = new URL(req.url, 'http://localhost').searchParams.get('id') || '';
     if (!id) { res.writeHead(400, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'id requerido' })); }
+    if (!_bankReqBelongsTo(id, uid)) {
+      res.writeHead(403, _apiHeaders(req));
+      return res.end(JSON.stringify({ error: 'Conexión no encontrada o no autorizada' }));
+    }
     const data = await _gcCall('GET', `/api/v2/requisitions/${id}/`, null);
     res.writeHead(200, _apiHeaders(req));
     res.end(JSON.stringify({ status: data.status, accounts: data.accounts || [] }));
   } catch (e) {
-    res.writeHead(e.message.includes('timeout') ? 504 : 500, _apiHeaders(req));
-    res.end(JSON.stringify({ error: e.message }));
+    const _gcS = e.message.includes('timeout') ? 504 : 500;
+    console.error('[FINOVA/GoCardless] getRequisition:', e.message?.slice(0, 100));
+    res.writeHead(_gcS, _apiHeaders(req));
+    res.end(JSON.stringify({ error: _gcS === 504 ? 'Tiempo de espera agotado.' : 'Error al obtener el estado de la conexión.' }));
   }
 }
 
 async function handleBankImport(req, res) {
-  if ((await _requireAuth(req, res)) === null) return;
+  const uid = await _requireAuth(req, res);
+  if (uid === null) return;
   if (!GC_SECRET_ID || !GC_SECRET_KEY) {
     res.writeHead(503, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'GoCardless no configurado.' }));
   }
+  if (!_requireJson(req, res)) return;
   let body = '';
   req.on('data', c => body += c);
   req.on('end', async () => {
@@ -901,6 +1192,10 @@ async function handleBankImport(req, res) {
       if (!requisitionId) {
         res.writeHead(400, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'requisitionId requerido' }));
+      }
+      if (!_bankReqBelongsTo(requisitionId, uid)) {
+        res.writeHead(403, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'Conexión no encontrada o no autorizada' }));
       }
       const reqData = await _gcCall('GET', `/api/v2/requisitions/${requisitionId}/`, null);
       if (reqData.status !== 'LN') {
@@ -942,8 +1237,10 @@ async function handleBankImport(req, res) {
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ accounts }));
     } catch (e) {
-      res.writeHead(e.message.includes('timeout') ? 504 : 500, _apiHeaders(req));
-      res.end(JSON.stringify({ error: e.message }));
+      const _gcS = e.message.includes('timeout') ? 504 : 500;
+      console.error('[FINOVA/GoCardless] import:', e.message?.slice(0, 100));
+      res.writeHead(_gcS, _apiHeaders(req));
+      res.end(JSON.stringify({ error: _gcS === 504 ? 'Tiempo de espera agotado al importar transacciones.' : 'Error al importar los movimientos bancarios.' }));
     }
   });
 }
@@ -953,9 +1250,14 @@ async function handleBankImport(req, res) {
 ═══════════════════════════════════════════════════════════════ */
 
 // Firebase project — used to verify JWT iss / aud claims.
-// Override with FINOVA_FIREBASE_PROJECT=DISABLED to skip token verification (local dev only).
 const _FIREBASE_PROJECT = process.env.FINOVA_FIREBASE_PROJECT || 'finova-92100';
-const _AUTH_ENABLED     = _FIREBASE_PROJECT !== 'DISABLED';
+
+// Auth is ENABLED by default. The only supported way to disable it is an explicit
+// FINOVA_DISABLE_AUTH=true env var — never set this in production.
+// Previous mechanism (FINOVA_FIREBASE_PROJECT=DISABLED) is no longer honoured; it was
+// a silent footgun where auth could be disabled by setting a project-ID variable to a
+// magic string rather than requiring a deliberate, named opt-out.
+const _AUTH_ENABLED = process.env.FINOVA_DISABLE_AUTH !== 'true';
 
 // Google JWKS cache (RSA public keys for RS256 Firebase tokens)
 let _jwksCache = { keys: null, expAt: 0 };
@@ -1050,12 +1352,22 @@ function _originOk(req) {
 /* ─── Datos de usuario autenticado (Firebase UID) ───────────── */
 const _UID_RE = /^[a-zA-Z0-9]{20,128}$/;
 
-async function handleUserDataGet(req, res) {
-  const ip = _clientIp(req);
-  if (!_rateOk('user-get', ip, 30)) {
-    res.writeHead(429, _apiHeaders(req, { 'Retry-After': '60' }));
-    return res.end(JSON.stringify({ error: 'Demasiadas peticiones. Espera un minuto.' }));
+/* Verifies the file about to be served belongs to the expected UID.
+   Blocks and logs if a path mismatch is detected (cross-user leak guard). */
+function _auditResponse(uid, filePath, req) {
+  const expected = path.resolve(path.join(USERS_DIR, `${uid}.json`));
+  const actual   = path.resolve(filePath);
+  if (actual !== expected) {
+    console.error('[FINOVA/Audit] ⚠️  PATH MISMATCH — cross-user data risk', {
+      uid, expected, actual, ip: _clientIp(req),
+    });
+    return false;
   }
+  return true;
+}
+
+async function handleUserDataGet(req, res) {
+  if (!_checkRateLimit(req, res, 'userData')) return;
 
   // Verify Firebase ID token — the UID is extracted from the verified token,
   // never trusted from the query string.
@@ -1065,7 +1377,7 @@ async function handleUserDataGet(req, res) {
       uid = await _verifyFirebaseToken(req.headers['authorization']);
     } catch (e) {
       res.writeHead(401, _apiHeaders(req));
-      return res.end(JSON.stringify({ error: 'No autorizado: ' + e.message }));
+      return res.end(JSON.stringify({ error: 'Token inválido.' }));
     }
   } else {
     uid = new URL(req.url, 'http://localhost').searchParams.get('uid') || '';
@@ -1080,6 +1392,10 @@ async function handleUserDataGet(req, res) {
     return res.end(JSON.stringify({ error: 'Cuenta suspendida' }));
   }
   const file = path.join(USERS_DIR, `${uid}.json`);
+  if (!_auditResponse(uid, file, req)) {
+    res.writeHead(500, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'Error de integridad de datos' }));
+  }
   if (!fs.existsSync(file)) {
     res.writeHead(200, _apiHeaders(req));
     return res.end(JSON.stringify({ ok: true, data: null }));
@@ -1090,8 +1406,7 @@ async function handleUserDataGet(req, res) {
     res.writeHead(200, _apiHeaders(req));
     res.end(JSON.stringify({ ok: true, data }));
   } catch (e) {
-    res.writeHead(500, _apiHeaders(req));
-    res.end(JSON.stringify({ error: e.message }));
+    _serverError(req, res, e);
   }
 }
 
@@ -1100,11 +1415,7 @@ async function handleUserDataPost(req, res) {
     res.writeHead(403, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'Origen no permitido' }));
   }
-  const ip = _clientIp(req);
-  if (!_rateOk('user-post', ip, 30)) {
-    res.writeHead(429, _apiHeaders(req, { 'Retry-After': '60' }));
-    return res.end(JSON.stringify({ error: 'Demasiadas peticiones. Espera un minuto.' }));
-  }
+  if (!_checkRateLimit(req, res, 'userDataPost')) return;
 
   // Verify token before streaming body — Node.js buffers request data during the await.
   let verifiedUid = null;
@@ -1113,10 +1424,11 @@ async function handleUserDataPost(req, res) {
       verifiedUid = await _verifyFirebaseToken(req.headers['authorization']);
     } catch (e) {
       res.writeHead(401, _apiHeaders(req));
-      return res.end(JSON.stringify({ error: 'No autorizado: ' + e.message }));
+      return res.end(JSON.stringify({ error: 'Token inválido.' }));
     }
   }
 
+  if (!_requireJson(req, res)) return;
   let body = '';
   req.on('data', chunk => {
     body += chunk;
@@ -1128,27 +1440,28 @@ async function handleUserDataPost(req, res) {
         res.writeHead(413, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'Datos demasiado grandes (máx 8 MB)' }));
       }
-      const { uid, data } = JSON.parse(body);
+      const { data } = JSON.parse(body);
+      // UID comes exclusively from the verified Firebase token; body uid is not trusted.
+      const uid = verifiedUid;
       if (!uid || !_UID_RE.test(uid)) {
         res.writeHead(400, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'UID inválido' }));
-      }
-      // Token UID must match the UID in the request body.
-      if (verifiedUid !== null && verifiedUid !== uid) {
-        res.writeHead(403, _apiHeaders(req));
-        return res.end(JSON.stringify({ error: 'Acceso denegado' }));
       }
       if (typeof data !== 'string' || data.length > _SYNC_MAX_BYTES) {
         res.writeHead(400, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'Payload inválido' }));
       }
+      const targetFile = path.join(USERS_DIR, `${uid}.json`);
+      if (!_auditResponse(uid, targetFile, req)) {
+        res.writeHead(500, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'Error de integridad de datos' }));
+      }
       const toWrite = _encryptUserData(data);
-      fs.writeFileSync(path.join(USERS_DIR, `${uid}.json`), toWrite, 'utf8');
+      fs.writeFileSync(targetFile, toWrite, 'utf8');
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true, saved: new Date().toISOString() }));
     } catch (e) {
-      res.writeHead(500, _apiHeaders(req));
-      res.end(JSON.stringify({ error: e.message }));
+      _serverError(req, res, e);
     }
   });
 }
@@ -1186,6 +1499,8 @@ function _addDays(dateStr, n) {
 function _todayUTC() { return new Date().toISOString().slice(0, 10); }
 
 async function handleSession(req, res) {
+  if (!_checkRateLimit(req, res, 'session')) return;
+  if (!_requireJson(req, res)) return;
   let body = '';
   req.on('data', c => body += c);
   req.on('end', () => {
@@ -1194,21 +1509,25 @@ async function handleSession(req, res) {
       if (!/^[0-9a-f-]{32,36}$/.test(clientId)) {
         res.writeHead(400, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'Invalid clientId' }));
       }
+      // Treat all client-supplied values as untrusted — clamp numbers, allowlist strings
+      const safeTxCount = Math.max(0, Math.min(1_000_000, Math.floor(Number(txCount) || 0)));
+      const safeSection = (typeof section === 'string' && /^[a-z0-9_-]{1,32}$/.test(section))
+        ? section : null;
       const today = _todayUTC();
       const data  = _loadAnalytics();
       if (!data[clientId]) data[clientId] = { firstSeen: today, sessions: [], txCount: 0, sections: {} };
       const c = data[clientId];
       if (!c.sessions.includes(today)) c.sessions.push(today);
-      c.txCount = Math.max(c.txCount || 0, txCount || 0);
-      if (section && typeof section === 'string' && section.length < 40) {
+      c.txCount = Math.max(c.txCount || 0, safeTxCount);
+      if (safeSection) {
         if (!c.sections) c.sections = {};
-        c.sections[section] = (c.sections[section] || 0) + 1;
+        c.sections[safeSection] = (c.sections[safeSection] || 0) + 1;
       }
       _saveAnalytics(data);
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true }));
     } catch (e) {
-      res.writeHead(400, _apiHeaders(req)); res.end(JSON.stringify({ error: e.message }));
+      res.writeHead(400, _apiHeaders(req)); res.end(JSON.stringify({ error: 'Bad request' }));
     }
   });
 }
@@ -1257,11 +1576,9 @@ async function handleStats(req, res) {
 const _EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function handleWaitlist(req, res) {
-  const ip = (req.socket?.remoteAddress || 'unknown').replace(/^::ffff:/, '');
-  if (!_rateOk('/api/waitlist', ip, 5)) {
-    res.writeHead(429, _apiHeaders(req));
-    return res.end(JSON.stringify({ error: 'Demasiadas peticiones. Inténtalo más tarde.' }));
-  }
+  if (!_checkRateLimit(req, res, 'waitlist')) return;
+  if (!_requireJson(req, res)) return;
+  const ip = _clientIp(req);
   let body = '';
   req.on('data', d => { body += d; if (body.length > 2000) body = '\x00OVERSIZE'; });
   req.on('end', () => {
@@ -1302,8 +1619,9 @@ const _SYNC_CODE_RE   = /^[a-f0-9]{8,16}$/;
 const _SYNC_MAX_BYTES = 8_000_000;
 
 async function handleSyncUpload(req, res) {
-  // Verificar token ANTES de leer el body (Node.js no pierde datos durante el await)
+  if (!_checkRateLimit(req, res, 'syncUpload')) return;
   if ((await _requireAuth(req, res)) === null) return;
+  if (!_requireJson(req, res)) return;
   let body = '';
   req.on('data', chunk => {
     body += chunk;
@@ -1328,20 +1646,13 @@ async function handleSyncUpload(req, res) {
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true, saved: new Date().toISOString() }));
     } catch (e) {
-      res.writeHead(500, _apiHeaders(req));
-      res.end(JSON.stringify({ error: e.message }));
+      _serverError(req, res, e);
     }
   });
 }
 
 async function handleSyncDownload(req, res) {
-  // Rate limit: 10 peticiones por minuto por IP — evita enumeración de códigos de sync
-  const ip = _clientIp(req);
-  if (!_rateOk('sync-dl', ip, 10)) {
-    res.writeHead(429, _apiHeaders(req, { 'Retry-After': '60' }));
-    return res.end(JSON.stringify({ error: 'Demasiadas peticiones. Espera un minuto.' }));
-  }
-
+  if (!_checkRateLimit(req, res, 'syncDownload')) return;
   if ((await _requireAuth(req, res)) === null) return;
 
   const urlObj = new URL(req.url, 'http://localhost');
@@ -1373,7 +1684,7 @@ async function handleUserMeta(req, res) {
       verifiedUid = await _verifyFirebaseToken(req.headers['authorization']);
     } catch (e) {
       res.writeHead(401, _apiHeaders(req));
-      return res.end(JSON.stringify({ error: 'No autorizado: ' + e.message }));
+      return res.end(JSON.stringify({ error: 'Token inválido.' }));
     }
   }
 
@@ -1402,8 +1713,7 @@ async function handleUserMeta(req, res) {
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true }));
     } catch (e) {
-      res.writeHead(500, _apiHeaders(req));
-      res.end(JSON.stringify({ error: e.message }));
+      _serverError(req, res, e);
     }
   });
 }
@@ -1552,6 +1862,54 @@ async function handleAdminStats(req, res) {
   }
 }
 
+/* ─── Admin: Rate Limit Stats ──────────────────────────────── */
+async function handleRateLimitStats(req, res) {
+  if ((await _adminGuard(req, res)) === null) return;
+  const now    = Date.now();
+  const nowSec = now / 1000;
+
+  const blockedIPs = [];
+  for (const [ip, e] of _failedAttempts) {
+    if (e.blockedUntil && e.blockedUntil > now) {
+      blockedIPs.push({
+        ip,
+        count:         e.count,
+        blockedUntil:  new Date(e.blockedUntil).toISOString(),
+        remainingMins: Math.ceil((e.blockedUntil - now) / 60000),
+      });
+    }
+  }
+  blockedIPs.sort((a, b) => b.count - a.count);
+
+  const topAIConsumers = [];
+  for (const [k, v] of _buckets) {
+    if (!k.startsWith('ai-uid:')) continue;
+    const uid       = k.slice(7);
+    const elapsed   = nowSec - v.lastRefill;
+    const projected = Math.min(_LIMITS.ai.byUID.free, v.tokens + elapsed * (_LIMITS.ai.byUID.free / 86400));
+    topAIConsumers.push({ uid: uid.slice(0, 8) + '…', tokensRemaining: Math.floor(projected) });
+  }
+  topAIConsumers.sort((a, b) => a.tokensRemaining - b.tokensRemaining);
+
+  const groqMin = _buckets.get('groq:global:min');
+  const groqDay = _buckets.get('groq:global:day');
+
+  res.writeHead(200, _apiHeaders(req));
+  res.end(JSON.stringify({
+    ok:             true,
+    blockedIPs:     blockedIPs.slice(0, 50),
+    topAIConsumers: topAIConsumers.slice(0, 20),
+    groq: {
+      minuteLimit:     _LIMITS.ai.global.groqMinute,
+      minuteRemaining: groqMin ? Math.floor(groqMin.tokens) : _LIMITS.ai.global.groqMinute,
+      dayLimit:        _LIMITS.ai.global.groqDay,
+      dayRemaining:    groqDay ? Math.floor(groqDay.tokens)  : _LIMITS.ai.global.groqDay,
+    },
+    bucketCount:  _buckets.size,
+    suspectIPs:   _failedAttempts.size,
+  }));
+}
+
 /* ─── Admin: gestión de roles ───────────────────────────────── */
 async function handleAdminSetRole(req, res) {
   // Requires Firebase token from a verified admin
@@ -1623,6 +1981,54 @@ function safeLog(label, data) {
   }
 }
 
+/* ─── Validación de entorno al arrancar ─────────────────────── */
+function _validateEnv() {
+  const warnings = [];
+  const errors   = [];
+
+  // A deployment is considered production if any of these signals are present.
+  // This catches Railway deployments that may not set NODE_ENV=production.
+  const isProd = process.env.NODE_ENV === 'production'
+    || !!process.env.RAILWAY_ENVIRONMENT
+    || !!process.env.RAILWAY_PROJECT_ID;
+
+  if (!process.env.ALLOWED_ORIGIN && isProd)
+    errors.push('ALLOWED_ORIGIN no configurado — CORS podría aceptar orígenes no deseados en producción');
+
+  if (!process.env.FINOVA_GROQ_KEY && !process.env.FINOVA_CLAUDE_KEY)
+    warnings.push('Sin FINOVA_GROQ_KEY ni FINOVA_CLAUDE_KEY — IA del servidor no disponible');
+
+  if (!process.env.FIREBASE_PROJECT_ID)
+    warnings.push('Sin FIREBASE_PROJECT_ID — verificación de revocación de tokens desactivada (válido en dev)');
+
+  if (!process.env.FINOVA_FIREBASE_PROJECT)
+    warnings.push('Sin FINOVA_FIREBASE_PROJECT — usando proyecto Firebase del código fuente como fallback');
+
+  if (!_AUTH_ENABLED) {
+    const msg = 'FINOVA_DISABLE_AUTH=true — autenticación completamente desactivada. Solo para desarrollo local.';
+    if (isProd) {
+      // Fatal: auth disabled in a production-like environment is a catastrophic misconfiguration
+      errors.push(msg + ' NUNCA activar en producción.');
+    } else {
+      warnings.push(msg);
+    }
+  }
+
+  if (!process.env.FINOVA_ADMIN_EMAILS)
+    warnings.push('Sin FINOVA_ADMIN_EMAILS — no hay administrador configurado por variable de entorno');
+
+  warnings.forEach(w => console.warn(`[FINOVA] ⚠️  ${w}`));
+
+  if (errors.length > 0) {
+    errors.forEach(e => console.error(`[FINOVA] ❌ ${e}`));
+    if (isProd) {
+      console.error('[FINOVA] 🛑 Configuración de producción inválida — el servidor no arrancará.');
+      process.exit(1);
+    }
+  }
+}
+_validateEnv();
+
 /* ─── HTTP server ────────────────────────────────────────────── */
 http.createServer((req, res) => {
   // Redirigir 127.0.0.1 → localhost (Firebase Auth solo acepta 'localhost')
@@ -1639,6 +2045,9 @@ http.createServer((req, res) => {
     res.writeHead(403, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'Forbidden' }));
   }
+
+  // Verificar que la petición proviene del proxy de Vercel (cuando el secret está configurado)
+  if (req.url.startsWith('/api/') && !_checkProxySecret(req, res)) return;
 
   // Rechazar bodies demasiado grandes (previene ataques de payload)
   // sync-upload y user-data aceptan hasta 8 MB; el resto se limita a 50 KB
@@ -1690,6 +2099,11 @@ http.createServer((req, res) => {
     return handleYahooProxy(req, res);
   }
 
+  // Exchange rates proxy
+  if (req.method === 'GET' && req.url.startsWith('/api/exchange')) {
+    return handleExchangeRates(req, res);
+  }
+
   // AI proxy
   if (req.method === 'POST' && req.url === '/api/ai') {
     return handleAIProxy(req, res);
@@ -1713,7 +2127,8 @@ http.createServer((req, res) => {
   if (req.method === 'GET'  && req.url.startsWith('/api/admin/health'))   return handleAdminHealth(req, res);
   if (req.method === 'GET'  && req.url.startsWith('/api/admin/stats'))    return handleAdminStats(req, res);
   if (req.method === 'POST' && req.url === '/api/admin/set-role')         return handleAdminSetRole(req, res);
-  if (req.method === 'GET'  && req.url.startsWith('/api/admin/get-role')) return handleAdminGetRole(req, res);
+  if (req.method === 'GET'  && req.url.startsWith('/api/admin/get-role'))    return handleAdminGetRole(req, res);
+  if (req.method === 'GET'  && req.url.startsWith('/api/admin/ratelimit'))  return handleRateLimitStats(req, res);
 
   // Analytics
   if (req.method === 'POST' && req.url === '/api/session') {
@@ -1740,16 +2155,40 @@ http.createServer((req, res) => {
     return res.end(JSON.stringify({ error: 'Not found' }));
   }
 
-  // Static files
-  const url      = req.url.split('?')[0];
-  const filePath = path.join(ROOT, url === '/' ? 'index.html' : url);
-  const ext      = path.extname(filePath).toLowerCase();
-  const mime     = MIME[ext] || 'text/plain';
+  // Static files — allowlist explícito, no se sirve nada fuera de esta lista.
+  // ROOT es el directorio del proyecto entero (incluye server.cjs, .env*, data/,
+  // .git/, node_modules/...), así que NUNCA se debe resolver un path arbitrario
+  // dentro de él: solo los archivos públicos del frontend que el propio HTML referencia.
+  const rawUrl = req.url.split('?')[0];
+  let decodedUrl;
+  try { decodedUrl = decodeURIComponent(rawUrl); } catch { decodedUrl = null; }
+
+  const notFound = () => {
+    res.writeHead(404, { 'Content-Type': 'application/json', ..._SEC });
+    res.end(JSON.stringify({ error: 'Not found' }));
+  };
+
+  if (decodedUrl === null || decodedUrl.includes('\0')) return notFound();
+
+  const relPath = decodedUrl === '/' ? 'landing.html' : decodedUrl.replace(/^\/+/, '');
+  const normRel = path.posix.normalize(relPath.replace(/\\/g, '/'));
+
+  const isAllowed =
+    _PUBLIC_ROOT_FILES.has(normRel) ||
+    (normRel.startsWith('src/') && normRel.endsWith('.js') && !normRel.includes('..'));
+  if (!isAllowed) return notFound();
+
+  // Defensa en profundidad: confirma que el path resuelto sigue dentro de ROOT.
+  const filePath = path.resolve(ROOT, normRel);
+  if (filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) return notFound();
+
+  const ext  = path.extname(filePath).toLowerCase();
+  const mime = MIME[ext] || 'text/plain';
 
   fs.readFile(filePath, (err, data) => {
-    if (err) { res.writeHead(404, { 'Content-Type': 'application/json', ..._SEC }); return res.end(JSON.stringify({ error: 'Not found' })); }
+    if (err) return notFound();
     const headers = { 'Content-Type': mime, ..._SEC };
-    if (ext === '.html' || url === '/') headers['Content-Security-Policy'] = _CSP;
+    if (ext === '.html') headers['Content-Security-Policy'] = _CSP;
     res.writeHead(200, headers);
     res.end(data);
   });

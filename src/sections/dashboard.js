@@ -832,7 +832,7 @@ function renderDashGoals() {
     return `
       <div class="dash-goal-row">
         <div class="dash-goal-header">
-          <span class="dash-goal-name">${g.emoji || '🎯'} ${escapeHtml(g.name)}</span>
+          <span class="dash-goal-name">${escapeHtml(g.emoji || '🎯')} ${escapeHtml(g.name)}</span>
           <span class="dash-goal-pct">${pct.toFixed(0)}%</span>
         </div>
         <div class="dash-goal-bar-bg">
@@ -915,7 +915,7 @@ function calcDashboardInsight() {
     const remaining = nearGoal.targetAmount - (nearGoal.currentAmount || 0);
     insights.push({
       type:  'positive',
-      icon:  nearGoal.emoji || '🎯',
+      icon:  escapeHtml(nearGoal.emoji || '🎯'),
       text:  `Estás al <strong>${p.toFixed(0)}%</strong> de tu objetivo <em>${escapeHtml(nearGoal.name)}</em> — solo faltan <strong>${formatCurrency(remaining)}</strong>`,
       score: p * 0.8,
     });
@@ -1015,7 +1015,7 @@ function renderMonthlyRecap() {
     .slice(0, 2)
     .map(g => {
       const pct = Math.round(g.currentAmount / g.targetAmount * 100);
-      return `<span class="recap-item"><span class="recap-label">${g.emoji || '◎'} ${escapeHtml(g.name)}</span><span class="recap-val">${pct}%</span></span>`;
+      return `<span class="recap-item"><span class="recap-label">${escapeHtml(g.emoji || '◎')} ${escapeHtml(g.name)}</span><span class="recap-val">${pct}%</span></span>`;
     });
 
   const monthName = prevD.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
@@ -1097,7 +1097,7 @@ function calcAlerts() {
     if (!hasRecent) {
       const key = `goal-stagnant-${g.id}`;
       if (!_isAlertDismissed(key)) {
-        alerts.push({ key, type: 'warning', icon: g.emoji || '🎯',
+        alerts.push({ key, type: 'warning', icon: escapeHtml(g.emoji || '🎯'),
           text: `Tu objetivo <strong>${escapeHtml(g.name)}</strong> lleva más de 3 meses sin progreso` });
       }
     }
@@ -1112,7 +1112,7 @@ function calcAlerts() {
     if (daysLeft > 0 && daysLeft <= 60) {
       const key = `goal-deadline-${g.id}`;
       if (!_isAlertDismissed(key)) {
-        alerts.push({ key, type: 'warning', icon: g.emoji || '🎯',
+        alerts.push({ key, type: 'warning', icon: escapeHtml(g.emoji || '🎯'),
           text: `Tu objetivo <strong>${escapeHtml(g.name)}</strong> vence en <strong>${daysLeft} días</strong> — llevas el <strong>${pct.toFixed(0)}%</strong>` });
       }
     }
@@ -1325,7 +1325,7 @@ function calcAlerts() {
 
     if (triggered) {
       const fullText = ca.label ? `<strong>${escapeHtml(ca.label)}:</strong> ${text}` : text;
-      alerts.push({ key: monthKey, type: ca.severity || 'info', icon: ca.icon || '🔔', text: fullText });
+      alerts.push({ key: monthKey, type: ca.severity || 'info', icon: escapeHtml(ca.icon || '🔔'), text: fullText });
     }
   });
 
@@ -1887,7 +1887,7 @@ function _buildTimelineEvents() {
     if (!g.targetAmount || (g.currentAmount || 0) < g.targetAmount) return;
     const date = g.deadline || today;
     events.push({
-      date, type: 'goal', icon: g.emoji || '🎯',
+      date, type: 'goal', icon: escapeHtml(g.emoji || '🎯'),
       title: `Objetivo completado: ${escapeHtml(g.name)}`,
       text:  `${formatCurrency(g.targetAmount)} alcanzados`,
     });
@@ -1896,7 +1896,7 @@ function _buildTimelineEvents() {
   // Manual annotations
   (APP.timelineAnnotations || []).forEach(a => {
     events.push({
-      date: a.date, type: 'note', icon: a.emoji || '📝',
+      date: a.date, type: 'note', icon: escapeHtml(a.emoji || '📝'),
       title: escapeHtml(a.text), text: '', id: a.id, manual: true,
     });
   });
@@ -2020,7 +2020,7 @@ function _renderNotifManager() {
   const customHtml = custom.length
     ? custom.map(ca => `
       <div class="notif-custom-row${ca.active === false ? ' notif-custom-inactive' : ''}">
-        <div class="notif-custom-icon">${ca.icon || '🔔'}</div>
+        <div class="notif-custom-icon">${escapeHtml(ca.icon || '🔔')}</div>
         <div class="notif-custom-info">
           <div class="notif-custom-name">${escapeHtml(ca.label || _alertTypeLabel(ca.type))}</div>
           <div class="notif-custom-params">${_fmtAlertParams(ca)}</div>

@@ -399,7 +399,7 @@ function _injectLogoutButton() {
     <button type="button" class="profile-dropdown-item auth-logout-btn" onclick="authLogout()">
       <span class="profile-dd-icon">⎋</span>
       <span>Cerrar sesión</span>
-      <span class="auth-logout-email">${APP.userEmail || ''}</span>
+      <span class="auth-logout-email">${escapeHtml(APP.userEmail || '')}</span>
     </button>`;
   dd.appendChild(wrap);
 }
@@ -472,7 +472,7 @@ function _updateModalPreview(src) {
   const el = document.getElementById('photo-preview-avatar');
   if (!el) return;
   if (src) {
-    el.innerHTML = `<img src="${src}" alt="Vista previa" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`;
+    el.innerHTML = `<img src="${escapeHtml(src)}" alt="Vista previa" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`;
   } else {
     el.innerHTML = '';
     el.textContent = _getInitials(APP.userName || APP.userEmail?.split('@')[0] || '?');
@@ -543,7 +543,7 @@ function _refreshAvatars() {
   const initials = _getInitials(name);
   const src      = APP.profilePhoto || APP.userPhoto || '';
   const imgHTML  = src
-    ? `<img src="${src}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`
+    ? `<img src="${escapeHtml(src)}" alt="Avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`
     : '';
 
   ['sidebar-avatar', 'dd-avatar', 'mh-avatar'].forEach(id => {

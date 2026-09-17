@@ -624,19 +624,23 @@ function editTransaction(id) {
 function deleteTransaction(id) {
   const tx = APP.transactions.find(t => t.id === id);
   if (!tx) return;
-  APP.transactions = APP.transactions.filter(t => t.id !== id);
-  updateNetworthHistory();
-  renderTransactions();
-  markDashboardDirty();
-  renderDashboard();
-  softDelete(`"${tx.description}" eliminado`, () => {
-    APP.transactions.push(tx);
-    saveData();
+  const row = document.querySelector(`tr[data-id="${id}"]`);
+
+  animateRowRemoval(row, () => {
+    APP.transactions = APP.transactions.filter(t => t.id !== id);
+    updateNetworthHistory();
     renderTransactions();
+    markDashboardDirty();
     renderDashboard();
-  }, () => {
-    // Committed (no undo) — delete photo from IDB
-    if (tx.photoId) deletePhoto(tx.photoId);
+    softDelete(`"${tx.description}" eliminado`, () => {
+      APP.transactions.push(tx);
+      saveData();
+      renderTransactions();
+      renderDashboard();
+    }, () => {
+      // Committed (no undo) — delete photo from IDB
+      if (tx.photoId) deletePhoto(tx.photoId);
+    });
   });
 }
 

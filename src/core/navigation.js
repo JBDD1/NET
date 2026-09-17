@@ -151,17 +151,18 @@ function renderSection(sectionId) {
     case 'goals':        renderGoals();        break;
     case 'simulator':
       if (typeof renderSimulator === 'function') { renderSimulator(); }
-      else { _lazyLoad(_LAZY_SCRIPTS.simulator).then(() => renderSimulator()).catch(console.error); }
+      else { _lazyLoad(_LAZY_SCRIPTS.simulator).then(() => { renderSimulator(); initScrollReveal(); }).catch(console.error); }
       break;
     case 'fiscalidad':
       if (typeof renderFiscalidad === 'function') { renderFiscalidad(); }
-      else { _lazyLoad(_LAZY_SCRIPTS.fiscalidad).then(() => renderFiscalidad()).catch(console.error); }
+      else { _lazyLoad(_LAZY_SCRIPTS.fiscalidad).then(() => { renderFiscalidad(); initScrollReveal(); }).catch(console.error); }
       break;
     case 'ai':        renderAI(); setTimeout(() => document.getElementById('ai-input')?.focus(), 80); break;
     case 'settings':  renderSettings();  break;
     case 'recurring': renderRecurring(); break;
     case 'admin':     if (typeof renderAdminSection === 'function') renderAdminSection(); break;
   }
+  requestAnimationFrame(() => initScrollReveal());
   _trackSectionVisit(sectionId);
 }
 

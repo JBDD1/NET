@@ -29,27 +29,20 @@ const AI_KEYS_ENC = {
   gemini: 'finova_gemini_key_enc',
   groq:   'finova_groq_key_enc',
 };
-const ENC_KEY_STORE = 'finova_enc_k';
+// The encryption key lives only in this JS execution context — never written to any
+// browser storage. This protects raw key bytes from disk forensics and cross-tab reads.
+// Trade-off: encrypted API keys become unreadable after a page reload (they are cleared
+// automatically on the first failed decrypt so the user is prompted to re-enter them).
 let _cryptoKey = null;
 
 async function _getOrCreateCryptoKey() {
   if (_cryptoKey) return _cryptoKey;
   try {
-    let stored = sessionStorage.getItem(ENC_KEY_STORE);
-    if (!stored) {
-      const legacy = localStorage.getItem(ENC_KEY_STORE);
-      if (legacy) {
-        stored = legacy;
-        sessionStorage.setItem(ENC_KEY_STORE, stored);
-        localStorage.removeItem(ENC_KEY_STORE);
-      } else {
-        const raw = crypto.getRandomValues(new Uint8Array(32));
-        stored = btoa(String.fromCharCode(...raw));
-        sessionStorage.setItem(ENC_KEY_STORE, stored);
-      }
-    }
-    const bytes = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
-    _cryptoKey = await crypto.subtle.importKey('raw', bytes, 'AES-GCM', false, ['encrypt', 'decrypt']);
+    // Purge any key material left in storage by previous versions of this module
+    try { sessionStorage.removeItem('finova_enc_k'); } catch {}
+    try { localStorage.removeItem('finova_enc_k');   } catch {}
+    const raw = crypto.getRandomValues(new Uint8Array(32));
+    _cryptoKey = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
     return _cryptoKey;
   } catch { return null; }
 }
@@ -90,7 +83,11 @@ async function loadApiKey(provider) {
       { name: 'AES-GCM', iv: combined.slice(0, 12) }, key, combined.slice(12)
     );
     return new TextDecoder().decode(plaintext);
-  } catch { return ''; }
+  } catch {
+    // Ciphertext belongs to a previous session key — discard it so the user is prompted
+    localStorage.removeItem(encStorageKey);
+    return '';
+  }
 }
 
 async function loadAllApiKeys() {
@@ -251,53 +248,96 @@ function _saveDataNow() {
 }
 
 /* ─── Historial de versiones local ── */
-const HISTORY_KEY    = 'finova_history_v1';
-const HISTORY_MAX    = 5;
+// v2: the full app-state snapshot (entry.enc) is AES-GCM encrypted with the session key.
+// Metadata (ts, txCount, networth) stays plaintext for display.
+// Because the key is ephemeral (KEYS-01), snapshots from a previous session cannot be
+// decrypted after a page reload — the UI communicates this clearly to the user.
+const HISTORY_KEY = 'finova_history_v2';
+const HISTORY_MAX = 5;
 let   _lastHistoryTs = 0;
 
-function _saveVersionSnapshot() {
+async function _saveVersionSnapshot() {
   if (_isDemoMode) return;
   const now = Date.now();
   if (now - _lastHistoryTs < 60000) return;
   _lastHistoryTs = now;
   try {
     const { claudeApiKey, openaiApiKey, geminiApiKey, groqApiKey, ...snap } = APP;
-    const entry = {
-      ts:       now,
-      txCount:  (APP.transactions || []).length,
-      networth: calcNetWorth(),
-      data:     snap,
-    };
+
+    let enc = null;
+    const key = await _getOrCreateCryptoKey();
+    if (key) {
+      const iv         = crypto.getRandomValues(new Uint8Array(12));
+      const ciphertext = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv }, key, new TextEncoder().encode(JSON.stringify(snap))
+      );
+      const combined = new Uint8Array(12 + ciphertext.byteLength);
+      combined.set(iv, 0);
+      combined.set(new Uint8Array(ciphertext), 12);
+      enc = 'enc1:' + btoa(String.fromCharCode(...combined));
+    }
+
+    const entry = { ts: now, txCount: (APP.transactions || []).length, networth: calcNetWorth(), enc };
     const raw     = localStorage.getItem(HISTORY_KEY);
     const history = raw ? JSON.parse(raw) : [];
     history.unshift(entry);
     if (history.length > HISTORY_MAX) history.length = HISTORY_MAX;
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-  } catch (e) {
-    // quota or parse error — silently skip
+
+    // Remove legacy plaintext history
+    localStorage.removeItem('finova_history_v1');
+  } catch {
+    // quota or crypto error — silently skip
   }
 }
 
-function restoreVersionSnapshot(index) {
+async function restoreVersionSnapshot(index) {
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
     if (!raw) return;
     const history = JSON.parse(raw);
     const entry   = history[index];
-    if (!entry?.data) return;
-    const label = new Date(entry.ts).toLocaleString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    const label   = new Date(entry.ts).toLocaleString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+    // Attempt decryption — fails if entry was created in a different session
+    let snap = null;
+    try {
+      if (!entry?.enc?.startsWith('enc1:')) throw new Error('no enc');
+      const key      = await _getOrCreateCryptoKey();
+      if (!key) throw new Error('no key');
+      const combined = Uint8Array.from(atob(entry.enc.slice(5)), c => c.charCodeAt(0));
+      const plain    = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: combined.slice(0, 12) }, key, combined.slice(12)
+      );
+      snap = JSON.parse(new TextDecoder().decode(plain));
+    } catch {
+      openModal(
+        'Versión no disponible',
+        `<p style="margin:0 0 10px;font-size:14px;color:var(--text-secondary);line-height:1.6">
+           La versión del <strong>${label}</strong> se creó en otra sesión y no puede recuperarse.
+         </p>
+         <p style="margin:0;font-size:13px;color:var(--text-muted)">
+           El historial cifrado solo es accesible dentro de la misma sesión de navegador en que se guardó.
+         </p>`,
+        null, null
+      );
+      const footer = document.getElementById('modal')?.querySelector('.modal-footer');
+      if (footer) footer.style.display = 'none';
+      return;
+    }
+
     openModal(
       'Restaurar versión',
       `<p style="margin:0 0 10px;font-size:14px;color:var(--text-secondary);line-height:1.6">
          ¿Restaurar la versión del <strong>${label}</strong>?
        </p>
        <p style="margin:0;font-size:13px;color:var(--text-muted)">
-         ${entry.txCount} transacciones · ${formatCurrency(entry.networth)} patrimonio
+         ${Number(entry.txCount) || 0} transacciones · ${formatCurrency(entry.networth)} patrimonio
        </p>
        <p style="margin:8px 0 0;font-size:12px;color:var(--down)">Esta acción reemplazará los datos actuales.</p>`,
       () => {
         closeModal();
-        APP = { ...APP, ...entry.data };
+        APP = { ...APP, ...snap };
         _attachAPPRedaction();
         _saveDataNow();
         navigateTo('dashboard');
@@ -306,7 +346,7 @@ function restoreVersionSnapshot(index) {
     );
     const btn = document.getElementById('modalConfirm');
     if (btn) btn.textContent = 'Restaurar';
-  } catch (e) {
+  } catch {
     showToast('Error al restaurar la versión', 'error');
   }
 }
@@ -322,18 +362,19 @@ function renderVersionHistory() {
       return;
     }
     el.innerHTML = history.map((entry, i) => {
-      const label = new Date(entry.ts).toLocaleString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      const label   = new Date(entry.ts).toLocaleString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      const txCount = Number(entry.txCount) || 0;
       return `
         <div class="settings-row" style="margin-top:${i > 0 ? '10' : '0'}px">
           <div class="settings-info">
             <div class="settings-name" style="font-size:13px">${label}</div>
-            <div class="settings-desc">${entry.txCount} transacciones · ${formatCurrency(entry.networth)}</div>
+            <div class="settings-desc">${txCount} transacciones · ${formatCurrency(entry.networth)}</div>
           </div>
           <button type="button" class="btn-secondary" style="font-size:12px;white-space:nowrap"
             onclick="restoreVersionSnapshot(${i})">Restaurar</button>
         </div>`;
     }).join('');
-  } catch (e) {
+  } catch {
     el.innerHTML = '<p style="font-size:12px;color:var(--text-muted);margin:0">No se pudo leer el historial.</p>';
   }
 }
@@ -363,7 +404,7 @@ const _debouncedServerSync = debounce(async () => {
         'Content-Type': 'application/json',
         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ uid: APP.uid, data }),
+      body: JSON.stringify({ data }),
       signal: AbortSignal.timeout(10000),
     });
   } catch (_) {}
@@ -465,7 +506,7 @@ async function _loadStateFromIDB() {
 function _setSyncCodeCookie(code) {
   if (!code) return;
   const exp = new Date(Date.now() + 30 * 86400000).toUTCString();
-  document.cookie = `finova_sync=${code}; expires=${exp}; path=/; SameSite=Strict`;
+  document.cookie = `finova_sync=${code}; expires=${exp}; path=/; SameSite=Strict; Secure`;
 }
 function _getSyncCodeCookie() {
   const m = document.cookie.match(/(?:^|;\s*)finova_sync=([a-f0-9]{8,16})/);

@@ -100,6 +100,17 @@ function lpSwitchTab(mode) {
   _clearError();
 }
 
+function lpTogglePasswordVisibility() {
+  const input = document.getElementById('lpPasswordInput');
+  const btn   = document.getElementById('lpPasswordToggle');
+  if (!input || !btn) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.classList.toggle('is-visible', show);
+  btn.setAttribute('aria-pressed', String(show));
+  btn.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+}
+
 function _showError(msg) {
   const el = document.getElementById('lpFormError');
   if (!el) return;
