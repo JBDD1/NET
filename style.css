@@ -961,8 +961,10 @@ ul  { list-style: none; }
   padding: 8px 10px;
   border-radius: var(--r-xs);
   color: color-mix(in srgb, var(--sidebar-text) 62%, transparent);
+  font-family: var(--font-serif);
   font-size: var(--fs-sm);
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   overflow: hidden;
   transition: color var(--transition), background var(--transition);
@@ -979,8 +981,10 @@ ul  { list-style: none; }
    valor suelto (antes 12px, fuera de --fs-*, y necesitaba !important
    para ganarle a .nav-item por tener la misma especificidad). */
 .nav-item.nav-sub-item {
+  font-family: var(--font-sans);
   font-size: var(--fs-xs);
   font-weight: 400;
+  letter-spacing: normal;
   padding: 7px 10px;
   color: color-mix(in srgb, var(--sidebar-text) 58%, transparent);
   min-height: 32px;
