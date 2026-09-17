@@ -199,7 +199,7 @@
 
       <!-- GRUPO: Ingresos & Gastos (con sub-items) -->
       <div class="nav-group" id="nav-group-transacciones">
-        <button class="nav-item nav-group-header" id="nav-group-toggle-transacciones" aria-expanded="false" aria-controls="nav-sub-transacciones">
+        <button class="nav-item nav-group-header" id="nav-group-toggle-transacciones" title="Ingresos & Gastos" aria-expanded="false" aria-controls="nav-sub-transacciones">
           <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-swap"/></svg></span>
           <span class="nav-label">Ingresos & Gastos</span>
           <span class="nav-arrow nav-label"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-right"/></svg></span>
@@ -223,7 +223,7 @@
 
       <!-- GRUPO: Inversiones (con sub-items) -->
       <div class="nav-group" id="nav-group-inversiones">
-        <button class="nav-item nav-group-header" id="nav-group-toggle-inversiones" aria-expanded="false" aria-controls="nav-sub-inversiones">
+        <button class="nav-item nav-group-header" id="nav-group-toggle-inversiones" title="Inversiones" aria-expanded="false" aria-controls="nav-sub-inversiones">
           <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-trending-up"/></svg></span>
           <span class="nav-label">Inversiones</span>
           <span class="nav-arrow nav-label"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-right"/></svg></span>
@@ -244,42 +244,48 @@
         </div>
       </div>
 
-      <button class="nav-item" data-section="networth">
-        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-scale"/></svg></span>
-        <span class="nav-label">Patrimonio Neto</span>
-      </button>
+      <div class="nav-group">
+        <div class="sidebar-group-label nav-label">Patrimonio</div>
+        <button class="nav-item" data-section="networth" title="Patrimonio Neto">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-scale"/></svg></span>
+          <span class="nav-label">Patrimonio Neto</span>
+        </button>
 
-      <button class="nav-item" data-section="pasivos">
-        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-minus-circle"/></svg></span>
-        <span class="nav-label">Pasivos</span>
-      </button>
+        <button class="nav-item" data-section="pasivos" title="Pasivos">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-minus-circle"/></svg></span>
+          <span class="nav-label">Pasivos</span>
+        </button>
 
-      <button class="nav-item" data-section="alternatives">
-        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-gem"/></svg></span>
-        <span class="nav-label">Activos Alt.</span>
-      </button>
+        <button class="nav-item" data-section="alternatives" title="Activos Alt.">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-gem"/></svg></span>
+          <span class="nav-label">Activos Alt.</span>
+        </button>
+      </div>
 
-<button class="nav-item" data-section="goals">
-        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg></span>
-        <span class="nav-label">Objetivos</span>
-      </button>
+      <div class="nav-group">
+        <div class="sidebar-group-label nav-label">Planificación</div>
+        <button class="nav-item" data-section="goals" title="Objetivos">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg></span>
+          <span class="nav-label">Objetivos</span>
+        </button>
 
-      <button class="nav-item" data-section="simulator">
-        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calculator"/></svg></span>
-        <span class="nav-label">Simulador</span>
-      </button>
+        <button class="nav-item" data-section="simulator" title="Simulador">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calculator"/></svg></span>
+          <span class="nav-label">Simulador</span>
+        </button>
 
-      <button class="nav-item" data-section="fiscalidad">
-        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-percent"/></svg></span>
-        <span class="nav-label">Fiscalidad</span>
-      </button>
+        <button class="nav-item" data-section="fiscalidad" title="Fiscalidad">
+          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-percent"/></svg></span>
+          <span class="nav-label">Fiscalidad</span>
+        </button>
+      </div>
 
-      <button class="nav-item" data-section="ai">
+      <button class="nav-item" data-section="ai" title="Asesor IA">
         <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-sparkles"/></svg></span>
         <span class="nav-label">Asesor IA</span>
       </button>
 
-      <button class="nav-item" data-section="admin" id="nav-admin" style="display:none">
+      <button class="nav-item" data-section="admin" id="nav-admin" title="Admin" style="display:none">
         <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-crown"/></svg></span>
         <span class="nav-label">Admin</span>
       </button>
@@ -287,7 +293,7 @@
     </nav>
 
     <div class="sidebar-footer">
-      <button class="nav-item" data-section="settings">
+      <button class="nav-item" data-section="settings" title="Ajustes">
         <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg></span>
         <span class="nav-label">Ajustes</span>
       </button>

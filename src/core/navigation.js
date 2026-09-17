@@ -71,14 +71,14 @@ function _execNavigateTo(sectionId) {
   if (INVERSIONES_SUBS.includes(sectionId)) {
     const groupHeader = document.getElementById('nav-group-toggle-inversiones');
     const subPanel    = document.getElementById('nav-sub-inversiones');
-    if (groupHeader) groupHeader.classList.add('open');
+    if (groupHeader) { groupHeader.classList.add('open'); groupHeader.setAttribute('aria-expanded', 'true'); }
     if (subPanel)    subPanel.classList.add('open');
   }
 
   if (TRANSACCIONES_SUBS.includes(sectionId)) {
     const groupHeader = document.getElementById('nav-group-toggle-transacciones');
     const subPanel    = document.getElementById('nav-sub-transacciones');
-    if (groupHeader) groupHeader.classList.add('open');
+    if (groupHeader) { groupHeader.classList.add('open'); groupHeader.setAttribute('aria-expanded', 'true'); }
     if (subPanel)    subPanel.classList.add('open');
   }
 
@@ -126,6 +126,7 @@ function toggleTransaccionesGroup() {
   const isOpen = sub.classList.contains('open');
   header.classList.toggle('open', !isOpen);
   sub.classList.toggle('open', !isOpen);
+  header.setAttribute('aria-expanded', String(!isOpen));
 }
 
 function toggleInversionesGroup() {
@@ -135,6 +136,7 @@ function toggleInversionesGroup() {
   const isOpen = sub.classList.contains('open');
   header.classList.toggle('open', !isOpen);
   sub.classList.toggle('open', !isOpen);
+  header.setAttribute('aria-expanded', String(!isOpen));
 }
 
 function renderSection(sectionId) {
