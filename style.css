@@ -907,11 +907,12 @@ ul  { list-style: none; }
 .logo { display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; }
 .logo-icon { display: flex; align-items: center; flex-shrink: 0; }
 .logo-text {
-  font-family: var(--font-serif);
-  font-size: var(--fs-lg);
-  font-weight: 400;
-  color: var(--sidebar-accent);
-  letter-spacing: 0.02em;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sidebar-text);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   transition: opacity var(--transition);
   white-space: nowrap;
 }
@@ -961,10 +962,10 @@ ul  { list-style: none; }
   padding: 8px 10px;
   border-radius: var(--r-xs);
   color: color-mix(in srgb, var(--sidebar-text) 62%, transparent);
-  font-family: var(--font-serif);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   font-size: var(--fs-sm);
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-weight: 500;
+  letter-spacing: normal;
   white-space: nowrap;
   overflow: hidden;
   transition: color var(--transition), background var(--transition);
@@ -981,10 +982,8 @@ ul  { list-style: none; }
    valor suelto (antes 12px, fuera de --fs-*, y necesitaba !important
    para ganarle a .nav-item por tener la misma especificidad). */
 .nav-item.nav-sub-item {
-  font-family: var(--font-sans);
   font-size: var(--fs-xs);
   font-weight: 400;
-  letter-spacing: normal;
   padding: 7px 10px;
   color: color-mix(in srgb, var(--sidebar-text) 58%, transparent);
   min-height: 32px;
