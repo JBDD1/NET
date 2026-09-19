@@ -194,7 +194,7 @@
 :root,
 :root[data-variant="obsidian-brass"],
 :root[data-variant="obsidian-brass"][data-theme="light"] {
-  --font-serif: 'Playfair Display', 'Times New Roman', Georgia, serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
   --font-sans:  'Inter', system-ui, -apple-system, sans-serif;
 
   --bg-base:        #f4efe6;
@@ -296,7 +296,7 @@
    2 · LINEN EDITORIAL  · LIGHT
 ═══════════════════════════════════════════════════════════════ */
 :root[data-variant="linen-editorial"] {
-  --font-serif: 'Playfair Display', 'Times New Roman', Georgia, serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
   --font-sans:  'Inter', system-ui, -apple-system, sans-serif;
 
   --bg-base:        #ebe5d6;
@@ -397,7 +397,7 @@
    3 · MIDNIGHT EMERALD · LIGHT
 ═══════════════════════════════════════════════════════════════ */
 :root[data-variant="midnight-emerald"] {
-  --font-serif: 'Playfair Display', 'Times New Roman', Georgia, serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
   --font-sans:  'Inter', system-ui, -apple-system, sans-serif;
 
   --bg-base:        #ede8db;
@@ -498,7 +498,7 @@
    4 · SOFT MONO · LIGHT
 ═══════════════════════════════════════════════════════════════ */
 :root[data-variant="soft-mono"] {
-  --font-serif: 'Playfair Display', 'Times New Roman', Georgia, serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
   --font-sans:  'Inter', system-ui, -apple-system, sans-serif;
 
   --bg-base:        #f3f3f0;
@@ -599,7 +599,7 @@
    5 · TERRACOTTA WARMTH · LIGHT
 ═══════════════════════════════════════════════════════════════ */
 :root[data-variant="terracotta-warmth"] {
-  --font-serif: 'Playfair Display', 'Times New Roman', Georgia, serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
   --font-sans:  'Inter', system-ui, -apple-system, sans-serif;
 
   --bg-base:        #efe7d8;

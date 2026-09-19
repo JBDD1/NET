@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'finova-v6';
+const CACHE_NAME = 'finova-v7';
 const API_CACHE  = 'finova-api-v1';
 const API_TTL    = 3_600_000; // 1 hour in ms
 const API_PATHS  = ['/api/yahoo', '/api/fx'];
