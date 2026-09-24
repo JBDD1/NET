@@ -101,8 +101,21 @@
   });
 
   // ── Service Worker ─────────────────────────────────────────────
+  // sw.js ya llama a self.skipWaiting() + self.clients.claim() para tomar
+  // el control lo antes posible, pero la pestaña ya abierta sigue servida
+  // por el Service Worker viejo hasta la próxima navegación — de ahí que
+  // antes hiciera falta recargar dos veces a mano. Con esto, en cuanto el
+  // nuevo Service Worker toma el control, la página se recarga sola UNA
+  // vez — el usuario solo tiene que recargar (o simplemente volver a
+  // visitar la página) una sola vez.
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(function () {});
+    var _swReloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (_swReloading) return; // por si el evento se dispara más de una vez
+      _swReloading = true;
+      window.location.reload();
+    });
   }
 
 })();
