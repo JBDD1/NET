@@ -2093,7 +2093,7 @@ function _importExcelBank(file) {
         header: 1, raw: false, defval: '', blankrows: false, dateNF: 'yyyy-mm-dd',
       });
       if (rows.length < 2) return showToast('No se encontraron transacciones en el archivo. Verifica que es un extracto bancario válido.', 'error');
-      const txs = _rowsToBankTransactions(rows[0], rows.slice(1));
+      const txs = _rowsToBankTransactions(rows);
       if (!txs.length) {
         console.warn('[Finova] Import Excel sin resultados:', txs._diag);
         return showToast(txs._diag || 'No se encontraron transacciones en el archivo. Verifica que es un extracto bancario válido.', 'error');
@@ -2124,9 +2124,28 @@ function _parseCSVDate(str) {
 }
 
 function _parseCSVAmt(str) {
-  const s = str.replace(/"/g, '').trim();
-  // Handle European format: "1.234,56" → remove thousands dot, replace decimal comma
-  return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+  let s = str.replace(/"/g, '').trim();
+  if (!s) return 0;
+  // Paréntesis = negativo, convención contable habitual: "(45,30)" → -45,30
+  let negative = false;
+  if (/^\(.*\)$/.test(s)) { negative = true; s = s.slice(1, -1); }
+  s = s.replace(/[€$£¥\s]/g, ''); // símbolos de moneda, en cualquier posición
+  if (/^-/.test(s)) { negative = true; s = s.slice(1); }
+  else if (/^\+/.test(s)) { s = s.slice(1); }
+
+  // El separador decimal es el que aparece EN ÚLTIMO LUGAR — funciona tanto
+  // para formato europeo (1.234,56 → coma decimal) como US/UK (1,234.56 →
+  // punto decimal), sin asumir uno solo (los neobancos en inglés suelen
+  // exportar en formato US aunque la cuenta esté en euros).
+  const lastComma = s.lastIndexOf(',');
+  const lastDot   = s.lastIndexOf('.');
+  if (lastComma > lastDot) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (lastDot > lastComma) {
+    s = s.replace(/,/g, '');
+  }
+  const n = parseFloat(s) || 0;
+  return negative ? -Math.abs(n) : n;
 }
 
 function _csvSplit(line, sep) {
@@ -2142,65 +2161,114 @@ function _csvSplit(line, sep) {
   return result;
 }
 
-// Detecta qué columnas son fecha/descripción/importe según el fingerprint de
-// cabeceras de los bancos españoles más comunes. Recibe la fila de cabeceras
-// ya separada en columnas (venga de un CSV o de una hoja de Excel).
-function _detectBankCols(rawHdrs) {
-  const hdrs = rawHdrs.map(h => String(h ?? '').replace(/"/g, '').toLowerCase().trim());
-  const col  = name => hdrs.findIndex(h => h.includes(name));
+// Muchos extractos (Sabadell entre ellos) anteponen varias filas de título o
+// metadatos ("Consulta de movimientos", "Cuenta: ES59...") antes de la fila
+// de cabeceras real — no se puede asumir que la primera fila del archivo
+// siempre es la cabecera. Se busca entre las primeras filas cuál "parece"
+// más una cabecera (más celdas que casan con vocabulario típico de fecha/
+// importe/concepto), y se usa esa.
+const _HEADER_KEYWORDS_RE = /fecha|date|\bdata\b|concepto|descripci|concept|detail|moviment|import|amount|cargo|abono|debit|credit|saldo|balance|valor|operativa|referenc|payee|merchant|memo|narrative|paid|money|type/i;
+function _findHeaderRowIdx(rows, maxScan = 20) {
+  let bestIdx = 0, bestScore = -1;
+  for (let i = 0; i < Math.min(rows.length, maxScan); i++) {
+    const row = rows[i];
+    if (!row) continue;
+    const nonEmpty = row.filter(c => String(c ?? '').trim() !== '');
+    if (nonEmpty.length < 2) continue; // una cabecera real tiene al menos 2 columnas
+    const score = nonEmpty.filter(c => _HEADER_KEYWORDS_RE.test(String(c))).length;
+    if (score > bestScore) { bestScore = score; bestIdx = i; }
+  }
+  return bestScore >= 2 ? bestIdx : 0; // si nada destaca, se asume la primera fila (comportamiento previo)
+}
 
-  const hasFechaValor = hdrs.some(h => h.includes('fecha valor') || h === 'fecha valor');
+// Detecta qué columnas son fecha/descripción/importe según el fingerprint de
+// cabeceras. Cubre bancos tradicionales españoles (BBVA, CaixaBank, Santander)
+// con reglas específicas, y un detector genérico mucho más amplio (español,
+// catalán e inglés) para el resto — incluidos neobancos (Revolut, N26, Wise,
+// Trade Republic, MyInvestor…), que exportan en inglés y a veces separan los
+// movimientos en dos columnas (cargo/abono) en vez de una con signo.
+function _detectBankCols(rawHdrs) {
+  const hdrs = rawHdrs.map(h => String(h ?? '').replace(/"/g, '').toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')); // quita tildes: "descripción" → "descripcion"
+  const col = re => hdrs.findIndex(h => re.test(h));
+
+  const hasFechaValor = hdrs.some(h => h.includes('fecha valor'));
   const hasConcepto   = hdrs.some(h => h === 'concepto');
   const hasDivisa     = hdrs.some(h => h.includes('divisa'));
-  const hasData       = hdrs.some(h => h === 'data'); // Catalan CaixaBank
-  const hasImport     = hdrs.some(h => h === 'import'); // Catalan "importe"
+  const hasData       = hdrs.some(h => h === 'data'); // catalán CaixaBank
+  const hasImport     = hdrs.some(h => h === 'import'); // catalán "importe"
   const hasDescripcio = hdrs.some(h => h.includes('descripc'));
 
-  let dateCol, descCol, amtCol;
+  let dateCol = -1, descCol = -1, amtCol = -1;
 
   if (hasFechaValor && hasConcepto) {
     // BBVA: Fecha | Fecha valor | Descripción | Concepto | Importe | Saldo
-    dateCol = col('fecha');                              // first "fecha" = operation date
-    descCol = hdrs.findIndex(h => h.includes('descripci') || h === 'concepto');
-    amtCol  = col('importe');
+    dateCol = hdrs.findIndex(h => h.includes('fecha'));   // primera "fecha" = fecha de operación
+    descCol = hdrs.findIndex(h => h.includes('descripc') || h === 'concepto');
+    amtCol  = hdrs.findIndex(h => h.includes('importe'));
   } else if (hasData && (hasImport || hasDescripcio)) {
-    // CaixaBank (Catalan): Data | Descripció | Import | Saldo
-    dateCol = col('data');
-    descCol = col('descripc');
-    amtCol  = hasImport ? hdrs.findIndex(h => h === 'import') : col('importe');
+    // CaixaBank (catalán): Data | Descripció | Import | Saldo
+    dateCol = hdrs.findIndex(h => h === 'data');
+    descCol = hdrs.findIndex(h => h.includes('descripc'));
+    amtCol  = hasImport ? hdrs.findIndex(h => h === 'import') : hdrs.findIndex(h => h.includes('importe'));
   } else if (hasDivisa) {
-    // Santander (classic): Fecha | Concepto | Importe | Divisa | Saldo…
-    dateCol = col('fecha');
-    descCol = hdrs.findIndex(h => h.includes('concepto') || h.includes('descripci'));
-    amtCol  = col('importe');
+    // Santander (clásico): Fecha | Concepto | Importe | Divisa | Saldo…
+    dateCol = hdrs.findIndex(h => h.includes('fecha'));
+    descCol = hdrs.findIndex(h => h.includes('concepto') || h.includes('descripc'));
+    amtCol  = hdrs.findIndex(h => h.includes('importe'));
   } else {
-    // Generic — look for typical column names
-    dateCol = hdrs.findIndex(h => /fecha|date|data/.test(h));
-    descCol = hdrs.findIndex(h => /descripci|concepto|concept|moviment|detail/.test(h));
-    amtCol  = hdrs.findIndex(h => /importe|import|amount/.test(h));
+    // Genérico — la primera columna cuyo nombre casa gana (el orden de las
+    // alternativas del regex no importa: si hay varias columnas de fecha,
+    // como "F. Operativa" y "F. Valor", se queda con la que va primero en
+    // el archivo, que es la fecha de operación en todos los bancos vistos).
+    dateCol = col(/fecha|f\.?\s*(operativa|valor|operaci[oó]n|movimiento|transacci[oó]n)|\bdata\b|\bdate\b|value date|booking date|started date|completed date|transaction date/);
+    // "descripci[oó]n?" cubre el español ("descripción"); "descripti" cubre
+    // el inglés ("description") — son raíces distintas, no una variante de
+    // acento de la otra, así que hacen falta las dos.
+    descCol = col(/descripci[oó]n?|descripti|concepto|concept|detalle|\bdetail|moviment|beneficiari|\bpayee\b|merchant|narrative|\bmemo\b/);
+    if (descCol < 0) descCol = col(/\btype\b/); // último recurso: menos descriptivo que "descripción" (p.ej. Revolut trae ambas)
+    amtCol  = col(/^importe|^import\b|cantidad|^amount|monto/);
   }
 
-  if (dateCol < 0 || amtCol < 0) return null;
-  if (descCol < 0) descCol = (dateCol === 0 ? 1 : 0); // last-resort fallback
-  return { dateCol, descCol, amtCol };
+  if (dateCol < 0) return null;
+
+  // Sin una sola columna de importe con signo: buscar cargo/abono separados
+  // (habitual en neobancos: "Money in" / "Money out", "Paid in" / "Paid out").
+  let debitCol = -1, creditCol = -1;
+  if (amtCol < 0) {
+    debitCol  = col(/cargo|^debit\b|paid out|money out|salida|withdrawal/);
+    creditCol = col(/abono|^credit\b|paid in|money in|entrada|deposit/);
+    if (debitCol < 0 && creditCol < 0) return null;
+  }
+
+  if (descCol < 0) descCol = (dateCol === 0 ? 1 : 0); // último recurso
+
+  return amtCol >= 0
+    ? { dateCol, descCol, amtCol }
+    : { dateCol, descCol, debitCol, creditCol };
 }
 
-// Convierte filas ya separadas en columnas (de CSV o de Excel) en transacciones
-// de Finova, con la misma categorización automática que el resto de la app.
+// Convierte filas ya separadas en columnas (de CSV o de Excel, SIN separar
+// cabecera/datos — eso lo hace esta función ahora) en transacciones de
+// Finova, con la misma categorización automática que el resto de la app.
 // Cuando el resultado queda vacío, adjunta un diagnóstico legible en
 // txs._diag (las cabeceras no reconocidas, o cuántas filas fallaron y por
-// qué) en vez de dejar un array vacío sin explicación — antes un CSV/Excel
-// real con formato ligeramente distinto fallaba en silencio.
-function _rowsToBankTransactions(rawHdrs, dataRows) {
-  const cleanHdrs = rawHdrs.map(h => String(h ?? '').replace(/"/g, '').trim()).filter(Boolean);
-  const cols = _detectBankCols(rawHdrs);
+// qué) en vez de dejar un array vacío sin explicación.
+function _rowsToBankTransactions(allRows) {
   const txs = [];
+  const headerIdx = _findHeaderRowIdx(allRows);
+  const rawHdrs   = allRows[headerIdx] || [];
+  const dataRows  = allRows.slice(headerIdx + 1);
+  const cleanHdrs = rawHdrs.map(h => String(h ?? '').replace(/"/g, '').trim()).filter(Boolean);
 
+  const cols = _detectBankCols(rawHdrs);
   if (!cols) {
     txs._diag = `No se reconocieron las columnas de fecha/importe. Cabeceras encontradas: ${cleanHdrs.join(', ') || '(sin cabecera detectada)'}`;
     return txs;
   }
-  const { dateCol, descCol, amtCol } = cols;
+  const { dateCol, descCol, amtCol, debitCol, creditCol } = cols;
+  const neededCols = [dateCol, descCol, amtCol, debitCol, creditCol].filter(c => typeof c === 'number' && c >= 0);
+  const maxCol = Math.max(...neededCols);
 
   const skippedRows = [];
   let badDateCount = 0, zeroAmtCount = 0;
@@ -2208,11 +2276,13 @@ function _rowsToBankTransactions(rawHdrs, dataRows) {
 
   dataRows.forEach((row, i) => {
     try {
-      if (row.length <= Math.max(dateCol, descCol, amtCol)) return;
+      if (!row || row.length <= maxCol) return;
       const rawDate = String(row[dateCol] ?? '');
       const date    = _parseCSVDate(rawDate);
       const desc    = String(row[descCol] ?? '').replace(/"/g, '').trim() || 'Transacción bancaria';
-      const amount  = _parseCSVAmt(String(row[amtCol] ?? '0'));
+      const amount  = amtCol >= 0
+        ? _parseCSVAmt(String(row[amtCol] ?? '0'))
+        : _parseCSVAmt(String(row[creditCol] ?? '0')) - Math.abs(_parseCSVAmt(String(row[debitCol] ?? '0')));
       if (!date) {
         badDateCount++;
         if (firstBadDateSample === null) firstBadDateSample = rawDate;
@@ -2225,7 +2295,7 @@ function _rowsToBankTransactions(rawHdrs, dataRows) {
       const local   = typeof matchLocalKeywords === 'function' ? matchLocalKeywords(desc, type) : null;
       txs.push({ date, description: desc, category: learned || local || cats[0] || 'Otros', type, amount: Math.abs(amount) });
     } catch (e) {
-      skippedRows.push(i + 2); // +2: 1-based, y la fila 1 es la cabecera
+      skippedRows.push(headerIdx + i + 2); // 1-based, contando la fila de cabecera real
     }
   });
 
@@ -2235,7 +2305,7 @@ function _rowsToBankTransactions(rawHdrs, dataRows) {
   }
 
   if (!txs.length && dataRows.length > 0) {
-    const parts = [`Columnas usadas: fecha="${cleanHdrs[dateCol] || '?'}", descripción="${cleanHdrs[descCol] || '?'}", importe="${cleanHdrs[amtCol] || '?'}".`];
+    const parts = [`Columnas usadas: fecha="${cleanHdrs[dateCol] || '?'}", descripción="${cleanHdrs[descCol] || '?'}", importe="${amtCol >= 0 ? (cleanHdrs[amtCol] || '?') : `${cleanHdrs[creditCol] || '?'} / ${cleanHdrs[debitCol] || '?'}`}".`];
     if (badDateCount) parts.push(`${badDateCount} fila(s) con fecha no reconocida (ej: "${firstBadDateSample}").`);
     if (zeroAmtCount) parts.push(`${zeroAmtCount} fila(s) con importe 0 o no numérico.`);
     txs._diag = parts.join(' ');
@@ -2249,12 +2319,15 @@ function _parseCSVBank(text) {
   const lines = raw.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return [];
 
-  // Detect separator (semicolon wins if more splits)
-  const h1  = lines[0];
-  const sep = h1.split(';').length >= h1.split(',').length ? ';' : ',';
-  const hdrs     = _csvSplit(h1, sep);
-  const dataRows = lines.slice(1).map(line => _csvSplit(line, sep));
-  return _rowsToBankTransactions(hdrs, dataRows);
+  // Detecta el separador contando en las primeras filas (no solo la primera
+  // línea, que puede ser un título sin ningún separador de columnas real).
+  const probeLines = lines.slice(0, 15);
+  const totalSemis  = probeLines.reduce((s, l) => s + (l.split(';').length - 1), 0);
+  const totalCommas = probeLines.reduce((s, l) => s + (l.split(',').length - 1), 0);
+  const sep = totalSemis >= totalCommas ? ';' : ',';
+
+  const allRows = lines.map(line => _csvSplit(line, sep));
+  return _rowsToBankTransactions(allRows);
 }
 
 /* ═══════════════════════════════════════════════════════════════
