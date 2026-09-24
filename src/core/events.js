@@ -23,8 +23,14 @@
   }
   _on('login-tab-signin', 'click', _loginTabClick('signin'));
   _on('login-tab-signup', 'click', _loginTabClick('signup'));
+  // Guardado con typeof: si auth.js no llegó a cargar (p.ej. fallo de red o
+  // de build), signInGoogle no existe — una referencia directa aquí lanzaría
+  // un ReferenceError sin capturar que abortaría el resto de esta función,
+  // dejando sin enganchar TODOS los listeners que vienen después (incluida
+  // la importación de CSV/Excel más abajo). Con la guarda, en el peor caso
+  // solo falla el login con Google; todo lo demás se sigue enganchando.
   var googleBtn = document.querySelector('.login-btn-google');
-  if (googleBtn) googleBtn.addEventListener('click', signInGoogle);
+  if (googleBtn && typeof signInGoogle === 'function') googleBtn.addEventListener('click', signInGoogle);
 
   // ── Profile dropdown ───────────────────────────────────────────
   _on('avatar-change-wrap', 'click', function (e) {
