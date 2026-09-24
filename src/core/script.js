@@ -2123,6 +2123,43 @@ function _parseCSVDate(str) {
   return '';
 }
 
+// Limpia jerga bancaria de la descripción para que se vea qué representa el
+// pago en vez de la cadena técnica en bruto del banco: quita números de
+// tarjeta enmascarados (5402XXXXXXXX9036), códigos de referencia tipo
+// **2839*, números de referencia sueltos al final, y pasa todo a Título
+// Case en vez de MAYÚSCULAS. No inventa información — si tras limpiar no
+// queda nada legible, se queda con el texto original.
+function _cleanBankDescription(raw) {
+  let s = String(raw || '').replace(/"/g, '').trim();
+  if (!s) return 'Transacción bancaria';
+  const original = s;
+
+  s = s.replace(/\b\d{4}[X*]{4,}\d{2,4}\b/gi, ' ');  // tarjeta enmascarada: 5402XXXXXXXX9036
+  s = s.replace(/\*+\s*\d+\s*\*?/g, ' ');             // códigos tipo **2839* o *2839
+  s = s.replace(/-/g, ' - ');                         // separa "Revolut-Dublin" en palabras propias
+  s = s.replace(/\//g, ' ');                          // "DONOSTIA/SAN" -> "DONOSTIA SAN"
+  s = s.replace(/\b\d{4,}\b/g, ' ');                  // códigos de tienda/referencia sueltos (4+ dígitos)
+  s = s.replace(/\s{2,}/g, ' ').replace(/^[\s\-]+|[\s\-]+$/g, '').trim();
+
+  if (!s) return _titleCaseEs(original);
+  return _titleCaseEs(s);
+}
+
+// Título Case simple: cada palabra con mayúscula inicial, salvo conectoras
+// (a, de, la...) que se dejan en minúscula cuando no van al principio. No
+// se intenta distinguir siglas reales (TARJ., SL) de nombres cortos en
+// mayúsculas (JULEN, BIZUM) — el extracto bancario original ya viene todo
+// en mayúsculas, así que esa distinción no es fiable; mejor consistente.
+const _ES_LOWERCASE_WORDS = new Set(['a', 'de', 'del', 'la', 'el', 'los', 'las', 'y', 'en']);
+function _titleCaseEs(s) {
+  const words = s.trim().split(/\s+/);
+  return words.map((w, i) => {
+    const lower = w.toLowerCase();
+    if (i > 0 && _ES_LOWERCASE_WORDS.has(lower)) return lower;
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }).join(' ');
+}
+
 function _parseCSVAmt(str) {
   let s = str.replace(/"/g, '').trim();
   if (!s) return 0;
@@ -2279,7 +2316,7 @@ function _rowsToBankTransactions(allRows) {
       if (!row || row.length <= maxCol) return;
       const rawDate = String(row[dateCol] ?? '');
       const date    = _parseCSVDate(rawDate);
-      const desc    = String(row[descCol] ?? '').replace(/"/g, '').trim() || 'Transacción bancaria';
+      const desc    = _cleanBankDescription(row[descCol]);
       const amount  = amtCol >= 0
         ? _parseCSVAmt(String(row[amtCol] ?? '0'))
         : _parseCSVAmt(String(row[creditCol] ?? '0')) - Math.abs(_parseCSVAmt(String(row[debitCol] ?? '0')));
