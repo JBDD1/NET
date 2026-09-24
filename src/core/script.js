@@ -2063,7 +2063,10 @@ function handleCSVImportFile(input) {
   reader.onload = e => {
     try {
       const txs = _parseCSVBank(e.target.result);
-      if (!txs.length) return showToast('No se encontraron transacciones en el archivo. Verifica que es un extracto bancario válido.', 'error');
+      if (!txs.length) {
+        console.warn('[Finova] Import CSV sin resultados:', txs._diag);
+        return showToast(txs._diag || 'No se encontraron transacciones en el archivo. Verifica que es un extracto bancario válido.', 'error');
+      }
       _showOFXPreview(txs, 'CSV');
     } catch (err) {
       console.error('CSV parse error:', err);
@@ -2091,7 +2094,10 @@ function _importExcelBank(file) {
       });
       if (rows.length < 2) return showToast('No se encontraron transacciones en el archivo. Verifica que es un extracto bancario válido.', 'error');
       const txs = _rowsToBankTransactions(rows[0], rows.slice(1));
-      if (!txs.length) return showToast('No se encontraron transacciones en el archivo. Verifica que es un extracto bancario válido.', 'error');
+      if (!txs.length) {
+        console.warn('[Finova] Import Excel sin resultados:', txs._diag);
+        return showToast(txs._diag || 'No se encontraron transacciones en el archivo. Verifica que es un extracto bancario válido.', 'error');
+      }
       _showOFXPreview(txs, 'Excel');
     } catch (err) {
       console.error('Excel parse error:', err);
@@ -2104,9 +2110,16 @@ function _importExcelBank(file) {
 
 function _parseCSVDate(str) {
   const s = str.replace(/"/g, '').trim();
-  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // AAAA-MM-DD / AAAA/MM/DD / AAAA.MM.DD, con o sin hora detrás (Excel a
+  // veces añade "00:00:00" a fechas): 2026-09-05[...], 2026/09/05
+  const iso = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+  // DD/MM/YYYY, DD-MM-YYYY o DD.MM.YYYY, con posible hora detrás
+  const dmy = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+  // DD/MM/YY — año de 2 dígitos, se asume 20XX
+  const dmy2 = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2})$/);
+  if (dmy2) return `20${dmy2[3]}-${dmy2[2].padStart(2, '0')}-${dmy2[1].padStart(2, '0')}`;
   return '';
 }
 
@@ -2174,20 +2187,38 @@ function _detectBankCols(rawHdrs) {
 
 // Convierte filas ya separadas en columnas (de CSV o de Excel) en transacciones
 // de Finova, con la misma categorización automática que el resto de la app.
+// Cuando el resultado queda vacío, adjunta un diagnóstico legible en
+// txs._diag (las cabeceras no reconocidas, o cuántas filas fallaron y por
+// qué) en vez de dejar un array vacío sin explicación — antes un CSV/Excel
+// real con formato ligeramente distinto fallaba en silencio.
 function _rowsToBankTransactions(rawHdrs, dataRows) {
+  const cleanHdrs = rawHdrs.map(h => String(h ?? '').replace(/"/g, '').trim()).filter(Boolean);
   const cols = _detectBankCols(rawHdrs);
-  if (!cols) return [];
+  const txs = [];
+
+  if (!cols) {
+    txs._diag = `No se reconocieron las columnas de fecha/importe. Cabeceras encontradas: ${cleanHdrs.join(', ') || '(sin cabecera detectada)'}`;
+    return txs;
+  }
   const { dateCol, descCol, amtCol } = cols;
 
-  const txs = [];
   const skippedRows = [];
+  let badDateCount = 0, zeroAmtCount = 0;
+  let firstBadDateSample = null;
+
   dataRows.forEach((row, i) => {
     try {
       if (row.length <= Math.max(dateCol, descCol, amtCol)) return;
-      const date   = _parseCSVDate(String(row[dateCol] ?? ''));
-      const desc   = String(row[descCol] ?? '').replace(/"/g, '').trim() || 'Transacción bancaria';
-      const amount = _parseCSVAmt(String(row[amtCol] ?? '0'));
-      if (!date || amount === 0) return;
+      const rawDate = String(row[dateCol] ?? '');
+      const date    = _parseCSVDate(rawDate);
+      const desc    = String(row[descCol] ?? '').replace(/"/g, '').trim() || 'Transacción bancaria';
+      const amount  = _parseCSVAmt(String(row[amtCol] ?? '0'));
+      if (!date) {
+        badDateCount++;
+        if (firstBadDateSample === null) firstBadDateSample = rawDate;
+        return;
+      }
+      if (amount === 0) { zeroAmtCount++; return; }
       const type    = amount > 0 ? 'income' : 'expense';
       const cats    = type === 'expense' ? APP.categories.expense : APP.categories.income;
       const learned = APP.categoryPatterns && _patCat(APP.categoryPatterns[txPatternKey(desc)]);
@@ -2197,10 +2228,19 @@ function _rowsToBankTransactions(rawHdrs, dataRows) {
       skippedRows.push(i + 2); // +2: 1-based, y la fila 1 es la cabecera
     }
   });
+
   if (skippedRows.length > 0) {
     const rowList = skippedRows.slice(0, 5).join(', ') + (skippedRows.length > 5 ? '…' : '');
     setTimeout(() => showToast(`Se ignoraron ${skippedRows.length} fila${skippedRows.length > 1 ? 's' : ''} por error (fila${skippedRows.length > 1 ? 's' : ''} ${rowList})`, 'error'), 500);
   }
+
+  if (!txs.length && dataRows.length > 0) {
+    const parts = [`Columnas usadas: fecha="${cleanHdrs[dateCol] || '?'}", descripción="${cleanHdrs[descCol] || '?'}", importe="${cleanHdrs[amtCol] || '?'}".`];
+    if (badDateCount) parts.push(`${badDateCount} fila(s) con fecha no reconocida (ej: "${firstBadDateSample}").`);
+    if (zeroAmtCount) parts.push(`${zeroAmtCount} fila(s) con importe 0 o no numérico.`);
+    txs._diag = parts.join(' ');
+  }
+
   return txs;
 }
 
