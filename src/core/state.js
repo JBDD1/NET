@@ -7,10 +7,10 @@
 ═══════════════════════════════════════════════════════════════ */
 
 const DEFAULT_CATEGORIES = {
-  income:  ['Salario', 'Freelance', 'Alquiler', 'Dividendos', 'Venta', 'Otros ingresos'],
+  income:  ['Salario', 'Freelance', 'Alquiler', 'Dividendos', 'Venta', 'Otros ingresos', 'Sin clasificar'],
   expense: ['Vivienda', 'Alimentación', 'Transporte', 'Salud', 'Educación',
             'Ocio', 'Ropa', 'Suscripciones', 'Seguros', 'Restaurantes',
-            'Fiesta', 'Amigos', 'Otros gastos']
+            'Fiesta', 'Amigos', 'Otros gastos', 'Sin clasificar']
 };
 
 let APP = {

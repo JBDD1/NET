@@ -1893,10 +1893,11 @@ function handleOFXImportFile(input) {
   if (!file) return;
   input.value = '';
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const txs = _parseOFXSGML(e.target.result);
       if (!txs.length) return showToast('No se encontraron transacciones en el archivo OFX/QFX', 'error');
+      await _enrichImportWithAI(txs);
       _showOFXPreview(txs);
     } catch (err) {
       console.error('OFX parse error:', err);
@@ -1940,12 +1941,18 @@ function _parseOFXSGML(text) {
       const isIncome = trntype === 'CREDIT' || trntype === 'DEP' || amount > 0;
       const type     = isIncome ? 'income' : 'expense';
 
-      const cats     = type === 'expense' ? APP.categories.expense : APP.categories.income;
-      const learned  = APP.categoryPatterns && _patCat(APP.categoryPatterns[txPatternKey(description)]);
-      const local    = typeof matchLocalKeywords === 'function' ? matchLocalKeywords(description, type) : null;
-      const category = learned || local || cats[0] || 'Otros';
+      const cls = _classifyLocal(description, type);
 
-      txs.push({ fitid, date, description, category, type, amount: Math.abs(amount) });
+      txs.push({
+        fitid, date, description, category: cls.category, type, amount: Math.abs(amount),
+        merchant:                 _extractMerchant(description),
+        transactionType:          _detectTransactionType(description, type),
+        categoryConfidence:       cls.confidence,
+        categoryConfidenceScore:  cls.confidenceScore,
+        categorySource:           cls.source,
+        categoryReviewed:         false,
+        categoryUpdatedAt:        new Date().toISOString(),
+      });
     } catch (e) {
       skippedBlocks.push(blockIndex);
     }
@@ -1997,21 +2004,29 @@ function _showOFXPreview(allRows, source = 'OFX/QFX') {
     ? `<span style="color:var(--text-muted)"> · ${dupCount} duplicadas omitidas</span>`
     : '';
 
-  const tableRows = rows.map(r => `
+  const unclassifiedCount = rows.filter(r => r.category === UNCLASSIFIED_CATEGORY).length;
+  const reviewNote = unclassifiedCount > 0
+    ? `<span style="color:var(--down)"> · ${unclassifiedCount} sin clasificar con seguridad, revisa la categoría</span>`
+    : '';
+
+  const tableRows = rows.map(r => {
+    const needsReview = r.category === UNCLASSIFIED_CATEGORY || r.categoryConfidence === 'low';
+    return `
     <tr>
       <td>${escapeHtml(r.date)}</td>
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.description)}</td>
-      <td>${escapeHtml(r.category)}</td>
+      <td>${needsReview ? '<span style="color:var(--down)" title="Categoría no determinada con seguridad">⚠️ </span>' : ''}${escapeHtml(r.category)}</td>
       <td><span class="badge badge-${r.type}">${r.type === 'income' ? 'Ingreso' : 'Gasto'}</span></td>
       <td class="text-right ${r.type === 'income' ? 'positive' : 'negative'}">${r.type === 'income' ? '+' : '-'}${formatCurrency(r.amount)}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
   openModal(
     `Importar ${_pendingImportSource} — ${rows.length} transacciones`,
     `<p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">
        Se van a importar <strong>${rows.length}</strong> transacciones nuevas.${dupNote}
-       Las categorías se han asignado automáticamente y puedes editarlas después.
+       Las categorías se han asignado automáticamente y puedes editarlas después.${reviewNote}
      </p>
      <div style="max-height:360px;overflow-y:auto">
        <table class="data-table" style="font-size:12px">
@@ -2029,9 +2044,20 @@ function _showOFXPreview(allRows, source = 'OFX/QFX') {
 
 function _confirmOFXImport() {
   _pendingOFXRows.forEach(r => {
-    const tx = { id: generateId(), date: r.date, description: r.description,
-                 category: r.category, type: r.type, amount: r.amount };
+    const tx = {
+      id: generateId(), date: r.date, description: r.description,
+      category: r.category, type: r.type, amount: r.amount,
+    };
     if (r.fitid) tx.fitid = r.fitid;
+    // Metadatos de clasificación — opcionales, no rompen transacciones
+    // creadas por otras vías (manual, quick-add) que no los llevan.
+    if (r.merchant)                        tx.merchant = r.merchant;
+    if (r.transactionType)                 tx.transactionType = r.transactionType;
+    if (r.categoryConfidence)              tx.categoryConfidence = r.categoryConfidence;
+    if (typeof r.categoryConfidenceScore === 'number') tx.categoryConfidenceScore = r.categoryConfidenceScore;
+    if (r.categorySource)                  tx.categorySource = r.categorySource;
+    tx.categoryReviewed  = false;
+    tx.categoryUpdatedAt = r.categoryUpdatedAt || new Date().toISOString();
     APP.transactions.push(tx);
   });
   APP.transactions.sort((a, b) => b.date.localeCompare(a.date));
@@ -2060,13 +2086,14 @@ function handleCSVImportFile(input) {
   }
 
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const txs = _parseCSVBank(e.target.result);
       if (!txs.length) {
         console.warn('[Finova] Import CSV sin resultados:', txs._diag);
         return showToast(txs._diag || 'No se encontraron transacciones en el archivo. Verifica que es un extracto bancario válido.', 'error');
       }
+      await _enrichImportWithAI(txs);
       _showOFXPreview(txs, 'CSV');
     } catch (err) {
       console.error('CSV parse error:', err);
@@ -2083,7 +2110,7 @@ function _importExcelBank(file) {
     return showToast('No se pudo cargar el lector de Excel. Recarga la página e inténtalo de nuevo.', 'error');
   }
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const workbook  = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
       const sheet     = workbook.Sheets[workbook.SheetNames[0]];
@@ -2098,6 +2125,7 @@ function _importExcelBank(file) {
         console.warn('[Finova] Import Excel sin resultados:', txs._diag);
         return showToast(txs._diag || 'No se encontraron transacciones en el archivo. Verifica que es un extracto bancario válido.', 'error');
       }
+      await _enrichImportWithAI(txs);
       _showOFXPreview(txs, 'Excel');
     } catch (err) {
       console.error('Excel parse error:', err);
@@ -2326,11 +2354,18 @@ function _rowsToBankTransactions(allRows) {
         return;
       }
       if (amount === 0) { zeroAmtCount++; return; }
-      const type    = amount > 0 ? 'income' : 'expense';
-      const cats    = type === 'expense' ? APP.categories.expense : APP.categories.income;
-      const learned = APP.categoryPatterns && _patCat(APP.categoryPatterns[txPatternKey(desc)]);
-      const local   = typeof matchLocalKeywords === 'function' ? matchLocalKeywords(desc, type) : null;
-      txs.push({ date, description: desc, category: learned || local || cats[0] || 'Otros', type, amount: Math.abs(amount) });
+      const type = amount > 0 ? 'income' : 'expense';
+      const cls  = _classifyLocal(desc, type);
+      txs.push({
+        date, description: desc, category: cls.category, type, amount: Math.abs(amount),
+        merchant:                 _extractMerchant(desc),
+        transactionType:          _detectTransactionType(desc, type),
+        categoryConfidence:       cls.confidence,
+        categoryConfidenceScore:  cls.confidenceScore,
+        categorySource:           cls.source,
+        categoryReviewed:         false,
+        categoryUpdatedAt:        new Date().toISOString(),
+      });
     } catch (e) {
       skippedRows.push(headerIdx + i + 2); // 1-based, contando la fila de cabecera real
     }
@@ -3462,6 +3497,152 @@ async function categorizeTxWithAI(description, type, available) {
     const suggested = (data.text || '').trim();
     return available.includes(suggested) ? suggested : null;
   } catch { return null; }
+}
+
+/* ─── Clasificación por lotes (importación masiva) ──────────────────
+   Mismo pipeline que autoSuggestCategory (aprendido → palabra clave → IA),
+   pero pensado para cientos/miles de filas: la IA solo se llama para los
+   comercios ÚNICOS que ni el aprendizaje ni las palabras clave resuelven,
+   en una única petición por lote — nunca una llamada por transacción.
+   Nunca inventa categoría sin base: si nada encaja, category queda en
+   UNCLASSIFIED_CATEGORY en vez de un valor por defecto arbitrario. ──── */
+const UNCLASSIFIED_CATEGORY = 'Sin clasificar';
+
+// Prefijos de jerga bancaria que _cleanBankDescription ya deja en Título
+// Case — se quitan para obtener solo el nombre del comercio/contraparte.
+const _MERCHANT_STRIP_RE = [
+  /^compra\s+tarj\.?\s*/i,
+  /^pago\s+bizum\s*/i,
+  /^bizum\s*/i,
+  /^transferencia\s+(a|de)\s*/i,
+  /^ingreso\s+efectivo(\s+cajero\s+automatico)?\s*/i,
+  /^recibo\s*/i,
+  /^adeudo\s*/i,
+  /^abono\s*/i,
+];
+function _extractMerchant(cleanedDesc) {
+  let s = String(cleanedDesc || '').trim();
+  for (const re of _MERCHANT_STRIP_RE) {
+    if (re.test(s)) { s = s.replace(re, '').trim(); break; }
+  }
+  s = s.split(' - ')[0].trim(); // "Revolut - Dublin" → "Revolut"
+  return s || cleanedDesc || null;
+}
+
+// Tipo de movimiento — informativo, NO sustituye a `type` (income/expense),
+// que sigue gobernando el signo y las estadísticas existentes tal cual
+// funcionan hoy. Solo se marca cuando el texto es inequívoco; en cualquier
+// otro caso se deja igual a `type` (sección 21 del pedido).
+const _TX_TYPE_KEYWORDS = {
+  refund:     ['devolucion', 'reembolso', 'nota de credito', 'refund'],
+  investment: ['compra de acciones', 'compra acciones', 'compra fondos', 'compra fondo',
+               'compra etf', 'compraventa valores', 'suscripcion fondo', 'interactive brokers',
+               'degiro', 'trade republic', 'myinvestor gestora', 'indexa capital'],
+  transfer:   ['traspaso entre cuentas', 'traspaso propio', 'traspaso a cuenta propia'],
+};
+function _detectTransactionType(description, type) {
+  const norm = String(description || '').toLowerCase();
+  for (const [txType, kws] of Object.entries(_TX_TYPE_KEYWORDS)) {
+    if (kws.some(kw => norm.includes(kw))) return txType;
+  }
+  return type;
+}
+
+// Solo reglas locales, sin red — aprendido (prioridad 1-3 del pedido: regla
+// manual, corrección previa y regla de comercio comparten el mismo almacén
+// APP.categoryPatterns) → palabra clave (prioridad 4) → "Sin clasificar".
+function _classifyLocal(description, type) {
+  if (APP.categoryPatterns) {
+    const key     = txPatternKey(description);
+    const learned = _patCat(APP.categoryPatterns[key]);
+    const avail   = type === 'income' ? APP.categories.income : APP.categories.expense;
+    if (learned && avail.includes(learned)) {
+      return { category: learned, confidence: 'high', confidenceScore: 0.95, source: 'learned' };
+    }
+  }
+  const local = matchLocalKeywords(description, type);
+  if (local) return { category: local, confidence: 'high', confidenceScore: 0.85, source: 'rule' };
+  return { category: UNCLASSIFIED_CATEGORY, confidence: 'low', confidenceScore: 0, source: 'unknown' };
+}
+
+// Clasifica por IA, en lotes, solo las descripciones ÚNICAS que _classifyLocal
+// no resolvió. Devuelve un Map(descripción → categoría) — nunca lanza: si la
+// IA no está disponible o falla, el Map queda vacío y las filas afectadas se
+// quedan en "Sin clasificar" (secciones 9 y 13: nunca romper la importación
+// ni inventar una categoría sin base).
+const _AI_CATEGORIZE_BATCH_SIZE = 60;
+async function _batchClassifyWithAI(uniqueDescs, type) {
+  const result = new Map();
+  if (!uniqueDescs.length) return result;
+
+  const anyKey = [APP.claudeApiKey, APP.openaiApiKey, APP.geminiApiKey, APP.groqApiKey].some(k => (k || '').trim());
+  const hasAI  = anyKey || (typeof _serverAI !== 'undefined' && _serverAI === true);
+  if (!hasAI) return result;
+
+  const available = type === 'income' ? APP.categories.income : APP.categories.expense;
+  const usable    = available.filter(c => c !== UNCLASSIFIED_CATEGORY);
+
+  for (let i = 0; i < uniqueDescs.length; i += _AI_CATEGORIZE_BATCH_SIZE) {
+    const chunk = uniqueDescs.slice(i, i + _AI_CATEGORIZE_BATCH_SIZE);
+    try {
+      const list = chunk.map((d, idx) => `${idx + 1}. ${d}`).join('\n');
+      const prompt = `Clasifica cada comercio/concepto de ${type === 'expense' ? 'gasto' : 'ingreso'} en UNA de estas categorías: ${usable.join(', ')}.\n` +
+        `Si ninguna encaja con seguridad, responde "${UNCLASSIFIED_CATEGORY}" para ese elemento — mejor eso que adivinar.\n` +
+        `Responde SOLO un JSON array de ${chunk.length} strings, una categoría por elemento en el mismo orden, sin explicación ni texto adicional.\n\n${list}`;
+      const res = await api.ai({
+        provider:     APP.aiProvider || 'claude',
+        apiKey:       (APP[({ claude: 'claudeApiKey', openai: 'openaiApiKey', gemini: 'geminiApiKey', groq: 'groqApiKey' })[APP.aiProvider]] || '').trim(),
+        messages:     [{ role: 'user', content: prompt }],
+        systemPrompt: 'Eres un clasificador de transacciones financieras. Respondes solo con un JSON array de strings, sin texto adicional ni markdown.',
+      });
+      if (!res.ok) continue; // este lote falla -> sus filas se quedan "Sin clasificar"
+      const data  = await res.json();
+      const text  = (data.text || '').trim();
+      const match = text.match(/\[[\s\S]*\]/);
+      if (!match) continue;
+      const parsed = JSON.parse(match[0]);
+      if (!Array.isArray(parsed) || parsed.length !== chunk.length) continue;
+      chunk.forEach((desc, idx) => {
+        const cat = String(parsed[idx] || '').trim();
+        if (usable.includes(cat)) result.set(desc, cat);
+      });
+    } catch { /* lote fallido: se ignora, esas filas quedan "Sin clasificar" */ }
+  }
+  return result;
+}
+
+// Enriquece con IA (en un solo lote por comercio único) las transacciones
+// que _classifyLocal dejó en "Sin clasificar". Se llama tras el parseo local
+// (rápido y sin red) y antes de mostrar la previsualización de importación.
+async function _enrichImportWithAI(txs) {
+  const byType = { expense: [], income: [] };
+  txs.forEach(t => { if (t.category === UNCLASSIFIED_CATEGORY) byType[t.type]?.push(t); });
+  const pendingCount = byType.expense.length + byType.income.length;
+  if (!pendingCount) return txs;
+
+  const uniqueTotal = new Set([...byType.expense, ...byType.income].map(t => txPatternKey(t.description))).size;
+  if (uniqueTotal > 3) showToast(`Clasificando ${uniqueTotal} comercios con IA…`, 'info', { duration: 4000 });
+
+  for (const type of ['expense', 'income']) {
+    const rows = byType[type];
+    if (!rows.length) continue;
+    const uniqueKeys = new Map(); // txPatternKey -> descripción representativa
+    rows.forEach(t => { if (!uniqueKeys.has(txPatternKey(t.description))) uniqueKeys.set(txPatternKey(t.description), t.description); });
+    const uniqueDescs = [...uniqueKeys.values()];
+    const catMap = await _batchClassifyWithAI(uniqueDescs, type);
+    if (!catMap.size) continue;
+    rows.forEach(t => {
+      const rep = uniqueKeys.get(txPatternKey(t.description));
+      const cat = catMap.get(rep);
+      if (cat) {
+        t.category           = cat;
+        t.categorySource      = 'ai';
+        t.categoryConfidence  = 'medium';
+        t.categoryConfidenceScore = 0.7;
+      }
+    });
+  }
+  return txs;
 }
 
 function showSectionNav(sec) {
