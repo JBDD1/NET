@@ -3382,6 +3382,10 @@ const CATEGORY_KEYWORDS = {
     'Dividendos': ['dividendo', 'cupon', 'renta fija', 'interes'],
     'Alquiler':   ['alquiler', 'arrendamiento', 'inquilino', 'renta'],
     'Venta':      ['venta', 'wallapop', 'ebay', 'vendido', 'segunda mano', 'vinted'],
+    // Ingresos en efectivo (cajero, reintegro) no encajan en ninguna categoría
+    // específica — antes caían sin regla y acababan en "Sin clasificar" (o,
+    // con el bug ya corregido, en la primera categoría de la lista al azar).
+    'Otros ingresos': ['ingreso efectivo', 'efectivo cajero', 'cajero automatico', 'reintegro'],
   },
 };
 
