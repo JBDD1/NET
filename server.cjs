@@ -1393,6 +1393,20 @@ function _auditResponse(uid, filePath, req) {
   return true;
 }
 
+/* Compares a uid claimed in a request body against the uid from the verified
+   token. Only for endpoints that still need a body uid for other reasons
+   (e.g. first-write bootstrap); endpoints that can derive uid purely from
+   the token (user-data, AI proxy) should keep doing that instead of calling
+   this — there's no client-supplied uid left to attack in that case. */
+function _verifyOwnership(req, res, verifiedUid, claimedUid) {
+  if (verifiedUid !== null && verifiedUid !== claimedUid) {
+    res.writeHead(403, _apiHeaders(req));
+    res.end(JSON.stringify({ error: 'Acceso denegado' }));
+    return false;
+  }
+  return true;
+}
+
 async function handleUserDataGet(req, res) {
   if (!_checkRateLimit(req, res, 'userData')) return;
 
@@ -1724,10 +1738,7 @@ async function handleUserMeta(req, res) {
         res.writeHead(400, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'UID inválido' }));
       }
-      if (verifiedUid !== null && verifiedUid !== uid) {
-        res.writeHead(403, _apiHeaders(req));
-        return res.end(JSON.stringify({ error: 'Acceso denegado' }));
-      }
+      if (!_verifyOwnership(req, res, verifiedUid, uid)) return;
       const existing = _readMeta(uid) || {};
       const meta = {
         ...existing,
