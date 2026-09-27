@@ -4050,6 +4050,18 @@ th.sort-active .sort-arrow { opacity: 1; }
   .btn-secondary  { padding: 8px 14px; font-size: 11px; }
 
   .chart-wrapper  { height: 240px; }
+
+  /* .modal-close / .photo-modal-close tienen mayor especificidad (clase)
+     que la regla general "button { min-height: 44px }" (etiqueta, ver
+     arriba en este mismo archivo), así que esa regla nunca llegaba a
+     aplicarles — se quedaban en 28x28px, por debajo del mínimo táctil de
+     44x44px (WCAG 2.5.5 / Apple HIG / Material). Es el botón de cerrar de
+     TODOS los modales de la app. */
+  .modal-close,
+  .photo-modal-close {
+    width: 44px;
+    height: 44px;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────
