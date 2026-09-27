@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'finova-v16';
+const CACHE_NAME = 'finova-v17';
 const API_CACHE  = 'finova-api-v1';
 const API_TTL    = 3_600_000; // 1 hour in ms
 const API_PATHS  = ['/api/yahoo', '/api/fx'];
@@ -169,17 +169,23 @@ self.addEventListener('fetch', event => {
   }
   event.respondWith(
     caches.match(event.request).then(cached => {
+      // 'network' es una Promise, y una Promise siempre es truthy — un
+      // "cached || network || fallback" nunca llegaría al fallback (queda
+      // como código muerto) y, si el fetch falla, event.respondWith recibe
+      // directamente null en vez del OFFLINE_PAGE. Por eso el fallback vive
+      // dentro del .catch() de la propia promesa de red, no como tercer
+      // operando del ||.
       const network = fetch(event.request).then(response => {
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => null);
-      return cached || network || new Response(OFFLINE_PAGE, {
+      }).catch(() => new Response(OFFLINE_PAGE, {
         status: 503,
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
-      });
+      }));
+      return cached || network;
     })
   );
 });
