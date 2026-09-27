@@ -338,6 +338,9 @@ function _checkRateLimit(req, res, endpoint) {
   const result = _tokenBucket(`rl:${endpoint}:${ip}`, capacity, refillRate);
   if (!result.ok) {
     const retryAfter = Math.max(result.resetIn, 1);
+    // Sin esto, un pico de 429 (abuso o un límite mal calibrado) es
+    // invisible al revisar los logs de Railway a mano — no queda ni rastro.
+    console.warn(`[FINOVA/RateLimit] 429 en '${endpoint}' — IP: ${ip}, ruta: ${req.url}`);
     res.writeHead(429, _apiHeaders(req, {
       'X-RateLimit-Limit':     String(capacity),
       'X-RateLimit-Remaining': '0',
@@ -483,6 +486,7 @@ function _buildServerSystemPrompt(anonMode, snapshot) {
 function _serverError(req, res, e, status = 500, userMsg = null) {
   console.error('[FINOVA][ERROR]', {
     ts:      new Date().toISOString(),
+    status,
     route:   req.url,
     method:  req.method,
     uid:     req.uid || 'anonymous',
@@ -2128,6 +2132,10 @@ http.createServer((req, res) => {
   // handleUserDataPost y handleUserMeta mantienen además su propio chequeo
   // interno como defensa en profundidad; aquí no se ha tocado ese código.
   if (req.method === 'POST' && req.url.startsWith('/api/') && !_originOk(req)) {
+    // Repetido a menudo = ALLOWED_ORIGIN no coincide con el dominio real en
+    // Railway, o alguien probando peticiones cross-origin — sin este log
+    // no queda ningún rastro al revisar los logs de Railway a mano.
+    console.warn(`[FINOVA/CORS] Origen rechazado: '${req.headers.origin || req.headers.referer || '(sin origin/referer)'}' — ruta: ${req.url}`);
     res.writeHead(403, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'Origen no permitido' }));
   }
