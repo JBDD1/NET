@@ -437,6 +437,27 @@ function renderDashboard() {
     greetEl.textContent = name ? `${sal}, ${name}` : 'Dashboard';
   }
 
+  // Pantalla de bienvenida — cuenta nueva sin transacciones ni cartera.
+  // Oculta el grid de KPIs/gráficos en vez de reescribirlo, así el layout
+  // original vuelve a aparecer solo con ocultar/mostrar en cuanto haya datos.
+  const emptyEl  = document.getElementById('dash-empty-state');
+  const blocksEl = document.getElementById('dash-blocks-container');
+  const isEmpty  = APP.transactions.length === 0 && APP.portfolio.length === 0;
+  if (emptyEl) {
+    emptyEl.style.display = isEmpty ? '' : 'none';
+    if (isEmpty) {
+      emptyEl.innerHTML = emptyState(
+        '👋',
+        'Bienvenido a Finova',
+        'Empieza añadiendo tus primeros datos para ver tu patrimonio en tiempo real.',
+        '+ Añadir primera transacción',
+        "navigateTo('transactions')"
+      );
+    }
+  }
+  if (blocksEl) blocksEl.style.display = isEmpty ? 'none' : '';
+  if (isEmpty) return;
+
   const v = _dashCalcValues();
 
   if (_isDashBlockVisible('dash-block-kpis')) {
