@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Finova — Gestión Financiera Personal</title>
   <meta name="description" content="Finova — Gestión financiera personal. Controla tu patrimonio, inversiones, transacciones y objetivos en un solo lugar." />
+  <!-- App autenticada, no contenido de búsqueda: no indexar (evita competir
+       con landing.html por las mismas keywords), pero sí seguir sus enlaces. -->
+  <meta name="robots" content="noindex, follow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
@@ -32,12 +35,19 @@
   <link rel="apple-touch-icon" sizes="120x120" href="icon-120.png" />
   <meta name="theme-color" content="#15110c" />
 
-  <!-- Open Graph -->
+  <!-- Open Graph — por si se comparte un enlace directo a la app -->
   <meta property="og:title" content="Finova — Tu asistente financiero personal" />
   <meta property="og:description" content="Gestiona tu patrimonio, inversiones, fiscalidad IRPF y objetivos en una app elegante. Gratis." />
   <meta property="og:image" content="https://jbdd1.github.io/NET/icon-512.png" />
+  <meta property="og:url" content="https://jbdd1.github.io/NET/index.html" />
   <meta property="og:type" content="website" />
+  <meta property="og:locale" content="es_ES" />
+  <meta property="og:site_name" content="Finova" />
+  <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Finova — Tu asistente financiero personal" />
+  <meta name="twitter:description" content="Gestiona tu patrimonio, inversiones, fiscalidad IRPF y objetivos en una app elegante. Gratis." />
+  <meta name="twitter:image" content="https://jbdd1.github.io/NET/icon-512.png" />
   <script>
     /* Aplicar tema ANTES del primer paint para evitar parpadeo */
     try {
