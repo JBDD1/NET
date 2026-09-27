@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'finova-v18';
+const CACHE_NAME = 'finova-v19';
 const API_CACHE  = 'finova-api-v1';
 const API_TTL    = 3_600_000; // 1 hour in ms
 const API_PATHS  = ['/api/yahoo', '/api/fx'];
@@ -44,7 +44,13 @@ async function _networkThenCacheApi(request) {
 const CRITICAL_ASSETS = [
   './',
   './index.html',
-  './style.css',
+  // style.css NO va aquí: es el único asset de esta lista que pasa por el
+  // pipeline normal de Rollup (vite.config.js), que le añade un hash al
+  // nombre de fichero en producción (p.ej. /assets/DIuZ1M_q.css) — el path
+  // literal './style.css' ya no existe en el build y cache.add() fallaría
+  // con un 404 real en cada instalación. El handler de 'fetch' de abajo ya
+  // cachea cualquier recurso la primera vez que se pide de verdad, así que
+  // el CSS con hash se cachea igualmente en la primera visita online.
   './src/core/script.js',
   './src/core/ai.js',
   './src/sections/dashboard.js',
