@@ -2088,7 +2088,7 @@ const _IS_CLOUD_DEPLOY = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILW
 http.createServer((req, res) => {
   // Redirigir 127.0.0.1 → localhost (Firebase Auth solo acepta 'localhost')
   if (req.headers.host && req.headers.host.startsWith('127.0.0.1')) {
-    res.writeHead(301, { 'Location': `http://localhost:${PORT}${req.url}` });
+    res.writeHead(301, { 'Location': `http://localhost:${PORT}${req.url}`, ..._SEC });
     return res.end();
   }
 
