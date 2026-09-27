@@ -1931,7 +1931,11 @@ function _parseOFXSGML(text) {
       const name      = get('NAME');
       const memo      = get('MEMO');
       const trntype   = get('TRNTYPE').toUpperCase();
-      const description = memo || name || 'Transacción bancaria';
+      // _cleanBankDescription también aquí: sin esto, el memo/nombre crudo del
+      // banco (que puede incluir números de tarjeta enmascarados o fragmentos
+      // de referencia/cuenta) llegaba tal cual al proveedor de IA en
+      // _enrichImportWithAI — CSV/Excel ya lo limpiaban, OFX no.
+      const description = _cleanBankDescription(memo || name || 'Transacción bancaria');
 
       let date = '';
       const dm = rawDate.match(/^(\d{4})(\d{2})(\d{2})/);
@@ -1944,10 +1948,12 @@ function _parseOFXSGML(text) {
       const type     = isIncome ? 'income' : 'expense';
 
       const cls = _classifyLocal(description, type);
+      const merch = _extractMerchant(description);
 
       txs.push({
         fitid, date, description, category: cls.category, type, amount: Math.abs(amount),
-        merchant:                 _extractMerchant(description),
+        merchant:                 merch.merchant,
+        merchantSource:           merch.source,
         transactionType:          _detectTransactionType(description, type),
         categoryConfidence:       cls.confidence,
         categoryConfidenceScore:  cls.confidenceScore,
@@ -1981,71 +1987,266 @@ function _txSignature(t) {
   return `${t.date}|${amt.toFixed(2)}|${t.type}|${(t.description || '').trim().toLowerCase().slice(0, 40)}`;
 }
 
+// Etiquetas en español del tipo de movimiento — informativo (no sustituye a
+// income/expense, que sigue gobernando signo y estadísticas tal cual hoy).
+const _TX_TYPE_LABELS = {
+  expense: 'Gasto', income: 'Ingreso', transfer: 'Transferencia',
+  investment: 'Inversión', refund: 'Reembolso',
+};
+
+// Decide el estado de una fila de importación y explica por qué, si aplica.
+// "ready" exige confianza ALTA en la categoría (patrón aprendido o palabra
+// clave) — una sugerencia de IA (confianza "medium") NO es motivo suficiente
+// para darla por buena sin revisión: sección 7 del pedido, "un 0,63 no
+// significa automáticamente que una clasificación sea válida".
+function _computeImportRowStatus(r) {
+  const reasons = [];
+  if (r.isPossibleDuplicate) {
+    reasons.push('Ya existe una transacción con la misma fecha, importe y descripción. Podría ser un duplicado, pero no hay un identificador bancario único para confirmarlo con seguridad.');
+  }
+  if (r.category === UNCLASSIFIED_CATEGORY) {
+    reasons.push('No hay información suficiente en la descripción para determinar la categoría con seguridad.');
+  } else if (r.categoryConfidence !== 'high') {
+    reasons.push('La categoría la ha sugerido la IA, sin una regla o corrección previa que la respalde.');
+  }
+  if (!r.merchant) {
+    reasons.push('No se ha podido identificar el comercio a partir de la descripción bancaria.');
+  }
+  const status = r.isPossibleDuplicate ? 'possible_duplicate' : (reasons.length ? 'review_required' : 'ready');
+  return { status, reasons };
+}
+
+let _pendingCertainDupCount = 0;
+
 function _showOFXPreview(allRows, source = 'OFX/QFX') {
   _pendingImportSource = source;
-  // FITID (OFX) es la deduplicación fiable — date+amount por sí solos descartarían
-  // silenciosamente transacciones legítimas del mismo día. Para filas sin fitid
-  // (CSV/Excel) se usa la firma de contenido como fallback.
+  // FITID (OFX) es un identificador único real del banco: coincidencia =
+  // duplicado seguro, se excluye directamente sin preguntar. Sin FITID
+  // (CSV/Excel) solo hay la firma de contenido (fecha+importe+tipo+inicio de
+  // descripción), que puede coincidir por azar entre dos operaciones
+  // distintas — eso es como mucho un POSIBLE duplicado, y nunca se descarta
+  // en silencio: se deja en la lista, marcado, para que el usuario decida.
   const existingFitids     = new Set(APP.transactions.map(t => t.fitid).filter(Boolean));
   const existingSignatures = new Set(APP.transactions.map(_txSignature));
 
-  const rows = allRows.filter(r =>
-    !(r.fitid && existingFitids.has(r.fitid)) &&
-    !(!r.fitid && existingSignatures.has(_txSignature(r)))
-  );
-  const dupCount = allRows.length - rows.length;
+  _pendingCertainDupCount = allRows.filter(r => r.fitid && existingFitids.has(r.fitid)).length;
 
+  const rows = allRows.filter(r => !(r.fitid && existingFitids.has(r.fitid)));
   if (!rows.length) {
-    showToast(`Todas las transacciones ya existen en Finova (${dupCount} duplicadas omitidas)`, 'info');
+    showToast(`Todas las transacciones ya existen en Finova (${_pendingCertainDupCount} duplicadas omitidas)`, 'info');
     return;
   }
 
+  rows.forEach(r => {
+    r.isPossibleDuplicate = !r.fitid && existingSignatures.has(_txSignature(r));
+    const { status, reasons } = _computeImportRowStatus(r);
+    r.importStatus  = status;
+    r.reviewReasons = reasons;
+  });
+
   _pendingOFXRows = rows;
+  _renderImportSummary();
+}
 
-  const dupNote = dupCount > 0
-    ? `<span style="color:var(--text-muted)"> · ${dupCount} duplicadas omitidas</span>`
-    : '';
+// Reconstruye y (re)abre el modal de resumen a partir de _pendingOFXRows —
+// se llama tanto la primera vez como al volver de revisar pendientes, para
+// que los contadores reflejen siempre el estado real, nunca uno fijo.
+function _renderImportSummary() {
+  const rows = _pendingOFXRows;
+  if (!rows.length) { closeModal(); return; }
 
-  const unclassifiedCount = rows.filter(r => r.category === UNCLASSIFIED_CATEGORY).length;
-  const reviewNote = unclassifiedCount > 0
-    ? `<span style="color:var(--down)"> · ${unclassifiedCount} sin clasificar con seguridad, revisa la categoría</span>`
+  const readyCount        = rows.filter(r => r.importStatus === 'ready').length;
+  const reviewCount       = rows.filter(r => r.importStatus === 'review_required').length;
+  const possibleDupCount  = rows.filter(r => r.importStatus === 'possible_duplicate').length;
+  const pendingCount      = reviewCount + possibleDupCount;
+  const merchantsFound    = rows.filter(r => r.merchant).length;
+  const categoriesFound   = rows.filter(r => r.category !== UNCLASSIFIED_CATEGORY).length;
+
+  const byType = {};
+  rows.forEach(r => {
+    const key = (r.transactionType && r.transactionType !== r.type) ? r.transactionType : r.type;
+    byType[key] = (byType[key] || 0) + 1;
+  });
+  const typeBreakdown = Object.entries(byType)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `<div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--text-secondary)">${_TX_TYPE_LABELS[k] || k}</span><strong>${n}</strong></div>`)
+    .join('');
+
+  const dupNote = _pendingCertainDupCount > 0
+    ? `<span style="color:var(--text-muted)"> · ${_pendingCertainDupCount} duplicadas (mismo ID bancario) omitidas</span>`
     : '';
 
   const tableRows = rows.map(r => {
-    const needsReview = r.category === UNCLASSIFIED_CATEGORY || r.categoryConfidence === 'low';
+    const icon = r.importStatus === 'ready'
+      ? '<span style="color:var(--up)" title="Lista para importar">✓</span>'
+      : r.importStatus === 'possible_duplicate'
+        ? '<span style="color:var(--text-muted)" title="Posible duplicado — requiere revisión">⧉</span>'
+        : '<span style="color:var(--down)" title="Necesita revisión">⚠️</span>';
     return `
     <tr>
       <td>${escapeHtml(r.date)}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.description)}</td>
-      <td>${needsReview ? '<span style="color:var(--down)" title="Categoría no determinada con seguridad">⚠️ </span>' : ''}${escapeHtml(r.category)}</td>
-      <td><span class="badge badge-${r.type}">${r.type === 'income' ? 'Ingreso' : 'Gasto'}</span></td>
+      <td>${r.merchant ? escapeHtml(r.merchant) : '<span style="color:var(--text-muted)">⚠ No identificado</span>'}</td>
+      <td style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(r.description)}">${escapeHtml(r.description)}</td>
+      <td>${r.category === UNCLASSIFIED_CATEGORY ? '<span style="color:var(--text-muted)">⚠ Pendiente</span>' : escapeHtml(r.category)}</td>
       <td class="text-right ${r.type === 'income' ? 'positive' : 'negative'}">${r.type === 'income' ? '+' : '-'}${formatCurrency(r.amount)}</td>
-    </tr>
-  `;
+      <td style="text-align:center">${icon}</td>
+    </tr>`;
   }).join('');
 
   openModal(
     `Importar ${_pendingImportSource} — ${rows.length} transacciones`,
-    `<p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">
-       Se van a importar <strong>${rows.length}</strong> transacciones nuevas.${dupNote}
-       Las categorías se han asignado automáticamente y puedes editarlas después.${reviewNote}
+    `<p style="font-size:13px;color:var(--text-secondary);margin:0 0 10px">
+       <strong style="color:var(--up)">${readyCount} listas para importar</strong>
+       ${pendingCount > 0 ? ` · <strong style="color:var(--down)">${pendingCount} necesitan revisión</strong>` : ''}${dupNote}
      </p>
-     <div style="max-height:360px;overflow-y:auto">
+     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px;font-size:12px">
+       <div class="card" style="padding:10px 14px">${typeBreakdown}</div>
+       <div class="card" style="padding:10px 14px">
+         <div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--text-secondary)">Comercios identificados</span><strong>${merchantsFound}</strong></div>
+         <div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--text-secondary)">Comercios pendientes</span><strong>${rows.length - merchantsFound}</strong></div>
+         <div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--text-secondary)">Categorías identificadas</span><strong>${categoriesFound}</strong></div>
+         <div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--text-secondary)">Categorías pendientes</span><strong>${rows.length - categoriesFound}</strong></div>
+         ${possibleDupCount > 0 ? `<div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--text-secondary)">Posibles duplicados</span><strong>${possibleDupCount}</strong></div>` : ''}
+       </div>
+     </div>
+     <div style="max-height:300px;overflow-y:auto">
        <table class="data-table" style="font-size:12px">
-         <thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Tipo</th><th>Importe</th></tr></thead>
+         <thead><tr><th>Fecha</th><th>Comercio</th><th>Descripción</th><th>Categoría</th><th>Importe</th><th></th></tr></thead>
          <tbody>${tableRows}</tbody>
        </table>
-     </div>`,
-    () => _confirmOFXImport(),
+     </div>
+     ${pendingCount > 0 ? `<div style="margin-top:14px;text-align:right">
+       <button type="button" class="btn-secondary" onclick="_showImportReviewModal()">Revisar ${pendingCount} pendiente${pendingCount === 1 ? '' : 's'}</button>
+     </div>` : ''}`,
+    readyCount > 0 ? () => _confirmOFXImport() : null,
     () => {
       const btn = document.getElementById('modalConfirm');
-      if (btn) btn.textContent = `Importar ${rows.length}`;
+      if (!btn) return;
+      if (readyCount > 0) { btn.textContent = `Importar ${readyCount} lista${readyCount === 1 ? '' : 's'}`; btn.style.display = ''; }
+      else btn.style.display = 'none';
     }
   );
 }
 
+// Modal de revisión — una tarjeta por operación pendiente, con los campos
+// dudosos editables y el motivo exacto de por qué necesita revisión (sección
+// 20 del pedido). Nada se asume: lo que el usuario deje en blanco se queda
+// pendiente, y "Recordar esta elección" es opt-in (por defecto sin marcar) —
+// una corrección nunca se convierte en regla permanente sin que el usuario
+// lo pida explícitamente (regla absoluta 14/sección 15).
+function _showImportReviewModal() {
+  const rows = _pendingOFXRows;
+  const idxs = rows.map((_, i) => i).filter(i => rows[i].importStatus !== 'ready');
+  if (!idxs.length) { _renderImportSummary(); return; }
+
+  const catOptionsFor = (type, current) => {
+    const list = (type === 'income' ? APP.categories.income : APP.categories.expense).filter(c => c !== UNCLASSIFIED_CATEGORY);
+    const opts = list.map(c => `<option value="${escapeHtml(c)}" ${c === current ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+    return `<option value="${UNCLASSIFIED_CATEGORY}" ${current === UNCLASSIFIED_CATEGORY ? 'selected' : ''}>⚠ Pendiente</option>${opts}`;
+  };
+  const typeOptionsFor = current => Object.entries(_TX_TYPE_LABELS)
+    .map(([k, label]) => `<option value="${k}" ${k === current ? 'selected' : ''}>${label}</option>`).join('');
+
+  const cards = idxs.map(i => {
+    const r = rows[i];
+    const reasonsHtml = r.reviewReasons.map(x => `<li>${escapeHtml(x)}</li>`).join('');
+    const dupControl = r.importStatus === 'possible_duplicate'
+      ? `<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px">
+           <input type="checkbox" id="review-includedup-${i}" />
+           Importar igualmente — no es un duplicado
+         </label>`
+      : '';
+    return `
+    <div class="card" style="margin-bottom:14px;padding:16px">
+      <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:4px">
+        <div style="font-size:12px;color:var(--text-secondary);word-break:break-word">${escapeHtml(r.description)}</div>
+        <div style="white-space:nowrap;font-weight:600" class="${r.type === 'income' ? 'positive' : 'negative'}">${r.type === 'income' ? '+' : '-'}${formatCurrency(r.amount)}</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">${escapeHtml(r.date)}</div>
+      <ul style="margin:0 0 10px;padding-left:18px;font-size:12px;color:var(--down)">${reasonsHtml}</ul>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Comercio</label>
+          <input type="text" class="text-input" id="review-merchant-${i}" value="${escapeHtml(r.merchant || '')}" placeholder="Sin identificar" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Categoría</label>
+          <select class="select-input" id="review-cat-${i}">${catOptionsFor(r.type, r.category)}</select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Tipo</label>
+          <select class="select-input" id="review-type-${i}">${typeOptionsFor(r.transactionType || r.type)}</select>
+        </div>
+      </div>
+      ${dupControl}
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px">
+        <input type="checkbox" id="review-remember-${i}" />
+        Recordar esta elección para operaciones similares
+      </label>
+    </div>`;
+  }).join('');
+
+  openModal(
+    `Revisar ${idxs.length} operación${idxs.length === 1 ? '' : 'es'}`,
+    `<p style="font-size:13px;color:var(--text-secondary);margin:0 0 14px">
+       Completa lo que falte y pulsa «Guardar». Lo que dejes en blanco se queda pendiente — Finova no inventa ningún dato.
+     </p>
+     <div style="max-height:420px;overflow-y:auto">${cards}</div>`,
+    () => _saveImportReview(idxs),
+    () => {
+      const btn = document.getElementById('modalConfirm');
+      if (btn) btn.textContent = 'Guardar y volver al resumen';
+    }
+  );
+}
+
+function _saveImportReview(idxs) {
+  idxs.forEach(i => {
+    const r = _pendingOFXRows[i];
+    if (!r) return;
+
+    const includeDupEl = document.getElementById(`review-includedup-${i}`);
+    if (includeDupEl && includeDupEl.checked) {
+      r.isPossibleDuplicate = false; // el usuario confirma explícitamente que NO es un duplicado
+    }
+
+    const newMerchant = (document.getElementById(`review-merchant-${i}`)?.value || '').trim();
+    if (newMerchant && newMerchant !== r.merchant) {
+      r.merchant       = newMerchant;
+      r.merchantSource = 'manual';
+    }
+
+    const newCat = document.getElementById(`review-cat-${i}`)?.value || r.category;
+    if (newCat !== r.category) {
+      r.category                = newCat;
+      r.categorySource          = newCat === UNCLASSIFIED_CATEGORY ? 'unknown' : 'manual';
+      r.categoryConfidence      = newCat === UNCLASSIFIED_CATEGORY ? 'low' : 'high';
+      r.categoryConfidenceScore = newCat === UNCLASSIFIED_CATEGORY ? 0 : 1;
+    }
+
+    const newType = document.getElementById(`review-type-${i}`)?.value;
+    if (newType) r.transactionType = newType;
+
+    // "Recordar esta elección" — regla absoluta 14: ninguna predicción se
+    // convierte en regla permanente sin confirmación explícita. Es literal:
+    // solo si la casilla está marcada, y solo si hay una categoría real.
+    const rememberEl = document.getElementById(`review-remember-${i}`);
+    if (rememberEl?.checked && newCat && newCat !== UNCLASSIFIED_CATEGORY) {
+      _patWrite(txPatternKey(r.description), newCat);
+    }
+
+    const { status, reasons } = _computeImportRowStatus(r);
+    r.importStatus  = status;
+    r.reviewReasons = reasons;
+  });
+
+  closeModal();
+  _renderImportSummary();
+}
+
 function _confirmOFXImport() {
-  _pendingOFXRows.forEach(r => {
+  const readyRows = _pendingOFXRows.filter(r => r.importStatus === 'ready');
+  readyRows.forEach(r => {
     const tx = {
       id: generateId(), date: r.date, description: r.description,
       category: r.category, type: r.type, amount: r.amount,
@@ -2054,6 +2255,7 @@ function _confirmOFXImport() {
     // Metadatos de clasificación — opcionales, no rompen transacciones
     // creadas por otras vías (manual, quick-add) que no los llevan.
     if (r.merchant)                        tx.merchant = r.merchant;
+    if (r.merchantSource)                  tx.merchantSource = r.merchantSource;
     if (r.transactionType)                 tx.transactionType = r.transactionType;
     if (r.categoryConfidence)              tx.categoryConfidence = r.categoryConfidence;
     if (typeof r.categoryConfidenceScore === 'number') tx.categoryConfidenceScore = r.categoryConfidenceScore;
@@ -2063,12 +2265,26 @@ function _confirmOFXImport() {
     APP.transactions.push(tx);
   });
   APP.transactions.sort((a, b) => b.date.localeCompare(a.date));
-  const count = _pendingOFXRows.length;
-  _pendingOFXRows = [];
+
+  const importedCount = readyRows.length;
+  // Lo que queda pendiente NO se pierde ni se fuerza a importar mal
+  // clasificado — se queda disponible para revisar después sin tener que
+  // reimportar el archivo entero (sección 22: nunca forzar a aceptar una
+  // clasificación incorrecta).
+  const remaining = _pendingOFXRows.filter(r => r.importStatus !== 'ready');
+  _pendingOFXRows = remaining;
+
   saveData();
   closeModal();
   renderTransactions();
-  showToast(`${count} transacciones importadas desde ${_pendingImportSource} ✓`, 'success');
+
+  if (remaining.length > 0) {
+    showToast(`${importedCount} transacciones importadas ✓ · ${remaining.length} pendientes de revisión`, importedCount > 0 ? 'success' : 'info', {
+      action: { label: 'Revisar', callback: () => _showImportReviewModal() },
+    });
+  } else {
+    showToast(`${importedCount} transacciones importadas desde ${_pendingImportSource} ✓`, 'success');
+  }
 }
 
 /* ─── Importación CSV / Excel bancario (Santander, BBVA, CaixaBank…) ── */
@@ -2358,9 +2574,11 @@ function _rowsToBankTransactions(allRows) {
       if (amount === 0) { zeroAmtCount++; return; }
       const type = amount > 0 ? 'income' : 'expense';
       const cls  = _classifyLocal(desc, type);
+      const merch = _extractMerchant(desc);
       txs.push({
         date, description: desc, category: cls.category, type, amount: Math.abs(amount),
-        merchant:                 _extractMerchant(desc),
+        merchant:                 merch.merchant,
+        merchantSource:           merch.source,
         transactionType:          _detectTransactionType(desc, type),
         categoryConfidence:       cls.confidence,
         categoryConfidenceScore:  cls.confidenceScore,
@@ -3526,13 +3744,30 @@ const _MERCHANT_STRIP_RE = [
   /^adeudo\s*/i,
   /^abono\s*/i,
 ];
+// Residuo de jerga bancaria que a veces sobrevive a la limpieza (p.ej. si el
+// prefijo no encaja con ningún patrón conocido) y que NO es un nombre de
+// comercio real — no debe devolverse como si lo fuera.
+const _MERCHANT_INVALID_RE = /^(tarj|tarjeta|compra|pago|varios|operacion|movimiento|desconocido|otro|efectivo)\.?$/i;
+
+// Regla absoluta: solo se devuelve un comercio si hay evidencia suficiente.
+// "COMPRA TARJ. 5402XXXX XXXX" no tiene ningún nombre real tras limpiar los
+// prefijos — lo que queda es un residuo de número de tarjeta enmascarado
+// (dígitos + X sueltas), no un comercio. En vez de devolver ese residuo como
+// si fuera el nombre, se cuenta cuántas letras "reales" quedan (fuera de
+// dígitos, x/X de máscara y puntuación) y si son menos de 3 se considera que
+// no hay comercio identificable — null, no una suposición.
 function _extractMerchant(cleanedDesc) {
   let s = String(cleanedDesc || '').trim();
   for (const re of _MERCHANT_STRIP_RE) {
     if (re.test(s)) { s = s.replace(re, '').trim(); break; }
   }
   s = s.split(' - ')[0].trim(); // "Revolut - Dublin" → "Revolut"
-  return s || cleanedDesc || null;
+
+  const letters = s.replace(/[0-9xX*.\s,\-]/g, '');
+  if (!s || s.length < 3 || letters.length < 3 || _MERCHANT_INVALID_RE.test(s)) {
+    return { merchant: null, source: 'unknown' };
+  }
+  return { merchant: s, source: 'rule' };
 }
 
 // Tipo de movimiento — informativo, NO sustituye a `type` (income/expense),

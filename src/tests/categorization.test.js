@@ -49,7 +49,7 @@ function loadScript() {
   fns = vm.runInContext(
     '({_classifyLocal,_detectTransactionType,_extractMerchant,_batchClassifyWithAI,' +
     '_enrichImportWithAI,_rowsToBankTransactions,_cleanBankDescription,txPatternKey,' +
-    'matchLocalKeywords,_patWrite,UNCLASSIFIED_CATEGORY})',
+    'matchLocalKeywords,_patWrite,_computeImportRowStatus,_parseOFXSGML,UNCLASSIFIED_CATEGORY})',
     context
   );
   // APP dentro del contexto vm es una copia distinta del objeto externo — nos
@@ -151,9 +151,105 @@ describe('_detectTransactionType — informativo, no cambia type', () => {
 });
 
 describe('_extractMerchant', () => {
-  test('quita jerga bancaria y deja el nombre del comercio', () => {
-    expect(fns._extractMerchant('Compra Tarj. Revolut - Dublin')).toBe('Revolut');
-    expect(fns._extractMerchant('Transferencia a Javier Baranda')).toBe('Javier Baranda');
+  test('quita jerga bancaria y deja el nombre del comercio (con evidencia suficiente)', () => {
+    expect(fns._extractMerchant('Compra Tarj. Revolut - Dublin')).toEqual({ merchant: 'Revolut', source: 'rule' });
+    expect(fns._extractMerchant('Transferencia a Javier Baranda')).toEqual({ merchant: 'Javier Baranda', source: 'rule' });
+  });
+
+  test('sin evidencia suficiente (solo residuo de tarjeta enmascarada) -> merchant null, NO inventa', () => {
+    // "COMPRA TARJ. 5402XXXX XXXX" tras limpiar prefijos solo deja dígitos y
+    // X sueltas — ningún nombre real. Debe quedar sin identificar, nunca
+    // devolver ese residuo como si fuera el comercio.
+    const r = fns._extractMerchant('Compra Tarj. 5402xxxx Xxxx');
+    expect(r.merchant).toBeNull();
+    expect(r.source).toBe('unknown');
+  });
+
+  test('residuo demasiado corto -> merchant null', () => {
+    expect(fns._extractMerchant('Compra Tarj. Ab').merchant).toBeNull();
+  });
+
+  test('jerga bancaria residual conocida (sin nombre real detrás) -> merchant null', () => {
+    expect(fns._extractMerchant('Compra Tarj.').merchant).toBeNull();
+  });
+});
+
+describe('_computeImportRowStatus — nunca listo sin evidencia suficiente', () => {
+  test('categoría de confianza alta + comercio identificado -> ready', () => {
+    const r = { category: 'Alimentación', categoryConfidence: 'high', merchant: 'Mercadona', isPossibleDuplicate: false };
+    expect(fns._computeImportRowStatus(r).status).toBe('ready');
+    expect(fns._computeImportRowStatus(r).reasons).toEqual([]);
+  });
+
+  test('sin clasificar -> review_required, con motivo explicado', () => {
+    const r = { category: fns.UNCLASSIFIED_CATEGORY, categoryConfidence: 'low', merchant: 'Comercio X', isPossibleDuplicate: false };
+    const { status, reasons } = fns._computeImportRowStatus(r);
+    expect(status).toBe('review_required');
+    expect(reasons.length).toBeGreaterThan(0);
+  });
+
+  test('categoría asignada solo por IA (confianza "medium") -> review_required, no se da por buena sin más', () => {
+    const r = { category: 'Ocio', categoryConfidence: 'medium', merchant: 'Comercio Y', isPossibleDuplicate: false };
+    expect(fns._computeImportRowStatus(r).status).toBe('review_required');
+  });
+
+  test('comercio no identificado -> review_required aunque la categoría sea de confianza alta', () => {
+    const r = { category: 'Alimentación', categoryConfidence: 'high', merchant: null, isPossibleDuplicate: false };
+    expect(fns._computeImportRowStatus(r).status).toBe('review_required');
+  });
+
+  test('posible duplicado -> status propio "possible_duplicate", no se mezcla con listo', () => {
+    const r = { category: 'Alimentación', categoryConfidence: 'high', merchant: 'Mercadona', isPossibleDuplicate: true };
+    expect(fns._computeImportRowStatus(r).status).toBe('possible_duplicate');
+  });
+});
+
+describe('OFX — seguridad: la descripción se limpia antes de llegar a la IA', () => {
+  test('_parseOFXSGML limpia el MEMO/NAME crudo igual que CSV/Excel', () => {
+    // MEMO con un patrón de tarjeta enmascarada tal como lo mandaría un banco.
+    const ofx = `
+<STMTTRN>
+<TRNTYPE>DEBIT
+<DTPOSTED>20260905
+<TRNAMT>-45.30
+<FITID>ABC123
+<NAME>MERCADONA
+<MEMO>COMPRA TARJ. 5402XXXXXXXX9036 MERCADONA 00432
+</STMTTRN>`;
+    const txs = fns._parseOFXSGML(ofx);
+    expect(txs.length).toBe(1);
+    // Ya no debe quedar el número de tarjeta enmascarado en la descripción
+    // que luego se manda a _enrichImportWithAI.
+    expect(txs[0].description).not.toMatch(/5402/);
+  });
+});
+
+describe('Test obligatorio — Finova NUNCA inventa (sección 39 del pedido)', () => {
+  test('descripción sin información suficiente: no inventa comercio, categoría ni confianza falsa', () => {
+    const rows = [
+      ['Fecha', 'Concepto', 'Importe'],
+      ['05/09/2026', 'COMPRA TARJ. 5402XXXX XXXX', '-12,00'],
+    ];
+    const txs = fns._rowsToBankTransactions(rows);
+    expect(txs.length).toBe(1);
+    const t = txs[0];
+
+    // No inventa comercio
+    expect(t.merchant).toBeNull();
+    expect(t.merchantSource).toBe('unknown');
+
+    // No inventa categoría — se queda "Sin clasificar", no la primera de la lista
+    expect(t.category).toBe(fns.UNCLASSIFIED_CATEGORY);
+    expect(t.categorySource).toBe('unknown');
+    expect(t.categoryConfidence).toBe('low');
+
+    // El estado calculado refleja que necesita revisión, no que esté listo
+    const { status, reasons } = fns._computeImportRowStatus({ ...t, isPossibleDuplicate: false });
+    expect(status).toBe('review_required');
+    expect(reasons.length).toBeGreaterThan(0);
+
+    // La descripción bancaria original se conserva tal cual, nunca se sustituye
+    expect(t.description).toContain('Tarj');
   });
 });
 
