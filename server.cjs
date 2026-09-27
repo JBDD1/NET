@@ -2107,6 +2107,18 @@ http.createServer((req, res) => {
     }
   }
 
+  // CSRF: cualquier POST a la API con Origin/Referer presente y fuera de
+  // _ALLOWED_ORIGINS se corta aquí, en un único punto, en vez de depender
+  // de que cada handler recuerde llamar a _originOk() por su cuenta.
+  // (Sin Origin/Referer — llamadas same-origin sin fetch cross-origin, o
+  // el proxy de Vercel llamando en servidor — _originOk() ya deja pasar.)
+  // handleUserDataPost y handleUserMeta mantienen además su propio chequeo
+  // interno como defensa en profundidad; aquí no se ha tocado ese código.
+  if (req.method === 'POST' && req.url.startsWith('/api/') && !_originOk(req)) {
+    res.writeHead(403, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'Origen no permitido' }));
+  }
+
   // CORS preflight
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
