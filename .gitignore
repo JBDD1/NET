@@ -7,9 +7,10 @@
 .env.*.local
 .env.server
 firebase-service-account.json
-*-service-account.json
+*service-account*.json
 *serviceAccount*.json
 *service_account*.json
+*firebase-adminsdk*.json
 *.pem
 *.p12
 *.key
