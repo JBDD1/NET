@@ -34,7 +34,7 @@ try {
   console.warn('[FINOVA] Firebase Admin SDK no disponible:', e.message);
 }
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
 const SYNC_DIR       = path.join(ROOT, 'data', 'sync');
 const USERS_DIR      = path.join(ROOT, 'data', 'users');
@@ -2078,6 +2078,8 @@ function _validateEnv() {
 }
 _validateEnv();
 
+const _IS_CLOUD_DEPLOY = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID || process.env.NODE_ENV === 'production');
+
 /* ─── HTTP server ────────────────────────────────────────────── */
 http.createServer((req, res) => {
   // Redirigir 127.0.0.1 → localhost (Firebase Auth solo acepta 'localhost')
@@ -2254,13 +2256,21 @@ http.createServer((req, res) => {
     res.end(ext === '.js' && normRel.startsWith('src/') ? _stripImportMeta(data.toString('utf8')) : data);
   });
 
-}).listen(PORT, '127.0.0.1', () => {
+// '0.0.0.0' (no '127.0.0.1'): en Railway el proxy que enruta el tráfico
+// público corre fuera del contenedor y se conecta por red al puerto — un
+// bind a loopback es invisible desde ahí, aunque el proceso arranque limpio
+// y los logs no muestren ningún error.
+}).listen(PORT, '0.0.0.0', () => {
   console.log('\x1b[36m%s\x1b[0m', `
   ╔════════════════════════════════════╗
-  ║   FINOVA — Servidor local listo   ║
-  ║   http://localhost:${PORT}           ║
+  ║   FINOVA — Servidor listo          ║
+  ║   Puerto: ${PORT}
   ╚════════════════════════════════════╝
   `);
-  const { exec } = require('child_process');
-  exec(`start http://localhost:${PORT}`);
+  // Abrir el navegador solo tiene sentido en desarrollo local; en Railway
+  // 'start' no es un comando válido (Linux) y no hay pantalla que abrir.
+  if (!_IS_CLOUD_DEPLOY) {
+    const { exec } = require('child_process');
+    exec(`start http://localhost:${PORT}`);
+  }
 });
