@@ -116,7 +116,7 @@ function renderTransactionCharts() {
 
 function renderChartIncomeExpense() {
   const ctx = document.getElementById('chart-income-expense');
-  if (!ctx) return;
+  if (!ctx || typeof Chart === 'undefined') return;
 
   const { gridColor, textColor, fontFamily } = getChartDefaults();
 
@@ -167,7 +167,7 @@ function renderChartIncomeExpense() {
 
 function renderChartExpenseByCategory() {
   const ctx = document.getElementById('chart-expense-category');
-  if (!ctx) return;
+  if (!ctx || typeof Chart === 'undefined') return;
 
   const { textColor, fontFamily } = getChartDefaults();
 

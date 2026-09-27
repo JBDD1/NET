@@ -829,7 +829,9 @@ async function init() {
 
   // 16. Renderizar sección inicial — onboarding shown first so overlay covers empty state
   if (_needsOnboarding) {
-    _ensureScript('./src/utils/onboarding.js').then(() => { if (typeof showOnboarding === 'function') showOnboarding(); });
+    _ensureScript('./src/utils/onboarding.js')
+      .then(() => { if (typeof showOnboarding === 'function') showOnboarding(); })
+      .catch(err => console.warn('[Finova] No se pudo cargar onboarding.js:', err.message));
   }
   navigateTo(APP.activeSection || 'dashboard');
 
@@ -857,9 +859,9 @@ async function init() {
 
   // Bank auto-sync — start polling if there are connected accounts
   if (!_isDemoMode && (APP.bankConnections || []).length) {
-    _ensureScript('./src/utils/bank-connect.js').then(() => {
-      if (typeof _bankStartAutoSync === 'function') _bankStartAutoSync();
-    });
+    _ensureScript('./src/utils/bank-connect.js')
+      .then(() => { if (typeof _bankStartAutoSync === 'function') _bankStartAutoSync(); })
+      .catch(err => console.warn('[Finova] No se pudo cargar bank-connect.js:', err.message));
   }
 
   // Handle PWA shortcut actions from manifest.json shortcuts
@@ -1065,10 +1067,10 @@ function _globalClickDispatch(e) {
     case 'test-webhook':               testWebhook(); break;
     case 'webhook-export-full':        exportViaWebhook('full'); break;
     case 'webhook-export-month':       exportViaWebhook('month'); break;
-    case 'show-onboarding':            _ensureScript('./src/utils/onboarding.js').then(() => showOnboarding()); break;
+    case 'show-onboarding':            _ensureScript('./src/utils/onboarding.js').then(() => showOnboarding()).catch(err => console.warn('[Finova] No se pudo cargar onboarding.js:', err.message)); break;
     case 'show-keyboard-help':         showKeyboardHelp(); break;
-    case 'start-tour':                 _ensureScript('./src/utils/onboarding.js').then(() => obStartTour()); break;
-    case 'run-tests':                  _ensureScript('./src/utils/tests.js').then(() => runTests()); break;
+    case 'start-tour':                 _ensureScript('./src/utils/onboarding.js').then(() => obStartTour()).catch(err => console.warn('[Finova] No se pudo cargar onboarding.js:', err.message)); break;
+    case 'run-tests':                  _ensureScript('./src/utils/tests.js').then(() => runTests()).catch(err => console.warn('[Finova] No se pudo cargar tests.js:', err.message)); break;
     case 'clear-photo-backups':        clearPhotoBackups(); break;
     case 'reset-dialog':               openResetDialog(); break;
     // Modal
@@ -2739,9 +2741,9 @@ function renderSettings() {
   }
 
   // Bank connections — load lazily; non-critical path
-  _ensureScript('./src/utils/bank-connect.js').then(() => {
-    if (typeof renderBankConnect === 'function') renderBankConnect();
-  });
+  _ensureScript('./src/utils/bank-connect.js')
+    .then(() => { if (typeof renderBankConnect === 'function') renderBankConnect(); })
+    .catch(err => console.warn('[Finova] No se pudo cargar bank-connect.js:', err.message));
 
   // Server AI banner (ai.js may not have checked yet — kick off the check)
   if (typeof _renderServerAIBanner === 'function') _renderServerAIBanner();
