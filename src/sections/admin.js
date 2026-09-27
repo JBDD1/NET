@@ -25,9 +25,10 @@ async function _ensureAdminMeta() {
 async function adminLoadStats() {
   try {
     const authH = await _getAuthHeader();
-    const [statsRes, healthRes] = await Promise.all([
+    const [statsRes, healthRes, retentionRes] = await Promise.all([
       fetch('/api/admin/stats',  { headers: authH }),
       fetch('/api/admin/health', { headers: authH }),
+      fetch('/api/stats',        { headers: authH }),
     ]);
     if (statsRes.status === 404 || healthRes.status === 404) {
       const kpis = document.getElementById('admin-kpis');
@@ -49,9 +50,41 @@ async function adminLoadStats() {
       _setAdminKpi('akpi-mem',    health.memoryMB + ' MB');
       _setAdminKpi('akpi-uptime', health.uptime);
     }
+    if (retentionRes.ok) {
+      _renderRetention(await retentionRes.json());
+    }
   } catch (e) {
     console.error('[Admin] Error cargando stats:', e);
   }
+}
+
+// D1/D7/D30 — definiciones y objetivos:
+//   D1  = % de usuarios que vuelven al día siguiente de registrarse (objetivo >20%)
+//   D7  = % que vuelven dentro de los 7 días  (objetivo >10%; por debajo del 8% el
+//         problema es el producto, no el marketing)
+//   D30 = % que vuelven dentro de los 30 días (objetivo >5%)
+function _renderRetention(r) {
+  _setRetentionKpi('akpi-d1',  r.D1,  20);
+  _setRetentionKpi('akpi-d7',  r.D7,  10);
+  _setRetentionKpi('akpi-d30', r.D30,  5);
+
+  const noteEl = document.getElementById('admin-retention-note');
+  if (!noteEl) return;
+  if (r.D7 === null) {
+    noteEl.textContent = 'Aún no hay usuarios con 7+ días de antigüedad — vuelve cuando haya datos.';
+  } else if (r.D7 < 8) {
+    noteEl.innerHTML = '<strong style="color:var(--down)">⚠ D7 por debajo del 8%: el problema es el producto, no el marketing.</strong> Habla directamente con los primeros 10 usuarios que se registren — es el feedback más valioso que vas a recibir.';
+  } else {
+    noteEl.textContent = '';
+  }
+}
+
+function _setRetentionKpi(id, pct, target) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (pct === null) { el.textContent = '—'; el.style.color = ''; return; }
+  el.textContent = pct + '%';
+  el.style.color = pct >= target ? 'var(--up)' : 'var(--down)';
 }
 
 function _setAdminKpi(id, val) {
