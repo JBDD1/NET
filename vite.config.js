@@ -1,6 +1,44 @@
 import { defineConfig, loadEnv } from 'vite';
 import { resolve } from 'path';
 import fs from 'fs';
+import { minify as terserMinify } from 'terser';
+
+// Mismas opciones que build.terserOptions más abajo (ver ese comentario) —
+// se reutilizan aquí para minificar los scripts clásicos de src/** y
+// landing.js, que Rollup NUNCA toca (no son type="module", así que no
+// forman parte de su grafo de módulos y build.minify no les aplica nada).
+const PROD_TERSER_OPTIONS = {
+  compress: {
+    drop_console:  true,   // Elimina todos los console.* en producción
+    drop_debugger: true,
+    dead_code:     true,
+    collapse_vars: true,
+    evaluate:      true,
+    passes:        2,
+    // NO se usan: unsafe, unsafe_math, pure_getters
+    // unsafe_math puede alterar resultados de aritmética float en apps fintech
+  },
+  mangle: {
+    // toplevel:false (default) — NO renombra funciones globales:
+    // el HTML usa onclick="openModal()" etc. que referencian funciones por nombre
+    // properties:false (default) — NO renombra propiedades de objetos:
+    // el JSON del servidor debe coincidir con las propiedades del frontend
+  },
+  format: {
+    comments:   false,  // Elimina todos los comentarios
+    ascii_only: false,  // Mantiene Unicode (español: ñ, é, ó…)
+  },
+  ecma: 2020,
+};
+
+async function _minifyClassicJs(code, label) {
+  const result = await terserMinify(code, PROD_TERSER_OPTIONS);
+  if (result.error) {
+    console.error(`[vite.config] Terser falló minificando ${label}:`, result.error);
+    throw result.error;
+  }
+  return result.code;
+}
 
 // IMPORTANTE: index.html y landing.html cargan sus scripts con <script src="...">
 // clásico (sin type="module"), a propósito — el HTML usa onclick="fn()" que necesita
@@ -33,22 +71,23 @@ function stripImportMeta(code, env) {
 // Copia archivos estáticos que no pasan por Rollup al directorio dist/
 // (iconos, manifest, sw.js, páginas HTML simples, etc.)
 function copyStaticAssets(outDir = 'dist', mode = 'production') {
+  const isProd = mode === 'production';
   const staticFiles = [
     'manifest.json', 'sw.js', 'robots.txt', 'sitemap.xml',
     'privacidad.html', 'privacy.html', 'terminos.html', 'terms.html',
-    'landing.js',
   ];
 
-  function copyJsDir(srcDir, destDir, env) {
+  async function copyJsDir(srcDir, destDir, env) {
     fs.mkdirSync(destDir, { recursive: true });
     for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
       // Los tests (src/tests/**) son solo para desarrollo, no se despliegan.
       if (entry.name === 'tests' && srcDir === 'src') continue;
       const srcPath  = resolve(srcDir, entry.name);
       const destPath = resolve(destDir, entry.name);
-      if (entry.isDirectory()) { copyJsDir(srcPath, destPath, env); continue; }
+      if (entry.isDirectory()) { await copyJsDir(srcPath, destPath, env); continue; }
       if (!entry.name.endsWith('.js')) { fs.copyFileSync(srcPath, destPath); continue; }
-      const code = stripImportMeta(fs.readFileSync(srcPath, 'utf8'), env);
+      let code = stripImportMeta(fs.readFileSync(srcPath, 'utf8'), env);
+      if (isProd) code = await _minifyClassicJs(code, srcPath);
       fs.writeFileSync(destPath, code, 'utf8');
     }
   }
@@ -56,7 +95,7 @@ function copyStaticAssets(outDir = 'dist', mode = 'production') {
   return {
     name: 'finova-copy-static',
     apply: 'build',
-    closeBundle() {
+    async closeBundle() {
       if (!fs.existsSync(outDir)) return;
       // Archivos específicos
       staticFiles.forEach(f => {
@@ -68,7 +107,14 @@ function copyStaticAssets(outDir = 'dist', mode = 'production') {
       });
       // Módulos clásicos de la app (ver comentario arriba)
       const env = loadEnv(mode, process.cwd(), 'VITE_');
-      copyJsDir('src', resolve(outDir, 'src'), env);
+      await copyJsDir('src', resolve(outDir, 'src'), env);
+      // landing.js es un script clásico igual que src/**/*.js (mismo motivo:
+      // landing.html lo carga sin type="module") — mismo tratamiento.
+      if (fs.existsSync('landing.js')) {
+        let code = stripImportMeta(fs.readFileSync('landing.js', 'utf8'), env);
+        if (isProd) code = await _minifyClassicJs(code, 'landing.js');
+        fs.writeFileSync(resolve(outDir, 'landing.js'), code, 'utf8');
+      }
     },
   };
 }
@@ -115,31 +161,11 @@ export default defineConfig(({ mode }) => {
       // CRÍTICO: sin source maps en producción — revelan el código original
       sourcemap: isProd ? false : 'inline',
 
-      // Minificación con terser (más agresiva que esbuild por defecto)
+      // Minificación con terser (más agresiva que esbuild por defecto).
+      // Mismas opciones que PROD_TERSER_OPTIONS arriba (compartidas con el
+      // minificado manual de los scripts clásicos en copyStaticAssets).
       minify: isProd ? 'terser' : false,
-      terserOptions: isProd ? {
-        compress: {
-          drop_console:  true,   // Elimina todos los console.* en producción
-          drop_debugger: true,
-          dead_code:     true,
-          collapse_vars: true,
-          evaluate:      true,
-          passes:        2,
-          // NO se usan: unsafe, unsafe_math, pure_getters
-          // unsafe_math puede alterar resultados de aritmética float en apps fintech
-        },
-        mangle: {
-          // toplevel:false (default) — NO renombra funciones globales:
-          // el HTML usa onclick="openModal()" etc. que referencian funciones por nombre
-          // properties:false (default) — NO renombra propiedades de objetos:
-          // el JSON del servidor debe coincidir con las propiedades del frontend
-        },
-        format: {
-          comments:   false,  // Elimina todos los comentarios
-          ascii_only: false,  // Mantiene Unicode (español: ñ, é, ó…)
-        },
-        ecma: 2020,
-      } : undefined,
+      terserOptions: isProd ? PROD_TERSER_OPTIONS : undefined,
 
       rollupOptions: {
         input: {
