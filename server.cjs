@@ -477,16 +477,23 @@ function _buildServerSystemPrompt(anonMode, snapshot) {
   return `Eres Finova AI, el asesor financiero personal integrado en la app Finova.\n${contextBlock}\nInstrucciones:\n- Responde siempre en español\n- Usa los datos reales del usuario para dar consejos personalizados con números concretos\n- Usa formato markdown básico (negritas con **, listas con -, saltos de línea) para estructurar respuestas\n- Usa el formato europeo de moneda (€1.234,56)\n- Si el usuario no tiene datos en alguna categoría, díselo\n- No garantices rentabilidades ni des consejos de inversión ilegales`;
 }
 
-// Respuesta genérica para errores internos — log completo en servidor, mensaje opaco al cliente.
-function _serverError(req, res, e, status = 500) {
-  console.error('[FINOVA/Error]', {
-    route:  req.url,
-    method: req.method,
-    msg:    e?.message?.slice(0, 300),
-    stack:  e?.stack?.split('\n').slice(0, 3).join(' | '),
+// Respuesta genérica para errores internos — log completo (con uid, ruta,
+// stack) para depurar en Railway sin reproducir el fallo; al cliente solo
+// llega un mensaje humano y accionable, nunca detalles técnicos.
+function _serverError(req, res, e, status = 500, userMsg = null) {
+  console.error('[FINOVA][ERROR]', {
+    ts:      new Date().toISOString(),
+    route:   req.url,
+    method:  req.method,
+    uid:     req.uid || 'anonymous',
+    message: e?.message?.slice(0, 300),
+    stack:   e?.stack?.split('\n').slice(0, 4).join(' | '),
   });
   res.writeHead(status, _apiHeaders(req));
-  res.end(JSON.stringify({ error: 'Error interno del servidor. Inténtalo de nuevo.' }));
+  res.end(JSON.stringify({
+    error: userMsg || 'Ha ocurrido un error inesperado. Si el problema persiste, contacta con soporte en MyFinova1@gmail.com',
+    code:  'INTERNAL_ERROR',
+  }));
 }
 
 // Returns true if the x-finova-proxy header matches FINOVA_PROXY_SECRET (when configured).
@@ -788,8 +795,7 @@ async function handleBatchQuotes(req, res) {
     res.writeHead(200, _apiHeaders(req));
     res.end(JSON.stringify(result));
   } catch (e) {
-    res.writeHead(500, _apiHeaders(req));
-    res.end(JSON.stringify({ error: e.message }));
+    _serverError(req, res, e, 500, 'No se pudieron obtener las cotizaciones. Inténtalo en unos minutos.');
   }
 }
 
@@ -862,8 +868,7 @@ async function handleYahooProxy(req, res) {
     res.writeHead(503, _apiHeaders(req));
     res.end(JSON.stringify({ error: 'Yahoo Finance no disponible en este momento' }));
   } catch (err) {
-    res.writeHead(500, _apiHeaders(req));
-    res.end(JSON.stringify({ error: err.message }));
+    _serverError(req, res, err, 500, 'No se pudo obtener la cotización. Inténtalo en unos minutos.');
   }
 }
 
@@ -1004,15 +1009,18 @@ async function handleAIProxy(req, res) {
 // Verifies Firebase token and returns uid, or writes 401 and returns null.
 // Uses Admin SDK (with revocation check) when available; custom RS256 otherwise.
 async function _requireAuth(req, res) {
-  if (!_AUTH_ENABLED) return 'dev-uid';
+  if (!_AUTH_ENABLED) { req.uid = 'dev-uid'; return 'dev-uid'; }
   const authHeader = req.headers['authorization'] || '';
   try {
     if (_adminReady) {
       if (!authHeader.startsWith('Bearer ')) throw Object.assign(new Error('Token ausente'), { code: 'auth/no-token' });
       const decoded = await _adminSDK.auth().verifyIdToken(authHeader.slice(7).trim(), true);
+      req.uid = decoded.uid;
       return decoded.uid;
     }
-    return await _verifyFirebaseToken(authHeader);
+    const uid = await _verifyFirebaseToken(authHeader);
+    req.uid = uid;
+    return uid;
   } catch (e) {
     const code      = e.code || '';
     const isExpired = code === 'auth/id-token-expired' || e.message === 'Token expirado';
@@ -1129,9 +1137,7 @@ async function handleBankInstitutions(req, res) {
     res.writeHead(200, _apiHeaders(req)); res.end(JSON.stringify(list));
   } catch (e) {
     const _gcS = e.message.includes('timeout') ? 504 : 500;
-    console.error('[FINOVA/GoCardless] institutions:', e.message?.slice(0, 100));
-    res.writeHead(_gcS, _apiHeaders(req));
-    res.end(JSON.stringify({ error: _gcS === 504 ? 'Tiempo de espera agotado.' : 'Error al obtener entidades bancarias.' }));
+    _serverError(req, res, e, _gcS, _gcS === 504 ? 'Tiempo de espera agotado.' : 'Error al obtener entidades bancarias.');
   }
 }
 
@@ -1171,9 +1177,7 @@ async function handleBankCreateRequisition(req, res) {
       res.end(JSON.stringify({ requisitionId: req2.id, link: req2.link }));
     } catch (e) {
       const _gcS = e.message.includes('timeout') ? 504 : 500;
-      console.error('[FINOVA/GoCardless] createRequisition:', e.message?.slice(0, 100));
-      res.writeHead(_gcS, _apiHeaders(req));
-      res.end(JSON.stringify({ error: _gcS === 504 ? 'Tiempo de espera agotado.' : 'Error al iniciar la conexión bancaria.' }));
+      _serverError(req, res, e, _gcS, _gcS === 504 ? 'Tiempo de espera agotado.' : 'Error al iniciar la conexión bancaria.');
     }
   });
 }
@@ -1197,9 +1201,7 @@ async function handleBankGetRequisition(req, res) {
     res.end(JSON.stringify({ status: data.status, accounts: data.accounts || [] }));
   } catch (e) {
     const _gcS = e.message.includes('timeout') ? 504 : 500;
-    console.error('[FINOVA/GoCardless] getRequisition:', e.message?.slice(0, 100));
-    res.writeHead(_gcS, _apiHeaders(req));
-    res.end(JSON.stringify({ error: _gcS === 504 ? 'Tiempo de espera agotado.' : 'Error al obtener el estado de la conexión.' }));
+    _serverError(req, res, e, _gcS, _gcS === 504 ? 'Tiempo de espera agotado.' : 'Error al obtener el estado de la conexión.');
   }
 }
 
@@ -1265,9 +1267,7 @@ async function handleBankImport(req, res) {
       res.end(JSON.stringify({ accounts }));
     } catch (e) {
       const _gcS = e.message.includes('timeout') ? 504 : 500;
-      console.error('[FINOVA/GoCardless] import:', e.message?.slice(0, 100));
-      res.writeHead(_gcS, _apiHeaders(req));
-      res.end(JSON.stringify({ error: _gcS === 504 ? 'Tiempo de espera agotado al importar transacciones.' : 'Error al importar los movimientos bancarios.' }));
+      _serverError(req, res, e, _gcS, _gcS === 504 ? 'Tiempo de espera agotado al importar transacciones.' : 'Error al importar los movimientos bancarios.');
     }
   });
 }
@@ -1423,6 +1423,7 @@ async function handleUserDataGet(req, res) {
   } else {
     uid = new URL(req.url, 'http://localhost').searchParams.get('uid') || '';
   }
+  req.uid = uid;
 
   if (!_UID_RE.test(uid)) {
     res.writeHead(400, _apiHeaders(req));
@@ -1463,6 +1464,7 @@ async function handleUserDataPost(req, res) {
   if (_AUTH_ENABLED) {
     try {
       verifiedUid = await _verifyFirebaseToken(req.headers['authorization']);
+      req.uid = verifiedUid;
     } catch (e) {
       res.writeHead(401, _apiHeaders(req));
       return res.end(JSON.stringify({ error: 'Token inválido.' }));
@@ -1609,7 +1611,7 @@ async function handleStats(req, res) {
       D30: d30.pct, D30_cohort: d30.n,
     }));
   } catch (e) {
-    res.writeHead(e.message.includes('timeout') ? 504 : 500, _apiHeaders(req)); res.end(JSON.stringify({ error: e.message }));
+    _serverError(req, res, e, e.message.includes('timeout') ? 504 : 500);
   }
 }
 
@@ -1723,6 +1725,7 @@ async function handleUserMeta(req, res) {
   if (_AUTH_ENABLED) {
     try {
       verifiedUid = await _verifyFirebaseToken(req.headers['authorization']);
+      req.uid = verifiedUid;
     } catch (e) {
       res.writeHead(401, _apiHeaders(req));
       return res.end(JSON.stringify({ error: 'Token inválido.' }));
@@ -1794,7 +1797,7 @@ async function handleAdminUsers(req, res) {
     res.writeHead(200, _apiHeaders(req));
     res.end(JSON.stringify({ ok: true, users }));
   } catch (e) {
-    res.writeHead(500, _apiHeaders(req)); res.end(JSON.stringify({ error: e.message }));
+    _serverError(req, res, e);
   }
 }
 
@@ -1816,7 +1819,7 @@ async function handleAdminBlock(req, res) {
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true, blocked }));
     } catch (e) {
-      res.writeHead(500, _apiHeaders(req)); res.end(JSON.stringify({ error: e.message }));
+      _serverError(req, res, e);
     }
   });
 }
@@ -1844,7 +1847,7 @@ async function handleAdminSetAdmin(req, res) {
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true }));
     } catch (e) {
-      res.writeHead(500, _apiHeaders(req)); res.end(JSON.stringify({ error: e.message }));
+      _serverError(req, res, e);
     }
   });
 }
@@ -1870,7 +1873,7 @@ async function handleAdminHealth(req, res) {
       timestamp:   new Date().toISOString(),
     }));
   } catch (e) {
-    res.writeHead(500, _apiHeaders(req)); res.end(JSON.stringify({ error: e.message }));
+    _serverError(req, res, e);
   }
 }
 
@@ -1896,7 +1899,7 @@ async function handleAdminStats(req, res) {
     res.writeHead(200, _apiHeaders(req));
     res.end(JSON.stringify({ ok: true, total, active7, active30, totalSessions, topSections }));
   } catch (e) {
-    res.writeHead(500, _apiHeaders(req)); res.end(JSON.stringify({ error: e.message }));
+    _serverError(req, res, e);
   }
 }
 
@@ -1969,7 +1972,15 @@ async function handleAdminSetRole(req, res) {
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true, targetUid, role }));
     } catch (e) {
-      res.writeHead(400, _apiHeaders(req)); res.end(JSON.stringify({ error: e.message }));
+      // _setUserRole solo lanza estos dos mensajes de validación fijos y
+      // seguros (nunca detalles internos) — se muestran tal cual. Cualquier
+      // otro fallo (p.ej. escritura a disco) es inesperado y pasa por el
+      // manejador genérico, que no expone nada al cliente.
+      if (e.message === 'UID inválido' || e.message === 'Rol inválido (free|premium)') {
+        res.writeHead(400, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: e.message }));
+      }
+      _serverError(req, res, e);
     }
   });
 }

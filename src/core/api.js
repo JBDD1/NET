@@ -30,6 +30,13 @@ async function _apiRequest(path, opts, withAuth) {
       (retryAfter < 120 ? retryAfter + 's' : Math.ceil(retryAfter / 60) + ' min') + '.';
     try { var d = await res.clone().json(); if (d.error) msg = d.error; } catch (_) {}
     if (typeof showToast === 'function') showToast(msg, 'error');
+  } else if (res.status >= 500) {
+    // El servidor nunca manda detalles técnicos en un 5xx (ver _serverError
+    // en server.cjs) — el campo "error" del cuerpo ya es un mensaje seguro
+    // y accionable, se muestra tal cual en vez de quedarse solo en consola.
+    var errMsg = 'Ha ocurrido un error inesperado. Inténtalo de nuevo.';
+    try { var d5 = await res.clone().json(); if (d5.error) errMsg = d5.error; } catch (_) {}
+    if (typeof showToast === 'function') showToast(errMsg, 'error');
   }
 
   return res;
