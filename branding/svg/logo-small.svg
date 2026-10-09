@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- ══════════════════════════════════════════════════════════════
+       VARIANTE PARA TAMANOS PEQUENOS (favicon: 16, 32, 48 px)
+       A 16-32 px el chip EMV y el filete del logo completo se vuelven
+       manchas ilegibles, y la F queda pegada al borde izquierdo.
+       Esta version mantiene letra y paleta, pero:
+         · sin chip ni filete (detalle que no sobrevive al rasterizado)
+         · sin grano: a este tamano no hay bandas que romper y el ruido
+           solo se percibe como suciedad
+         · fondo plano: mas limpio y con mas contraste en miniatura
+         · F un 8% MAS GRANDE que en el maestro y centrada, para ganar
+           peso visual (es lo que hace legible un favicon)
+  ══════════════════════════════════════════════════════════════ -->
+  <defs>
+    <linearGradient id="goldMetal" x1="8%" y1="0%" x2="55%" y2="100%" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#F6D064"/>
+      <stop offset="45%"  stop-color="#DCAC34"/>
+      <stop offset="100%" stop-color="#B98A1C"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="220" fill="#15120f"/>
+
+  <!-- F centrada: 519x790, margenes 253px laterales y 117px arriba/abajo -->
+  <path transform="translate(76.85, -38.18) scale(1.08516)"
+        d="M162,143 H640 V240 H277 V460 H534 V551 H277 V871 H162 Z"
+        fill="url(#goldMetal)"/>
+</svg>

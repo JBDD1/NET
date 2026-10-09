@@ -5,7 +5,14 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
-const svgBuffer = readFileSync(resolve(ROOT, 'svg/logo.svg'));
+// El maestro lleva un marcador {{GRAIN}} (grano anti-banding). Estas
+// exportaciones son masters de diseno: no se sirven a usuarios y lo normal
+// es reescalarlas hacia abajo, donde el grano no aporta. Ademas el ruido es
+// incompresible y a 4096px disparaba el PNG a 3 MB. Se exportan limpias.
+const GRAIN = 0;
+const svgText = readFileSync(resolve(ROOT, 'svg/logo.svg'), 'utf8').replace('{{GRAIN}}', String(GRAIN));
+if (svgText.includes('{{GRAIN}}')) throw new Error('quedo un marcador {{GRAIN}} sin sustituir');
+const svgBuffer = Buffer.from(svgText);
 
 function mkdir(dir) {
   mkdirSync(dir, { recursive: true });
@@ -22,7 +29,6 @@ async function render(size, outPath) {
 
 async function main() {
   mkdir(resolve(ROOT, 'png'));
-  mkdir(resolve(ROOT, 'icons'));
 
   // High-res PNGs
   for (const size of [4096, 2048, 1024]) {
@@ -31,14 +37,11 @@ async function main() {
     console.log(`✓ png/logo-${size}.png`);
   }
 
-  // App icons
-  for (const size of [16, 32, 48, 64, 120, 128, 152, 167, 180, 192, 256, 512, 1024]) {
-    const out = resolve(ROOT, `icons/icon-${size}.png`);
-    await render(size, out);
-    console.log(`✓ icons/icon-${size}.png`);
-  }
+  // Los iconos de app (16-1024) los genera scripts/generate-icons.js, que
+  // usa la variante pequena para <=48px y supersampling. Duplicarlos aqui
+  // con otro metodo los dejaria peores y desincronizados.
 
-  console.log('\n✅ Todos los iconos generados correctamente.');
+  console.log('\n✅ Exportaciones de logo en alta resolucion generadas.');
 }
 
 main().catch(err => {

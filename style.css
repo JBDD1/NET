@@ -3915,7 +3915,12 @@ th.sort-active .sort-arrow { opacity: 1; }
 
   .main-content {
     margin-left: 0 !important;
-    padding-bottom: 72px; /* espacio para nav inferior */
+    /* Antes reservaba 72px para .mobile-bottom-nav, pero esa barra NUNCA se
+       muestra: un segundo bloque @media la oculta con display:none !important
+       (el diseno movil actual usa .mobile-header sticky arriba). Eran 72px
+       muertos en cada pagina. Se deja solo margen de respiracion + el hueco
+       del indicador de inicio en iPhone con notch. */
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   }
 
   /* Botón hamburguesa visible */

@@ -29,6 +29,22 @@
       <stop offset="100%" stop-color="#0c0b0a"/>
     </radialGradient>
 
+    <!-- ── Grano fino — ROMPE EL BANDING del degradado radial ──────────
+         Un degradado oscuro de 8 bits produce anillos concéntricos
+         visibles (cada salto de nivel cubre decenas de píxeles). Un
+         ruido monocromo difumina esos saltos y el degradado se percibe
+         liso. La intensidad la fija el generador: solo >=512px lo necesitan, y el
+         ruido es incompresible (en PNG multiplica x5 el peso), asi que en
+         tamanos menores se deja a 0. -->
+    <filter id="grain" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" seed="11" result="noise"/>
+      <feColorMatrix in="noise" type="saturate" values="0" result="mono"/>
+      <feComponentTransfer in="mono" result="faint">
+        <feFuncA type="linear" slope="0"/>
+      </feComponentTransfer>
+      <feComposite in="faint" in2="SourceGraphic" operator="atop"/>
+    </filter>
+
     <!-- ── Clippath redondeado — para contener todo ── -->
     <clipPath id="iconClip">
       <rect width="1024" height="1024" rx="220"/>
@@ -36,14 +52,18 @@
 
   </defs>
 
-  <!-- ════ FONDO ════ -->
-  <rect width="1024" height="1024" rx="220" fill="url(#bgDepth)"/>
-  <!-- Borde dorado sutil — efecto premium -->
-  <rect width="1024" height="1024" rx="220" fill="none"
+  <!-- ════ FONDO (con grano anti-banding) ════ -->
+  <g filter="url(#grain)">
+    <rect width="1024" height="1024" rx="220" fill="url(#bgDepth)"/>
+  </g>
+
+  <!-- Borde dorado sutil — insertado 1.5px hacia dentro para que el trazo
+       (centrado sobre el path) quede COMPLETO dentro del lienzo; antes la
+       mitad caía fuera y el borde se veía dentado al rasterizar. -->
+  <rect x="1.5" y="1.5" width="1021" height="1021" rx="218.5" fill="none"
         stroke="#d4a960" stroke-width="3" stroke-opacity="0.22"/>
 
   <!-- ════ LETRA F — path único, sin redondeos internos ════ -->
-  <!-- M = moveto · H = horizontal · V = vertical · Z = close -->
   <path clip-path="url(#iconClip)"
         d="M162,143 H640 V240 H277 V460 H534 V551 H277 V871 H162 Z"
         fill="url(#goldMetal)"/>
@@ -54,20 +74,14 @@
         fill="url(#metalSheen)"/>
 
   <!-- ════ CHIP EMV — cuerpo sólido, inferior derecho ════ -->
-  <rect x="655" y="695" width="205" height="176" rx="24"
-        fill="url(#goldChip)"/>
-  <!-- Destello metálico sobre el chip -->
-  <rect x="655" y="695" width="205" height="176" rx="24"
-        fill="url(#metalSheen)"/>
+  <rect x="655" y="695" width="205" height="176" rx="24" fill="url(#goldChip)"/>
+  <rect x="655" y="695" width="205" height="176" rx="24" fill="url(#metalSheen)"/>
 
   <!-- ════ CHIP — celdas 2×3 (oscuras) ════ -->
-  <!-- Fila 1 -->
   <rect x="673" y="709" width="80" height="44" rx="7" fill="#0d0c0b"/>
   <rect x="762" y="709" width="80" height="44" rx="7" fill="#0d0c0b"/>
-  <!-- Fila 2 -->
   <rect x="673" y="761" width="80" height="44" rx="7" fill="#0d0c0b"/>
   <rect x="762" y="761" width="80" height="44" rx="7" fill="#0d0c0b"/>
-  <!-- Fila 3 -->
   <rect x="673" y="813" width="80" height="44" rx="7" fill="#0d0c0b"/>
   <rect x="762" y="813" width="80" height="44" rx="7" fill="#0d0c0b"/>
 
