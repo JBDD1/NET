@@ -245,7 +245,10 @@ function showToast(message, type = 'success', opts = {}) {
     toast.querySelector('.toast-action').addEventListener('click', () => {
       toast._toastDismiss?.();
       if (typeof opts.action.callback === 'function') opts.action.callback();
-      else handleAction(opts.action.action);
+      // Sin callback no hay nada que ejecutar: aqui se llamaba a handleAction(),
+      // que no existe en ningun archivo del proyecto -> ReferenceError al pulsar
+      // el boton del toast. Se avisa por consola en vez de romper la UI.
+      else console.warn('[Finova] Toast con accion pero sin callback:', opts.action.action);
     });
   } else {
     toast.addEventListener('click', (e) => {
@@ -879,7 +882,7 @@ async function init() {
         showToast(
           '📊 Informe mensual listo — ' + new Date(prevMonth + '-01').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
           'info',
-          { duration: 12000, action: { label: 'Descargar PDF', action: 'monthly-briefing' } }
+          { duration: 12000, action: { label: 'Descargar PDF', callback: () => exportMonthlyBriefingPDF() } }
         );
       }, 2500);
     }

@@ -1477,13 +1477,19 @@ async function handleUserDataPost(req, res) {
 
   if (!_requireJson(req, res)) return;
   let body = '';
+  // Flag en vez de un centinela dentro de 'body': al marcarlo como cadena, el
+  // siguiente chunk se concatenaba encima y la comprobacion posterior ya no
+  // coincidia -> caia en JSON.parse y devolvia 500 en vez de 413. Ademas asi se
+  // deja de acumular memoria en cuanto se supera el limite.
+  let oversize = false;
   req.on('data', chunk => {
+    if (oversize) return;
     body += chunk;
-    if (body.length > _SYNC_MAX_BYTES) body = '\x00OVERSIZE';
+    if (body.length > _SYNC_MAX_BYTES) { oversize = true; body = ''; }
   });
   req.on('end', () => {
     try {
-      if (body === '\x00OVERSIZE') {
+      if (oversize) {
         res.writeHead(413, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'Datos demasiado grandes (máx 8 MB)' }));
       }
@@ -1627,9 +1633,10 @@ function handleWaitlist(req, res) {
   if (!_requireJson(req, res)) return;
   const ip = _clientIp(req);
   let body = '';
-  req.on('data', d => { body += d; if (body.length > 2000) body = '\x00OVERSIZE'; });
+  let oversize = false;
+  req.on('data', d => { if (oversize) return; body += d; if (body.length > 2000) { oversize = true; body = ''; } });
   req.on('end', () => {
-    if (body.startsWith('\x00')) {
+    if (oversize) {
       res.writeHead(400, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'Petición demasiado grande.' }));
     }
     let email;
@@ -1670,13 +1677,19 @@ async function handleSyncUpload(req, res) {
   if ((await _requireAuth(req, res)) === null) return;
   if (!_requireJson(req, res)) return;
   let body = '';
+  // Flag en vez de un centinela dentro de 'body': al marcarlo como cadena, el
+  // siguiente chunk se concatenaba encima y la comprobacion posterior ya no
+  // coincidia -> caia en JSON.parse y devolvia 500 en vez de 413. Ademas asi se
+  // deja de acumular memoria en cuanto se supera el limite.
+  let oversize = false;
   req.on('data', chunk => {
+    if (oversize) return;
     body += chunk;
-    if (body.length > _SYNC_MAX_BYTES) body = '\x00OVERSIZE';
+    if (body.length > _SYNC_MAX_BYTES) { oversize = true; body = ''; }
   });
   req.on('end', () => {
     try {
-      if (body === '\x00OVERSIZE') {
+      if (oversize) {
         res.writeHead(413, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'Datos demasiado grandes (máx 8 MB)' }));
       }

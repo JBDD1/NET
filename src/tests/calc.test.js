@@ -79,14 +79,28 @@ function calcPortfolioCAGR() {
   return (Math.pow(totalValue / totalCost, 1 / years) - 1) * 100;
 }
 
-function _advanceRecurringDate(dateStr, frequency) {
-  const d = new Date(dateStr);
+// COPIA EXACTA de src/core/calcs.js (_advanceRecurringDate). Antes esta copia
+// divergia del original (new Date(dateStr) -> UTC, en vez de local), de modo que
+// los tests validaban una funcion que no existia en la app y no detectaron el
+// bug de huso horario que restaba un dia en cada avance.
+function _advanceRecurringDate(dateStr, frequency, renewalDay = null) {
+  const d = new Date(dateStr + 'T00:00:00');
   const freq = { weekly: [7, 'day'], biweekly: [14, 'day'], monthly: [1, 'month'], quarterly: [3, 'month'], annual: [1, 'year'] }[frequency];
   if (!freq) return dateStr;
-  if (freq[1] === 'day')   d.setDate(d.getDate() + freq[0]);
-  if (freq[1] === 'month') d.setMonth(d.getMonth() + freq[0]);
-  if (freq[1] === 'year')  d.setFullYear(d.getFullYear() + freq[0]);
-  return d.toISOString().slice(0, 10);
+  if (freq[1] === 'day') d.setDate(d.getDate() + freq[0]);
+  if (freq[1] === 'month') {
+    if (renewalDay && frequency === 'monthly') {
+      d.setDate(1);
+      d.setMonth(d.getMonth() + freq[0]);
+      const maxDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      d.setDate(Math.min(renewalDay, maxDay));
+    } else {
+      d.setMonth(d.getMonth() + freq[0]);
+    }
+  }
+  if (freq[1] === 'year') d.setFullYear(d.getFullYear() + freq[0]);
+  const _p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${_p(d.getMonth() + 1)}-${_p(d.getDate())}`;
 }
 
 function applyRecurring(id) {

@@ -150,7 +150,12 @@ function _advanceRecurringDate(dateStr, frequency, renewalDay = null) {
     }
   }
   if (freq[1] === 'year') d.setFullYear(d.getFullYear() + freq[0]);
-  return d.toISOString().slice(0, 10);
+  // Se formatea con los componentes LOCALES, no con toISOString(): la fecha se
+  // construye a medianoche local (dateStr + 'T00:00:00'), y en cualquier huso al
+  // este de UTC (toda Espana) toISOString() devuelve el dia ANTERIOR, por lo que
+  // cada avance de una recurrente perdia un dia (01-01 +trimestral -> 03-31).
+  const _p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${_p(d.getMonth() + 1)}-${_p(d.getDate())}`;
 }
 
 function updateNetworthHistory(preNW) {

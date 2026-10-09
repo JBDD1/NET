@@ -816,6 +816,7 @@ body {
   color: var(--text-primary);
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh; /* iOS: evita el scroll sobrante que deja 100vh bajo la barra del navegador */
   overflow-x: hidden;
 }
 
@@ -834,6 +835,7 @@ ul  { list-style: none; }
 .sidebar {
   width: var(--sidebar-w);
   min-height: 100vh;
+  min-height: 100dvh; /* iOS: evita el scroll sobrante que deja 100vh bajo la barra del navegador */
   background: var(--sidebar-bg);
   border-right: 1px solid rgba(255,255,255,0.04);
   position: fixed;
@@ -886,6 +888,7 @@ ul  { list-style: none; }
   flex: 1;
   min-width: 0;          /* evita que el flex item supere el ancho del viewport */
   min-height: 100vh;
+  min-height: 100dvh; /* iOS: evita el scroll sobrante que deja 100vh bajo la barra del navegador */
   overflow-x: hidden;    /* el desbordamiento lo gestiona cada .table-wrapper */
   transition: margin-left var(--transition);
 }
@@ -4051,12 +4054,11 @@ th.sort-active .sort-arrow { opacity: 1; }
 
   .chart-wrapper  { height: 240px; }
 
-  /* .modal-close / .photo-modal-close tienen mayor especificidad (clase)
-     que la regla general "button { min-height: 44px }" (etiqueta, ver
-     arriba en este mismo archivo), así que esa regla nunca llegaba a
-     aplicarles — se quedaban en 28x28px, por debajo del mínimo táctil de
-     44x44px (WCAG 2.5.5 / Apple HIG / Material). Es el botón de cerrar de
-     TODOS los modales de la app. */
+  /* La regla general "button { min-height: 44px }" sí les llega (min-height
+     y height son propiedades distintas: la altura usada es la mayor de las
+     dos), pero solo arregla el ALTO. Estos botones seguían midiendo 28px de
+     ANCHO, por debajo del mínimo táctil de 44x44 (WCAG 2.5.5 / Apple HIG).
+     Es el botón de cerrar de TODOS los modales de la app. */
   .modal-close,
   .photo-modal-close {
     width: 44px;
@@ -4130,6 +4132,14 @@ th.sort-active .sort-arrow { opacity: 1; }
 /* Touch targets mínimos de 44px (antes decía 44 en el comentario pero
    aplicaba 36 — por debajo del mínimo WCAG/Apple HIG/Material) */
 @media (max-width: 768px) {
+  /* Los botones de solo icono cumplian el alto (min-height de abajo) pero no
+     el ancho: se quedaban entre 22 y 40px. Se les da ancho minimo tactil sin
+     tocar los botones con texto, que ya son anchos de por si. */
+  .btn-icon, .btn-icon-xs, .btn-icon-sm, .mobile-menu-close,
+  .btn-back-to-top, .month-nav-btn, .ai-key-help-btn, .ai-send-btn {
+    min-width: 44px;
+  }
+
   button, .btn-primary, .btn-secondary, .nav-item, .toggle-switch {
     min-height: 44px;
   }
