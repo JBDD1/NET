@@ -11,7 +11,7 @@
     "dev": "vite",
     "build": "vite build --mode production",
     "build:dev": "vite build --mode development",
-    "build:gh": "cross-env VITE_BASE=/FinovaKimi/ vite build --mode production",
+    "build:gh": "cross-env VITE_BASE=/NET/ vite build --mode production",
     "preview": "vite preview",
     "start": "node server.cjs",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",

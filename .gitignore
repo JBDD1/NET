@@ -26,6 +26,8 @@ dist-ssr/
 
 # ── Datos de usuarios (Railway los guarda en su disco) ────────
 # data/ completo excluido para no subir datos privados
+# carpeta entera: asi un fichero de datos NUEVO tambien queda fuera
+data/
 data/sync/
 data/users/
 data/analytics.json
