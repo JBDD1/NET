@@ -254,8 +254,7 @@
         </div>
       </div>
 
-      <div class="nav-group">
-        <div class="sidebar-group-label nav-label">Patrimonio</div>
+      <div class="nav-group" style="margin-top:20px">
         <button class="nav-item" data-section="networth" title="Patrimonio Neto">
           <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-scale"/></svg></span>
           <span class="nav-label">Patrimonio Neto</span>
@@ -482,7 +481,7 @@
       <div class="section-header">
         <h1 id="dash-greeting">Dashboard</h1>
         <div class="btn-row">
-          <button type="button" id="btn-dashboard-editor" class="btn-ghost" style="font-size:12px;padding:6px 14px" title="Personalizar bloques del dashboard"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-settings"/></svg> Editar</button>
+          <button type="button" id="btn-dashboard-editor" class="btn-ghost" style="font-size:12px;padding:6px 14px" title="Mover, añadir, ocultar y redimensionar bloques del dashboard" aria-pressed="false"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-settings"/></svg> Personalizar dashboard</button>
           <button type="button" class="btn-ghost" data-action="export-monthly-pdf" style="font-size:12px;padding:6px 14px" title="Exportar resumen del mes actual en PDF"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-file"/></svg> PDF</button>
           <button type="button" class="btn-primary" data-action="quick-add-nav" style="font-size:12px;padding:6px 14px">+ Transacción</button>
         </div>
@@ -578,10 +577,41 @@
           </div>
         </div>
 
+        <div id="dash-block-liabilities" class="dash-block">
+          <div class="card" style="height:100%">
+            <div class="card-title-row">
+              <h3 class="card-title">Pasivos</h3>
+              <button type="button" class="btn-ghost-sm" data-action="navigate" data-section="pasivos">Ver todos →</button>
+            </div>
+            <div id="dash-liabilities-stats" class="recap-stats"></div>
+          </div>
+        </div>
+
         <div id="dash-block-investments" class="dash-block">
           <div class="card" style="height:100%">
             <h3 class="card-title">Top Inversiones</h3>
             <div id="top-investments-list" class="ranked-list"></div>
+          </div>
+        </div>
+
+        <div id="dash-block-dividends" class="dash-block">
+          <div class="card" style="height:100%">
+            <div class="card-title-row">
+              <h3 class="card-title">Dividendos</h3>
+              <button type="button" class="btn-ghost-sm" data-action="navigate" data-section="dividends">Ver todos →</button>
+            </div>
+            <div id="dash-dividends-stats" class="recap-stats"></div>
+            <div id="dash-dividends-list" class="ranked-list"></div>
+          </div>
+        </div>
+
+        <div id="dash-block-watchlist" class="dash-block">
+          <div class="card" style="height:100%">
+            <div class="card-title-row">
+              <h3 class="card-title">Watchlist</h3>
+              <button type="button" class="btn-ghost-sm" data-action="navigate" data-section="watchlist">Ver todos →</button>
+            </div>
+            <div id="dash-watchlist-list" class="ranked-list"></div>
           </div>
         </div>
 
@@ -592,6 +622,16 @@
               <button class="btn-ghost-sm" data-action="add-transaction" title="Añadir transacción (N)" style="font-size:12px">+ Añadir</button>
             </div>
             <div id="recent-transactions" class="activity-list"></div>
+          </div>
+        </div>
+
+        <div id="dash-block-bizums" class="dash-block">
+          <div class="card" style="height:100%">
+            <div class="card-title-row">
+              <h3 class="card-title">Bizums pendientes</h3>
+              <button type="button" class="btn-ghost-sm" data-action="navigate" data-section="bizums">Ver todos →</button>
+            </div>
+            <div id="dash-bizums-stats" class="recap-stats"></div>
           </div>
         </div>
 

@@ -836,7 +836,15 @@ async function init() {
       .then(() => { if (typeof showOnboarding === 'function') showOnboarding(); })
       .catch(err => console.warn('[Finova] No se pudo cargar onboarding.js:', err.message));
   }
-  navigateTo(APP.activeSection || 'dashboard');
+  // Migra, una sola vez, cualquier preferencia del antiguo personalizador
+  // genérico del dashboard al nuevo editor dedicado — antes de la primera
+  // renderización para que getEffectiveDashLayout() ya la vea.
+  if (typeof _dashMigrateLegacyLayoutConfig === 'function' && _dashMigrateLegacyLayoutConfig()) saveData();
+
+  // El arranque siempre aterriza en Dashboard, aunque la sesión anterior
+  // se cerrara en otra sección (APP.activeSection queda persistido para
+  // otros usos en runtime, p.ej. qué submenú abrir arriba).
+  navigateTo('dashboard');
 
   // Ocultar pantalla de carga con fade-out
   const loadingEl = document.getElementById('app-loading');
@@ -1060,7 +1068,7 @@ function _globalClickDispatch(e) {
     case 'ai-send':                    aiSend(); break;
     // Settings
     case 'ob-welcome-done':            obWelcomeDone(); break;
-    case 'open-dashboard-editor':      openDashboardEditor(); break;
+    case 'open-dashboard-editor':      toggleDashboardEditMode(); break;
     case 'toggle-settings-disclaimer': toggleSettingsDisclaimer(el); break;
     case 'download-backup':            downloadBackup(); break;
     case 'sync-generate':              syncGenerateCode(el); break;
@@ -4122,20 +4130,13 @@ function isCurrentMonth(dateStr) {
    Visibilidad persiste en APP.layoutConfig.
 ═══════════════════════════════════════════════════════════════ */
 
+// NOTA: 'section-dashboard' no vive aquí — tiene su propio editor dedicado
+// (ver dashboard.js: toggleDashboardEditMode / DASH_BLOCK_DEFS), que además
+// de mostrar/ocultar permite reordenar y redimensionar en el propio canvas.
+// Antes de ese editor, el dashboard SÍ usaba este sistema genérico; por eso
+// _dashMigrateLegacyLayoutConfig() en dashboard.js traslada automáticamente
+// cualquier preferencia que ya existiera en layoutConfig['section-dashboard'].
 const SECTION_WIDGETS = {
-  'section-dashboard': [
-    { id: 'dash-block-kpis',           label: 'KPIs principales',       icon: '📊' },
-    { id: 'dash-block-chart-networth', label: 'Evolución patrimonio',    icon: '📈' },
-    { id: 'dash-block-chart-dist',     label: 'Distribución cartera',    icon: '🥧' },
-    { id: 'dash-block-investments',    label: 'Mejores inversiones',     icon: '🏆' },
-    { id: 'dash-block-activity',       label: 'Actividad reciente',      icon: '⟳'  },
-    { id: 'dash-block-goals',          label: 'Objetivos',               icon: '🎯' },
-    { id: 'dash-block-expcats',        label: 'Gastos por categoría',    icon: '🏷' },
-    { id: 'dash-block-rule5030',       label: 'Regla 50/30/20',          icon: '⚖️' },
-    { id: 'dash-block-wealth-score',   label: 'Wealth Score',            icon: '💎' },
-    { id: 'dash-block-timeline',       label: 'Timeline financiero',     icon: '📅' },
-    { id: 'dash-block-heatmap',        label: 'Mapa de calor gastos',    icon: '🗓' },
-  ],
   'section-transactions': [
     { id: 'tx-widget-quickadd', label: 'Añadir rápido',          icon: '⚡' },
     { id: 'tx-widget-kpis',     label: 'KPIs del mes',           icon: '📊' },
@@ -4229,7 +4230,6 @@ function openSectionCustomizer(sectionId) {
   if (!widgets) return;
   const secCfg = (APP.layoutConfig || {})[sectionId] || {};
   const sectionNames = {
-    'section-dashboard':     'Dashboard',
     'section-transactions':  'Ingresos & Gastos',
     'section-portfolio':     'Cartera',
     'section-networth':      'Patrimonio Neto',

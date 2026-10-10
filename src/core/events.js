@@ -49,7 +49,7 @@
   _on('btnDevMode', 'click', toggleDevMode);
 
   // ── Dashboard ──────────────────────────────────────────────────
-  _on('btn-dashboard-editor', 'click', openDashboardEditor);
+  _on('btn-dashboard-editor', 'click', toggleDashboardEditMode);
 
   // ── Transactions ───────────────────────────────────────────────
   _on('csv-import-input', 'change', function () { handleCSVImportFile(this); });

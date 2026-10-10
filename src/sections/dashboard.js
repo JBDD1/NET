@@ -5,19 +5,65 @@
 
 /* ─── Dashboard layout system ────────────────────────────────── */
 const _dbIcon = name => `<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-${name}"></use></svg>`;
+
+// category: 'resumen' | 'inversiones' | 'organizacion' | 'otros' — agrupa el
+// catálogo "+ Añadir widget". defaultSize/sizes acotan qué tamaños tiene
+// sentido permitir por tipo de contenido (p.ej. los KPIs o el heatmap solo
+// funcionan a ancho completo — no se ofrecen tamaños incompatibles).
 const DASH_BLOCK_DEFS = [
-  { id: 'dash-block-kpis',            label: 'Indicadores (KPIs)',        icon: _dbIcon('dashboard'),    full: true,  kpis: true },
-  { id: 'dash-block-chart-networth',  label: 'Evolución del patrimonio',  icon: _dbIcon('trending-up'),  full: true  },
-  { id: 'dash-block-chart-dist',      label: 'Distribución patrimonio',   icon: _dbIcon('networth'),     full: false },
-  { id: 'dash-block-investments',     label: 'Top inversiones',           icon: _dbIcon('trophy'),       full: false },
-  { id: 'dash-block-activity',        label: 'Actividad reciente',        icon: _dbIcon('clock'),        full: false },
-  { id: 'dash-block-goals',           label: 'Objetivos financieros',     icon: _dbIcon('target'),       full: false },
-  { id: 'dash-block-expcats',         label: 'Gastos por categoría',      icon: _dbIcon('wallet'),       full: false },
-  { id: 'dash-block-rule5030',        label: 'Regla 50/30/20',            icon: _dbIcon('scale'),        full: false },
-  { id: 'dash-block-wealth-score',    label: 'Wealth Score',              icon: _dbIcon('networth'),     full: false },
-  { id: 'dash-block-timeline',        label: 'Timeline financiero',       icon: _dbIcon('clock'),        full: true  },
-  { id: 'dash-block-heatmap',         label: 'Heatmap de gastos',         icon: _dbIcon('grid'),         full: true  },
+  { id: 'dash-block-kpis',            label: 'Indicadores (KPIs)',        icon: _dbIcon('dashboard'),    kpis: true,
+    category: 'resumen', desc: 'Patrimonio, balance, cartera, efectivo, ahorro y dividendos de un vistazo.',
+    defaultSize: 'full', sizes: ['full'] },
+  { id: 'dash-block-chart-networth',  label: 'Evolución del patrimonio',  icon: _dbIcon('trending-up'),
+    category: 'resumen', desc: 'Gráfico de la evolución de tu patrimonio neto en el tiempo.',
+    defaultSize: 'full', sizes: ['large', 'full'] },
+  { id: 'dash-block-chart-dist',      label: 'Distribución patrimonio',   icon: _dbIcon('networth'),
+    category: 'resumen', desc: 'Reparto entre efectivo, inversiones, inmuebles y activos alternativos.',
+    defaultSize: 'medium', sizes: ['small', 'medium', 'large'] },
+  { id: 'dash-block-liabilities',     label: 'Pasivos',                   icon: _dbIcon('minus-circle'),
+    category: 'resumen', desc: 'Deuda total, cuota mensual y ratio de endeudamiento.',
+    defaultSize: 'small', sizes: ['small', 'medium', 'large'] },
+  { id: 'dash-block-expcats',         label: 'Gastos por categoría',      icon: _dbIcon('wallet'),
+    category: 'resumen', desc: 'Tus categorías de gasto con más peso este mes.',
+    defaultSize: 'medium', sizes: ['small', 'medium', 'large'] },
+  { id: 'dash-block-rule5030',        label: 'Regla 50/30/20',            icon: _dbIcon('scale'),
+    category: 'resumen', desc: 'Necesidades, deseos y ahorro frente a tus ingresos del mes.',
+    defaultSize: 'medium', sizes: ['small', 'medium', 'large'] },
+  { id: 'dash-block-investments',     label: 'Top inversiones',           icon: _dbIcon('trophy'),
+    category: 'inversiones', desc: 'Tus activos con mejor rentabilidad en cartera.',
+    defaultSize: 'medium', sizes: ['small', 'medium', 'large'] },
+  { id: 'dash-block-dividends',       label: 'Dividendos',                icon: _dbIcon('percent'),
+    category: 'inversiones', desc: 'Proyección de dividendos anuales por activo.',
+    defaultSize: 'medium', sizes: ['small', 'medium', 'large'] },
+  { id: 'dash-block-watchlist',       label: 'Watchlist',                 icon: _dbIcon('eye'),
+    category: 'inversiones', desc: 'Activos que sigues y su distancia al precio objetivo.',
+    defaultSize: 'medium', sizes: ['small', 'medium', 'large'] },
+  { id: 'dash-block-goals',           label: 'Objetivos financieros',     icon: _dbIcon('target'),
+    category: 'organizacion', desc: 'Progreso de tus objetivos de ahorro activos.',
+    defaultSize: 'medium', sizes: ['small', 'medium', 'large'] },
+  { id: 'dash-block-activity',        label: 'Actividad reciente',        icon: _dbIcon('clock'),
+    category: 'organizacion', desc: 'Tus últimas transacciones registradas.',
+    defaultSize: 'medium', sizes: ['small', 'medium', 'large', 'full'] },
+  { id: 'dash-block-bizums',          label: 'Bizums pendientes',         icon: _dbIcon('swap'),
+    category: 'organizacion', desc: 'Lo que te deben y lo que debes, pendiente de cobro o pago.',
+    defaultSize: 'small', sizes: ['small', 'medium', 'large'] },
+  { id: 'dash-block-wealth-score',    label: 'Wealth Score',              icon: _dbIcon('networth'),
+    category: 'otros', desc: 'Puntuación global de tu salud financiera.',
+    defaultSize: 'medium', sizes: ['small', 'medium', 'large'] },
+  { id: 'dash-block-timeline',        label: 'Timeline financiero',       icon: _dbIcon('clock'),
+    category: 'otros', desc: 'Diario cronológico de eventos financieros.',
+    defaultSize: 'full', sizes: ['full'] },
+  { id: 'dash-block-heatmap',         label: 'Heatmap de gastos',         icon: _dbIcon('grid'),
+    category: 'otros', desc: 'Intensidad de gasto día a día durante el año.',
+    defaultSize: 'full', sizes: ['full'] },
 ];
+
+const DASH_CATEGORY_LABELS = {
+  resumen:      'Resumen financiero',
+  inversiones:  'Inversiones',
+  organizacion: 'Organización financiera',
+  otros:        'Otros módulos',
+};
 
 const DASH_KPI_DEFS = [
   { id: 'dash-kpi-networth',  label: 'Patrimonio neto' },
@@ -28,15 +74,33 @@ const DASH_KPI_DEFS = [
   { id: 'dash-kpi-dividends', label: 'Dividendos anuales' },
 ];
 
+const DASH_SIZE_CLASSES = ['dash-block-small', 'dash-block-medium', 'dash-block-large', 'dash-block-full'];
+
+function _dashDefaultLayout() {
+  return DASH_BLOCK_DEFS.map(d => ({ id: d.id, visible: true, size: d.defaultSize }));
+}
+
+// Combina DASH_BLOCK_DEFS (catálogo real de widgets) con APP.dashboardLayout
+// (preferencias guardadas). Tolera preferencias antiguas o incompletas:
+// entradas corruptas o de widgets que ya no existen se ignoran sin romper
+// nada; un tamaño inválido o ausente (layouts guardados antes de que
+// existiera "size") cae al tamaño por defecto del widget.
 function getEffectiveDashLayout() {
   const stored = APP.dashboardLayout;
-  if (!stored || !Array.isArray(stored)) {
-    return DASH_BLOCK_DEFS.map(d => ({ id: d.id, visible: true }));
-  }
-  const ids = stored.map(b => b.id);
-  const result = [...stored];
+  if (!stored || !Array.isArray(stored)) return _dashDefaultLayout();
+
+  const seen   = new Set();
+  const result = [];
+  stored.forEach(b => {
+    if (!b || typeof b.id !== 'string') return;
+    const def = DASH_BLOCK_DEFS.find(d => d.id === b.id);
+    if (!def || seen.has(b.id)) return;
+    seen.add(b.id);
+    const size = def.sizes.includes(b.size) ? b.size : def.defaultSize;
+    result.push({ id: b.id, visible: b.visible !== false, size });
+  });
   DASH_BLOCK_DEFS.forEach(d => {
-    if (!ids.includes(d.id)) result.push({ id: d.id, visible: true });
+    if (!seen.has(d.id)) result.push({ id: d.id, visible: true, size: d.defaultSize });
   });
   return result;
 }
@@ -53,9 +117,12 @@ function applyDashboardLayout() {
     if (el) container.appendChild(el);
   });
 
-  layout.forEach(({ id, visible }) => {
+  layout.forEach(({ id, visible, size }) => {
     const el = document.getElementById(id);
-    if (el) el.style.display = visible ? '' : 'none';
+    if (!el) return;
+    el.style.display = visible ? '' : 'none';
+    el.classList.remove(...DASH_SIZE_CLASSES);
+    el.classList.add('dash-block-' + size);
   });
 
   DASH_KPI_DEFS.forEach(({ id }) => {
@@ -64,142 +131,458 @@ function applyDashboardLayout() {
   });
 }
 
-/* ─── Dashboard editor ───────────────────────────────────────── */
-let _dashEditLayout    = null;
-let _dashEditKpis      = null;
-let _dashEditorDragSrc = null;
-let _dashEditorGhost   = null;
-
-function openDashboardEditor() {
-  _dashEditLayout = getEffectiveDashLayout().map(b => ({ ...b }));
-  _dashEditKpis   = { ...(APP.dashboardKpis || {}) };
-
-  openModal('Personalizar Dashboard', '', null, _renderDashEditor);
-  setTimeout(_renderDashEditor, 50);
-  const footer = document.getElementById('modal')?.querySelector('.modal-footer');
-  if (footer) footer.style.display = 'none';
+// Migración única: antes del editor en vivo, el dashboard también se podía
+// personalizar (solo mostrar/ocultar) desde el "Personalizar sección"
+// genérico (APP.layoutConfig['section-dashboard'], ver script.js). Si un
+// usuario ya ocultó bloques por ahí y nunca usó el editor dedicado, se
+// traslada esa preferencia al nuevo sistema una sola vez para no perderla.
+function _dashMigrateLegacyLayoutConfig() {
+  const legacy = APP.layoutConfig && APP.layoutConfig['section-dashboard'];
+  if (!legacy || APP.dashboardLayout) return false;
+  const layout = _dashDefaultLayout().map(b => ({ ...b, visible: legacy[b.id] !== false }));
+  APP.dashboardLayout = layout;
+  delete APP.layoutConfig['section-dashboard'];
+  return true;
 }
 
-function _renderDashEditor() {
-  const body = document.getElementById('modalBody');
-  if (!body) return;
+/* ─── Dashboard editor — edición en vivo sobre el propio dashboard ─── */
+let _dashEditMode         = false;
+let _dashDraftLayout      = null;  // [{id, visible, size}] — borrador de trabajo, no se guarda hasta pulsar "Guardar"
+let _dashDraftKpis        = null;  // { kpiId: boolean }
+let _dashDragInfo         = null;  // arrastre puntero en curso
+let _dashDropIndicator    = null;
 
-  const rows = _dashEditLayout.map((block, idx) => {
-    const def = DASH_BLOCK_DEFS.find(d => d.id === block.id);
-    if (!def) return '';
-    const opacity = block.visible ? '1' : '0.45';
+function _dashReduceMotion() {
+  try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+}
 
-    let kpiSub = '';
-    if (def.kpis) {
-      kpiSub = `<div class="dash-editor-kpi-subs">` +
-        DASH_KPI_DEFS.map(k => {
-          const vis = _dashEditKpis[k.id] !== false;
-          return `<label class="dash-editor-kpi-check">
-            <input type="checkbox" ${vis ? 'checked' : ''} onchange="_toggleDashKpi('${k.id}',this.checked)" />
-            ${escapeHtml(k.label)}
-          </label>`;
-        }).join('') +
-        `</div>`;
+// Función pura: dado el orden actual de ids, calcula el nuevo orden al mover
+// draggedId junto a targetId (antes o después). Se usa tanto desde el
+// arrastre con puntero como desde los botones ↑/↓ — y es testeable sin DOM.
+function _dashComputeReorder(ids, draggedId, targetId, before) {
+  const arr = ids.slice();
+  const fromIdx = arr.indexOf(draggedId);
+  if (fromIdx === -1 || draggedId === targetId) return arr;
+  arr.splice(fromIdx, 1);
+  let toIdx = arr.indexOf(targetId);
+  if (toIdx === -1) return ids.slice();
+  if (!before) toIdx += 1;
+  arr.splice(toIdx, 0, draggedId);
+  return arr;
+}
+
+function toggleDashboardEditMode() {
+  if (_dashEditMode) return;
+  if (APP.activeSection !== 'dashboard') navigateTo('dashboard');
+  // Espera a que la sección esté visible/pintada antes de enganchar overlays
+  requestAnimationFrame(() => requestAnimationFrame(_dashEnterEditMode));
+}
+
+function _dashEnterEditMode() {
+  if (_dashEditMode) return;
+  if (APP.transactions.length === 0 && APP.portfolio.length === 0) {
+    showToast('Añade algún dato antes de personalizar el dashboard', 'info');
+    return;
+  }
+  _dashEditMode    = true;
+  _dashDraftLayout = getEffectiveDashLayout().map(b => ({ ...b }));
+  _dashDraftKpis   = { ...(APP.dashboardKpis || {}) };
+  document.getElementById('section-dashboard')?.classList.add('dash-edit-mode');
+  document.getElementById('btn-dashboard-editor')?.setAttribute('aria-pressed', 'true');
+  _dashApplyDraftToDOM({ animate: false });
+  _dashRenderEditBar();
+}
+
+function _dashExitEditMode() {
+  _dashEditMode    = false;
+  _dashDraftLayout = null;
+  _dashDraftKpis   = null;
+  _dashHideDropIndicator();
+  document.getElementById('section-dashboard')?.classList.remove('dash-edit-mode');
+  document.getElementById('btn-dashboard-editor')?.setAttribute('aria-pressed', 'false');
+  document.querySelectorAll('#dash-blocks-container .dash-block-toolbar').forEach(b => b.remove());
+  document.querySelectorAll('#dash-blocks-container .dash-block').forEach(el => {
+    el.classList.remove('dash-editing', 'dash-dragging');
+    el.style.transform = '';
+    el.style.transition = '';
+  });
+  document.getElementById('dash-edit-bar')?.remove();
+}
+
+function _dashCancelEdit() {
+  _dashExitEditMode();
+  applyDashboardLayout(); // vuelve a la distribución realmente guardada
+}
+
+function _dashApplyDraftToDOM(opts = {}) {
+  const container = document.getElementById('dash-blocks-container');
+  if (!container || !_dashDraftLayout) return;
+
+  const animate = !!opts.animate && !_dashReduceMotion();
+  const visibleDraft = _dashDraftLayout.filter(b => b.visible !== false);
+
+  const firstRects = new Map();
+  if (animate) {
+    visibleDraft.forEach(b => {
+      const el = document.getElementById(b.id);
+      if (el) firstRects.set(b.id, el.getBoundingClientRect());
+    });
+  }
+
+  visibleDraft.forEach(b => {
+    const el = document.getElementById(b.id);
+    if (el) container.appendChild(el);
+  });
+
+  _dashDraftLayout.forEach(b => {
+    const el = document.getElementById(b.id);
+    if (!el) return;
+    el.style.display = b.visible !== false ? '' : 'none';
+    el.classList.remove(...DASH_SIZE_CLASSES);
+    el.classList.add('dash-block-' + b.size);
+  });
+
+  if (animate) {
+    visibleDraft.forEach(b => {
+      const el    = document.getElementById(b.id);
+      const first = firstRects.get(b.id);
+      if (!el || !first) return;
+      const last = el.getBoundingClientRect();
+      const dx = first.left - last.left, dy = first.top - last.top;
+      if (!dx && !dy) return;
+      el.style.transition = 'none';
+      el.style.transform  = `translate(${dx}px, ${dy}px)`;
+      requestAnimationFrame(() => {
+        el.style.transition = 'transform .22s cubic-bezier(.2,.8,.2,1)';
+        el.style.transform  = '';
+      });
+    });
+  }
+
+  _dashRenderEditToolbars();
+}
+
+function _dashRenderEditToolbars() {
+  if (!_dashEditMode) return;
+  const visibleDraft = _dashDraftLayout.filter(b => b.visible !== false);
+
+  visibleDraft.forEach((b, idx) => {
+    const def = DASH_BLOCK_DEFS.find(d => d.id === b.id);
+    const el  = document.getElementById(b.id);
+    if (!el || !def) return;
+    el.classList.add('dash-editing');
+
+    let bar = el.querySelector(':scope > .dash-block-toolbar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'dash-block-toolbar';
+      el.insertBefore(bar, el.firstChild);
     }
 
-    return `<div class="dash-editor-row" draggable="true" data-idx="${idx}" data-id="${escapeHtml(block.id)}" style="opacity:${opacity}">
-      <span class="dash-editor-handle">⠿</span>
-      <span class="dash-editor-icon">${def.icon}</span>
-      <div class="dash-editor-info">
-        <div class="dash-editor-label">${escapeHtml(def.label)}</div>
-        ${kpiSub}
-      </div>
-      <label class="toggle-switch" style="flex-shrink:0;margin-top:2px">
-        <input type="checkbox" ${block.visible ? 'checked' : ''} onchange="_toggleDashBlock('${escapeHtml(block.id)}',this.checked)" />
-        <span class="toggle-slider"></span>
-      </label>
+    const sizeLabel = { small: 'S', medium: 'M', large: 'L', full: 'XL' }[b.size] || 'M';
+    const canResize  = def.sizes.length > 1;
+    const isFirst = idx === 0, isLast = idx === visibleDraft.length - 1;
+
+    bar.innerHTML = `
+      <button type="button" class="dash-tb-btn dash-tb-handle" title="Arrastrar para mover" aria-label="Arrastrar para mover ${escapeHtml(def.label)}">⠿</button>
+      <span class="dash-tb-label">${escapeHtml(def.label)}</span>
+      <span class="dash-tb-spacer"></span>
+      ${def.kpis ? `<button type="button" class="dash-tb-btn" data-dash-kpi-settings title="Configurar indicadores" aria-label="Configurar indicadores visibles"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-settings"/></svg></button>` : ''}
+      ${canResize ? `<button type="button" class="dash-tb-btn dash-tb-size" data-dash-size title="Tamaño: ${sizeLabel} — pulsa para cambiar" aria-label="Cambiar tamaño, actual ${sizeLabel}">${sizeLabel}</button>` : ''}
+      <button type="button" class="dash-tb-btn" data-dash-move="-1" ${isFirst ? 'disabled' : ''} title="Mover arriba" aria-label="Mover ${escapeHtml(def.label)} hacia arriba"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-right"/></svg></button>
+      <button type="button" class="dash-tb-btn" data-dash-move="1" ${isLast ? 'disabled' : ''} title="Mover abajo" aria-label="Mover ${escapeHtml(def.label)} hacia abajo"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-right"/></svg></button>
+      <button type="button" class="dash-tb-btn dash-tb-hide" data-dash-hide title="Ocultar bloque" aria-label="Ocultar ${escapeHtml(def.label)}"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-eye-off"/></svg></button>
+    `;
+
+    bar.querySelector('[data-dash-move="-1"]')?.addEventListener('click', () => _dashMoveBlock(b.id, -1));
+    bar.querySelector('[data-dash-move="1"]')?.addEventListener('click',  () => _dashMoveBlock(b.id, 1));
+    bar.querySelector('[data-dash-hide]')?.addEventListener('click', () => _dashToggleVisible(b.id, false));
+    bar.querySelector('[data-dash-size]')?.addEventListener('click', () => _dashCycleSize(b.id));
+    bar.querySelector('[data-dash-kpi-settings]')?.addEventListener('click', e => { e.stopPropagation(); openDashKpiSettings(); });
+    bar.querySelector('.dash-tb-handle')?.addEventListener('pointerdown', e => _dashPointerDown(e, b.id));
+  });
+}
+
+function _dashMoveBlock(id, dir) {
+  const visibleIds = _dashDraftLayout.filter(b => b.visible !== false).map(b => b.id);
+  const i = visibleIds.indexOf(id), j = i + dir;
+  if (i === -1 || j < 0 || j >= visibleIds.length) return;
+  const newIds = _dashComputeReorder(_dashDraftLayout.map(b => b.id), id, visibleIds[j], dir === -1);
+  const byId = new Map(_dashDraftLayout.map(b => [b.id, b]));
+  _dashDraftLayout = newIds.map(nid => byId.get(nid));
+  _dashApplyDraftToDOM({ animate: true });
+}
+
+function _dashCycleSize(id) {
+  const def   = DASH_BLOCK_DEFS.find(d => d.id === id);
+  const block = _dashDraftLayout.find(b => b.id === id);
+  if (!def || !block || def.sizes.length < 2) return;
+  const i = def.sizes.indexOf(block.size);
+  block.size = def.sizes[(i + 1) % def.sizes.length];
+  _dashApplyDraftToDOM({ animate: true });
+}
+
+function _dashToggleVisible(id, visible) {
+  const block = _dashDraftLayout.find(b => b.id === id);
+  if (!block) return;
+  block.visible = visible;
+  _dashApplyDraftToDOM({ animate: true });
+}
+
+/* ── Arrastre con puntero (ratón y táctil unificados) ─────────── */
+function _dashPointerDown(e, id) {
+  if (e.button !== undefined && e.button !== 0) return;
+  e.preventDefault();
+  const el = document.getElementById(id);
+  const container = document.getElementById('dash-blocks-container');
+  if (!el || !container) return;
+  _dashDragInfo = { id, el, container };
+  try { e.target.setPointerCapture(e.pointerId); } catch {}
+  el.classList.add('dash-dragging');
+  document.body.classList.add('dash-dragging-active');
+  const move = ev => _dashPointerMove(ev);
+  const up   = ev => { _dashPointerUp(ev); cleanup(); };
+  const cleanup = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', up);
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+}
+
+function _dashPointerMove(e) {
+  if (!_dashDragInfo) return;
+  const { container, id } = _dashDragInfo;
+  const x = e.clientX, y = e.clientY;
+  const siblings = [...container.querySelectorAll(':scope > .dash-block')]
+    .filter(el => el.style.display !== 'none' && el.id !== id);
+  if (!siblings.length) return;
+
+  let targetId = null, before = false, minDist = Infinity;
+  for (const sib of siblings) {
+    const r = sib.getBoundingClientRect();
+    if (y >= r.top && y <= r.bottom) {
+      targetId = sib.id;
+      before   = x < r.left + r.width / 2;
+      minDist  = 0;
+      break;
+    }
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const d  = Math.hypot(x - cx, y - cy);
+    if (d < minDist) { minDist = d; targetId = sib.id; before = y < cy; }
+  }
+  if (targetId) _dashShowDropIndicator(targetId, before);
+}
+
+function _dashPointerUp() {
+  if (!_dashDragInfo) return;
+  const { id, el } = _dashDragInfo;
+  el.classList.remove('dash-dragging');
+  document.body.classList.remove('dash-dragging-active');
+  const indicator = _dashDropIndicator;
+  _dashHideDropIndicator();
+  _dashDragInfo = null;
+  if (indicator && indicator.targetId && indicator.targetId !== id) {
+    const newIds = _dashComputeReorder(_dashDraftLayout.map(b => b.id), id, indicator.targetId, indicator.before);
+    const byId = new Map(_dashDraftLayout.map(b => [b.id, b]));
+    _dashDraftLayout = newIds.map(nid => byId.get(nid));
+  }
+  _dashApplyDraftToDOM({ animate: true });
+}
+
+function _dashShowDropIndicator(targetId, before) {
+  if (_dashDropIndicator && _dashDropIndicator.targetId === targetId && _dashDropIndicator.before === before) return;
+  _dashHideDropIndicator();
+  document.getElementById(targetId)?.classList.add(before ? 'dash-drop-before' : 'dash-drop-after');
+  _dashDropIndicator = { targetId, before };
+}
+
+function _dashHideDropIndicator() {
+  if (_dashDropIndicator) {
+    document.getElementById(_dashDropIndicator.targetId)?.classList.remove('dash-drop-before', 'dash-drop-after');
+  }
+  _dashDropIndicator = null;
+}
+
+/* ── Barra flotante de acciones del modo edición ──────────────── */
+function _dashRenderEditBar() {
+  let bar = document.getElementById('dash-edit-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'dash-edit-bar';
+    bar.className = 'dash-edit-bar';
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML = `
+    <span class="dash-edit-bar-badge"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-edit"/></svg> Editando dashboard</span>
+    <span class="dash-edit-bar-spacer"></span>
+    <button type="button" class="btn-ghost" id="dash-edit-add">+ Añadir widget</button>
+    <button type="button" class="btn-ghost" id="dash-edit-reset">↺ Restaurar</button>
+    <button type="button" class="btn-secondary" id="dash-edit-cancel">Cancelar</button>
+    <button type="button" class="btn-primary" id="dash-edit-save">Guardar cambios</button>
+  `;
+  bar.querySelector('#dash-edit-add').addEventListener('click', openDashboardWidgetCatalog);
+  bar.querySelector('#dash-edit-reset').addEventListener('click', _dashConfirmReset);
+  bar.querySelector('#dash-edit-cancel').addEventListener('click', _dashCancelEdit);
+  bar.querySelector('#dash-edit-save').addEventListener('click', _dashSaveLayout);
+}
+
+function _dashConfirmReset() {
+  openModal('Restaurar dashboard predeterminado', `
+    <p style="font-size:14px;color:var(--text-secondary);line-height:1.6;margin:0 0 8px">
+      Se restaurará el orden, tamaño y visibilidad originales de los bloques del dashboard.
+    </p>
+    <p style="font-size:13px;color:var(--text-muted);margin:0">
+      Esto no afecta a tus datos financieros — ninguna transacción, inversión, objetivo ni otro dato se modifica.
+    </p>`,
+    () => {
+      _dashDraftLayout = _dashDefaultLayout();
+      _dashDraftKpis   = DASH_KPI_DEFS.reduce((o, d) => ({ ...o, [d.id]: true }), {});
+      _dashApplyDraftToDOM({ animate: true });
+    }
+  );
+  const btn = document.getElementById('modalConfirm');
+  if (btn) btn.textContent = 'Restaurar';
+}
+
+function _dashSaveLayout() {
+  APP.dashboardLayout = _dashDraftLayout.map(b => ({ ...b }));
+  APP.dashboardKpis   = { ..._dashDraftKpis };
+  const ok = _saveDataNow(); // guardado inmediato (no debounced) — feedback veraz
+  if (ok) {
+    markDashboardDirty();
+    _dashExitEditMode();
+    applyDashboardLayout();
+    renderDashboard();
+    showToast('Dashboard guardado ✓', 'success');
+  }
+  // Si falla, _saveDataNow() ya informa (toast o modal de cuota llena) y el
+  // modo edición permanece abierto con el borrador intacto para reintentar.
+}
+
+/* ── Catálogo "+ Añadir widget" ────────────────────────────────── */
+function openDashboardWidgetCatalog() {
+  if (!_dashDraftLayout) return;
+  const order = ['resumen', 'inversiones', 'organizacion', 'otros'];
+  const byCat = {};
+  DASH_BLOCK_DEFS.forEach(d => { (byCat[d.category] = byCat[d.category] || []).push(d); });
+
+  const sections = order.filter(c => byCat[c]?.length).map(cat => {
+    const items = byCat[cat].map(def => {
+      const inDraft = _dashDraftLayout.find(b => b.id === def.id);
+      const added   = !!inDraft && inDraft.visible !== false;
+      return `
+        <div class="dash-cat-item${added ? ' dash-cat-item--added' : ''}">
+          <span class="dash-cat-item-icon">${def.icon}</span>
+          <div class="dash-cat-item-info">
+            <div class="dash-cat-item-name">${escapeHtml(def.label)}</div>
+            <div class="dash-cat-item-desc">${escapeHtml(def.desc || '')}</div>
+          </div>
+          ${added
+            ? `<span class="dash-cat-item-badge">Añadido</span>`
+            : `<button type="button" class="btn-ghost-sm" data-dash-catalog-add="${escapeHtml(def.id)}">+ Añadir</button>`}
+        </div>`;
+    }).join('');
+    return `<div class="dash-cat-group">
+      <div class="dash-cat-group-title">${DASH_CATEGORY_LABELS[cat]}</div>
+      ${items}
     </div>`;
   }).join('');
 
-  body.innerHTML = `
-    <p class="modal-help-text">
-      Arrastra para reordenar · activa o desactiva cada bloque con el toggle.<br>
-      <strong>Los datos nunca se borran</strong> al ocultar un bloque.
-    </p>
-    <div id="dash-editor-list">${rows}</div>
-    <div class="modal-footer-btns">
-      <button class="btn-secondary" onclick="_resetDashLayout()">↺ Restaurar por defecto</button>
-      <div class="modal-footer-btns-right">
-        <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
-        <button class="btn-primary" onclick="_saveDashLayout()">Guardar cambios</button>
-      </div>
-    </div>`;
-
-  _attachDashEditorDrag();
-}
-
-function _attachDashEditorDrag() {
-  const list = document.getElementById('dash-editor-list');
-  if (!list) return;
-
-  list.querySelectorAll('.dash-editor-row').forEach(row => {
-    row.addEventListener('dragstart', (e) => {
-      _dashEditorDragSrc = row;
-      e.dataTransfer.effectAllowed = 'move';
-      setTimeout(() => {
-        _dashEditorGhost = document.createElement('div');
-        _dashEditorGhost.className = 'dash-editor-ghost';
-        _dashEditorGhost.style.height = row.offsetHeight + 'px';
-        row.parentNode.insertBefore(_dashEditorGhost, row);
-        row.style.display = 'none';
-      }, 0);
-    });
-    row.addEventListener('dragend', () => {
-      if (_dashEditorGhost?.parentNode) _dashEditorGhost.remove();
-      _dashEditorGhost = null;
-      row.style.display = '';
-      list.querySelectorAll('.dash-editor-row').forEach(r => r.classList.remove('dash-editor-drag-over'));
-    });
-    row.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      if (_dashEditorDragSrc && _dashEditorDragSrc !== row) {
-        list.querySelectorAll('.dash-editor-row').forEach(r => r.classList.remove('dash-editor-drag-over'));
-        row.classList.add('dash-editor-drag-over');
-      }
-    });
-    row.addEventListener('drop', (e) => {
-      e.preventDefault();
-      row.classList.remove('dash-editor-drag-over');
-      if (!_dashEditorDragSrc || _dashEditorDragSrc === row) return;
-      const fromIdx = parseInt(_dashEditorDragSrc.dataset.idx);
-      const toIdx   = parseInt(row.dataset.idx);
-      const moved = _dashEditLayout.splice(fromIdx, 1)[0];
-      _dashEditLayout.splice(toIdx, 0, moved);
-      _renderDashEditor();
+  openModal('Añadir widget', `
+    <p class="modal-help-text">Elige los bloques que quieras mostrar en tu dashboard. Puedes reordenarlos y cambiar su tamaño después.</p>
+    <div class="dash-catalog">${sections}</div>`,
+    null, null
+  );
+  const footer = document.getElementById('modal')?.querySelector('.modal-footer');
+  if (footer) footer.style.display = 'none';
+  document.getElementById('modalBody')?.querySelectorAll('[data-dash-catalog-add]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _dashAddWidgetToDraft(btn.dataset.dashCatalogAdd);
+      openDashboardWidgetCatalog();
     });
   });
 }
 
-function _toggleDashBlock(id, visible) {
-  const block = _dashEditLayout.find(b => b.id === id);
-  if (block) block.visible = visible;
-  _renderDashEditor();
+function _dashAddWidgetToDraft(id) {
+  const def = DASH_BLOCK_DEFS.find(d => d.id === id);
+  if (!def || !_dashDraftLayout) return; // id desconocido — nunca se inventa un widget
+  let block = _dashDraftLayout.find(b => b.id === id);
+  if (block) {
+    if (block.visible !== false) return; // ya añadido, evita duplicarlo
+    block.visible = true;
+  } else {
+    block = { id, visible: true, size: def.defaultSize };
+    _dashDraftLayout.push(block);
+  }
+  _dashApplyDraftToDOM({ animate: true });
+  // Un widget que estaba oculto no tiene contenido pintado todavía (solo se
+  // repinta en el renderDashboard() normal, que no corre hasta Guardar) —
+  // se renderiza aquí para que la vista previa en vivo no se vea vacía.
+  _dashRenderWidgetContent(id);
 }
 
-function _toggleDashKpi(id, visible) {
-  _dashEditKpis[id] = visible;
+// Pinta el contenido real de un bloque recién mostrado en modo edición,
+// reutilizando exactamente la misma función de render que usa el dashboard
+// normal — nunca genera datos de muestra para la vista previa.
+function _dashRenderWidgetContent(id) {
+  try {
+    switch (id) {
+      case 'dash-block-kpis': {
+        const v = _dashCalcValues();
+        _dashUpdateKPIs(v);
+        _dashUpdateSparklines(v.annualDiv);
+        break;
+      }
+      case 'dash-block-chart-networth': renderChartNetworthHistory(); break;
+      case 'dash-block-chart-dist':     renderChartDistribution(calcCashTotal(), calcPortfolioValue(), calcAlternativesTotal(), calcPropertiesTotal()); break;
+      case 'dash-block-investments':    renderTopInvestments(); break;
+      case 'dash-block-activity':       renderRecentActivity(); break;
+      case 'dash-block-goals':          renderDashGoals(); break;
+      case 'dash-block-expcats':        renderDashExpenseCats(); break;
+      case 'dash-block-rule5030':       renderRule5030(); break;
+      case 'dash-block-wealth-score':   renderWealthScore(); break;
+      case 'dash-block-timeline':       renderFinancialTimeline(); break;
+      case 'dash-block-heatmap':        renderSpendingHeatmap(); break;
+      case 'dash-block-dividends':      renderDashDividends(); break;
+      case 'dash-block-watchlist':      renderDashWatchlist(); break;
+      case 'dash-block-bizums':         renderDashBizums(); break;
+      case 'dash-block-liabilities':    renderDashLiabilities(); break;
+    }
+  } catch (e) { console.warn('[Finova] vista previa de widget:', id, e); }
 }
 
-function _resetDashLayout() {
-  _dashEditLayout = DASH_BLOCK_DEFS.map(d => ({ id: d.id, visible: true }));
-  _dashEditKpis   = DASH_KPI_DEFS.reduce((o, d) => ({ ...o, [d.id]: true }), {});
-  _renderDashEditor();
+function openDashKpiSettings() {
+  if (!_dashDraftKpis) return;
+  const rows = DASH_KPI_DEFS.map(k => {
+    const vis = _dashDraftKpis[k.id] !== false;
+    return `<label class="dash-editor-kpi-check" style="font-size:13.5px;padding:7px 0">
+      <input type="checkbox" ${vis ? 'checked' : ''} data-dash-kpi="${escapeHtml(k.id)}" />
+      ${escapeHtml(k.label)}
+    </label>`;
+  }).join('<br>');
+  openModal('Configurar indicadores', `
+    <p class="modal-help-text">Elige qué indicadores mostrar dentro del bloque de KPIs principales.</p>
+    <div>${rows}</div>`,
+    null, null
+  );
+  const footer = document.getElementById('modal')?.querySelector('.modal-footer');
+  if (footer) footer.style.display = 'none';
+  document.getElementById('modalBody')?.querySelectorAll('[data-dash-kpi]').forEach(cb => {
+    cb.addEventListener('change', () => { _dashDraftKpis[cb.dataset.dashKpi] = cb.checked; });
+  });
 }
 
-function _saveDashLayout() {
-  APP.dashboardLayout = _dashEditLayout.map(b => ({ ...b }));
-  APP.dashboardKpis   = { ..._dashEditKpis };
-  saveData();
-  markDashboardDirty(); // newly visible blocks need content — force immediate re-render
-  applyDashboardLayout();
-  renderDashboard();
-  closeModal();
-  showToast('Dashboard personalizado', 'success');
+/* ── Error localizado y reintentable por bloque ─────────────────── */
+function _dashBlockError(containerId, retryFnName) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = `<div class="dash-empty dash-block-error">
+    <svg class="icon icon-xs" aria-hidden="true"><use href="#icon-alert-triangle"/></svg>
+    No se pudo cargar este bloque. <span class="link-btn" onclick="${retryFnName}()">Reintentar</span>
+  </div>`;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -403,6 +786,10 @@ function _dashDeferredRender(cash, portfolio) {
   const showInv       = _isDashBlockVisible('dash-block-investments');
   const showGoals     = _isDashBlockVisible('dash-block-goals');
   const showExpCats   = _isDashBlockVisible('dash-block-expcats');
+  const showDiv       = _isDashBlockVisible('dash-block-dividends');
+  const showWatch     = _isDashBlockVisible('dash-block-watchlist');
+  const showBizums    = _isDashBlockVisible('dash-block-bizums');
+  const showLiab      = _isDashBlockVisible('dash-block-liabilities');
 
   if (showNetworth || showDist)
     document.querySelectorAll('#section-dashboard .chart-wrapper, #section-dashboard .chart-donut-wrapper')
@@ -411,17 +798,118 @@ function _dashDeferredRender(cash, portfolio) {
   if (showInv)       _skelList('top-investments-list', 4);
   if (showGoals)     _skelList('dash-goals-list',      3);
   if (showExpCats)   _skelList('dash-expense-cats',    4);
+  if (showDiv)       _skelList('dash-dividends-list',  3);
+  if (showWatch)     _skelList('dash-watchlist-list',  3);
 
   ric(() => {
     if (showNetworth) try { renderChartNetworthHistory(); } catch(e) { console.warn('chart networth:', e); }
     if (showDist)     try { renderChartDistribution(cash, portfolio, calcAlternativesTotal(), calcPropertiesTotal()); } catch(e) { console.warn('chart dist:', e); }
-    if (showInv)      try { renderTopInvestments(); }  catch(e) { console.warn('top investments:', e); }
-    if (showActivity) try { renderRecentActivity(); }  catch(e) { console.warn('recent activity:', e); }
-    if (showGoals)    try { renderDashGoals(); }       catch(e) { console.warn('dash goals:', e); }
-    if (showExpCats)  try { renderDashExpenseCats(); } catch(e) { console.warn('dash expense cats:', e); }
+    if (showInv)      try { renderTopInvestments(); }  catch(e) { console.warn('top investments:', e); _dashBlockError('top-investments-list', 'renderTopInvestments'); }
+    if (showActivity) try { renderRecentActivity(); }  catch(e) { console.warn('recent activity:', e); _dashBlockError('recent-transactions', 'renderRecentActivity'); }
+    if (showGoals)    try { renderDashGoals(); }       catch(e) { console.warn('dash goals:', e); _dashBlockError('dash-goals-list', 'renderDashGoals'); }
+    if (showExpCats)  try { renderDashExpenseCats(); } catch(e) { console.warn('dash expense cats:', e); _dashBlockError('dash-expense-cats', 'renderDashExpenseCats'); }
+    if (showDiv)      try { renderDashDividends(); }   catch(e) { console.warn('dash dividends:', e); _dashBlockError('dash-dividends-list', 'renderDashDividends'); }
+    if (showWatch)    try { renderDashWatchlist(); }   catch(e) { console.warn('dash watchlist:', e); _dashBlockError('dash-watchlist-list', 'renderDashWatchlist'); }
+    if (showBizums)   try { renderDashBizums(); }      catch(e) { console.warn('dash bizums:', e); _dashBlockError('dash-bizums-stats', 'renderDashBizums'); }
+    if (showLiab)     try { renderDashLiabilities(); } catch(e) { console.warn('dash liabilities:', e); _dashBlockError('dash-liabilities-stats', 'renderDashLiabilities'); }
     document.querySelectorAll('#section-dashboard .chart-wrapper.loading, #section-dashboard .chart-donut-wrapper.loading')
       .forEach(el => el.classList.remove('loading'));
   });
+}
+
+/* ─── Widgets nuevos: Dividendos, Watchlist, Bizums, Pasivos ────── */
+// Reutilizan APP.dividends/watchlist/bizums/liabilities y las mismas
+// funciones de cálculo que sus secciones completas (portfolio.js,
+// bizums.js, networth.js) — nunca recalculan ni inventan cifras propias.
+
+function renderDashDividends() {
+  const list = document.getElementById('dash-dividends-list');
+  const sub  = document.getElementById('dash-dividends-stats');
+  if (!list) return;
+  if (APP.dividends.length === 0) {
+    if (sub) sub.innerHTML = '';
+    list.innerHTML = `<div class="dash-empty">Sin dividendos registrados — <span class="link-btn" onclick="navigateTo('dividends')">Registrar dividendo</span></div>`;
+    return;
+  }
+  const FREQ_MULT = { annual: 1, semiannual: 2, quarterly: 4, monthly: 12 };
+  const rows = APP.dividends
+    .map(d => ({ ...d, annual: d.dividendPerShare * d.shares * (FREQ_MULT[d.frequency] || 1) * _divFxRate(d) }))
+    .sort((a, b) => b.annual - a.annual);
+  const total = rows.reduce((s, d) => s + d.annual, 0);
+
+  if (sub) sub.innerHTML = `
+    <span class="recap-item"><span class="recap-label">Anual</span><span class="recap-val positive">${formatCurrency(total)}</span></span>
+    <span class="recap-item"><span class="recap-label">Mensual</span><span class="recap-val">${formatCurrency(total / 12)}</span></span>`;
+
+  list.innerHTML = rows.slice(0, 5).map((d, i) => `
+    <div class="ranked-item">
+      <div class="ranked-rank">#${i + 1}</div>
+      <div class="ranked-info">
+        <div class="ranked-name">${escapeHtml(d.assetName)}</div>
+        <div class="ranked-ticker">${escapeHtml(d.ticker)}</div>
+      </div>
+      <div class="ranked-pct positive">${formatCurrency(d.annual)}</div>
+    </div>`).join('');
+}
+
+function renderDashWatchlist() {
+  const el = document.getElementById('dash-watchlist-list');
+  if (!el) return;
+  if (APP.watchlist.length === 0) {
+    el.innerHTML = `<div class="dash-empty">Watchlist vacía — <span class="link-btn" onclick="navigateTo('watchlist')">Añadir ticker</span></div>`;
+    return;
+  }
+  const rows = APP.watchlist.map(w => {
+    const hasTarget = w.targetPrice && w.targetPrice > 0;
+    const alertType = w.alertType || 'above';
+    const reached   = hasTarget && (alertType === 'below' ? w.currentPrice <= w.targetPrice : w.currentPrice >= w.targetPrice);
+    const pctToTarget = hasTarget ? Math.abs(((w.targetPrice - w.currentPrice) / w.currentPrice) * 100) : Infinity;
+    return { ...w, reached, hasTarget, pctToTarget };
+  }).sort((a, b) => (a.reached === b.reached) ? a.pctToTarget - b.pctToTarget : (a.reached ? -1 : 1));
+
+  el.innerHTML = rows.slice(0, 5).map(w => `
+    <div class="ranked-item">
+      <div class="ranked-info">
+        <div class="ranked-name">${escapeHtml(w.name)}${w.reached ? ' 🔔' : ''}</div>
+        <div class="ranked-ticker">${escapeHtml(w.ticker)}</div>
+      </div>
+      <div class="ranked-pct">${formatCurrency(w.currentPrice)}</div>
+    </div>`).join('');
+}
+
+function renderDashBizums() {
+  const el = document.getElementById('dash-bizums-stats');
+  if (!el) return;
+  const bizums = APP.bizums || [];
+  if (bizums.length === 0) {
+    el.innerHTML = `<div class="dash-empty">Sin bizums registrados — <span class="link-btn" onclick="navigateTo('bizums')">Añadir bizum</span></div>`;
+    return;
+  }
+  const pendingIn  = bizums.filter(b => b.direction === 'in'  && b.status === 'pending').reduce((s, b) => s + b.amount, 0);
+  const pendingOut = bizums.filter(b => b.direction === 'out' && b.status === 'pending').reduce((s, b) => s + b.amount, 0);
+  const balance = pendingIn - pendingOut;
+  el.innerHTML = `
+    <span class="recap-item"><span class="recap-label">Te deben</span><span class="recap-val positive">${formatCurrency(pendingIn)}</span></span>
+    <span class="recap-item"><span class="recap-label">Debes</span><span class="recap-val negative">${formatCurrency(pendingOut)}</span></span>
+    <span class="recap-item"><span class="recap-label">Balance</span><span class="recap-val ${colorClass(balance)}">${formatCurrency(balance, true)}</span></span>`;
+}
+
+function renderDashLiabilities() {
+  const el = document.getElementById('dash-liabilities-stats');
+  if (!el) return;
+  const liabilities = APP.liabilities || [];
+  if (liabilities.length === 0) {
+    el.innerHTML = `<div class="dash-empty">Sin pasivos registrados — <span class="link-btn" onclick="navigateTo('pasivos')">Añadir pasivo</span></div>`;
+    return;
+  }
+  const total        = calcLiabilitiesTotal();
+  const monthly      = liabilities.reduce((s, l) => s + (parseFloat(l.monthlyPayment) || 0), 0);
+  const totalAssets  = calcCashTotal() + calcPortfolioValue() + calcAlternativesTotal() + calcPropertiesTotal();
+  const ratio        = totalAssets > 0 ? (total / totalAssets) * 100 : 0;
+  el.innerHTML = `
+    <span class="recap-item"><span class="recap-label">Deuda total</span><span class="recap-val negative">${formatCurrency(total)}</span></span>
+    <span class="recap-item"><span class="recap-label">Cuota mensual</span><span class="recap-val">${formatCurrency(monthly)}</span></span>
+    <span class="recap-item"><span class="recap-label">Deuda / activos</span><span class="recap-val ${ratio > 50 ? 'negative' : ''}">${ratio.toFixed(1)}%</span></span>`;
 }
 
 function renderDashboard() {
