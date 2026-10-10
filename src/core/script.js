@@ -55,9 +55,12 @@ function openModal(title, body, onConfirm = null, afterRender = null) {
   }
   document.getElementById('modalOverlay').classList.add('open');
 
-  // Restaurar footer si fue ocultado
+  // Restaurar footer si fue ocultado, y el ancho si un modal anterior pidió modal-wide
+  // (se hace aquí, no en closeModal, porque abrir un modal desde dentro de otro —p.ej.
+  // editar una transacción desde el detalle de categoría— nunca pasa por closeModal)
   const footer = document.getElementById('modal').querySelector('.modal-footer');
   if (footer) footer.style.display = '';
+  document.getElementById('modal')?.classList.remove('modal-wide');
 
   _modalConfirmHandler = onConfirm;
   _modalPreviousFocus  = document.activeElement;
@@ -3575,16 +3578,22 @@ const SECTIONS = {
   SETTINGS:     'settings',
 };
 
+// Orden por defecto del menú lateral — solo se usa mientras APP.sectionOrder
+// esté vacío (ver initSettings). Objetivos/Simulador/Fiscalidad van primero,
+// justo debajo del título, a petición explícita; el resto conserva su orden
+// relativo anterior. applySectionOrder() reconstruye el <nav> entero en este
+// orden en cada carga, así que esta lista es la que manda de verdad, no el
+// orden en el que los botones aparecen escritos en index.html.
 const NAV_SECTIONS = [
+  { key: 'goals',         label: 'Objetivos',             desc: 'Metas de ahorro e inversión' },
+  { key: 'simulator',     label: 'Simulador',             desc: 'Cálculo de interés compuesto' },
+  { key: 'fiscalidad',    label: 'Fiscalidad',            desc: 'IRPF y declaración de la renta' },
   { key: 'dashboard',     label: 'Dashboard',            desc: 'Visión general del patrimonio' },
   { key: 'transacciones', label: 'Ingresos & Gastos',    desc: 'Transacciones y Bizums' },
   { key: 'inversiones',   label: 'Inversiones',           desc: 'Cartera, Watchlist y Dividendos' },
   { key: 'networth',      label: 'Patrimonio Neto',       desc: 'Efectivo, inversiones y distribución' },
   { key: 'pasivos',       label: 'Pasivos',               desc: 'Deudas y préstamos' },
   { key: 'alternatives',  label: 'Activos Alternativos',  desc: 'Relojes, arte y otros activos' },
-  { key: 'goals',         label: 'Objetivos',             desc: 'Metas de ahorro e inversión' },
-  { key: 'simulator',     label: 'Simulador',             desc: 'Cálculo de interés compuesto' },
-  { key: 'fiscalidad',    label: 'Fiscalidad',            desc: 'IRPF y declaración de la renta' },
   { key: 'ai',            label: 'Asesor IA',             desc: 'Análisis financiero con inteligencia artificial' },
 ];
 

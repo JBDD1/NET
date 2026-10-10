@@ -254,40 +254,35 @@
         </div>
       </div>
 
-      <div class="nav-group" style="margin-top:20px">
-        <button class="nav-item" data-section="networth" title="Patrimonio Neto">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-scale"/></svg></span>
-          <span class="nav-label">Patrimonio Neto</span>
-        </button>
+      <button class="nav-item" data-section="networth" title="Patrimonio Neto">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-scale"/></svg></span>
+        <span class="nav-label">Patrimonio Neto</span>
+      </button>
 
-        <button class="nav-item" data-section="pasivos" title="Pasivos">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-minus-circle"/></svg></span>
-          <span class="nav-label">Pasivos</span>
-        </button>
+      <button class="nav-item" data-section="pasivos" title="Pasivos">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-minus-circle"/></svg></span>
+        <span class="nav-label">Pasivos</span>
+      </button>
 
-        <button class="nav-item" data-section="alternatives" title="Activos Alt.">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-gem"/></svg></span>
-          <span class="nav-label">Activos Alt.</span>
-        </button>
-      </div>
+      <button class="nav-item" data-section="alternatives" title="Activos Alt.">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-gem"/></svg></span>
+        <span class="nav-label">Activos Alt.</span>
+      </button>
 
-      <div class="nav-group">
-        <div class="sidebar-group-label nav-label">Planificación</div>
-        <button class="nav-item" data-section="goals" title="Objetivos">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg></span>
-          <span class="nav-label">Objetivos</span>
-        </button>
+      <button class="nav-item" data-section="goals" title="Objetivos">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg></span>
+        <span class="nav-label">Objetivos</span>
+      </button>
 
-        <button class="nav-item" data-section="simulator" title="Simulador">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calculator"/></svg></span>
-          <span class="nav-label">Simulador</span>
-        </button>
+      <button class="nav-item" data-section="simulator" title="Simulador">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calculator"/></svg></span>
+        <span class="nav-label">Simulador</span>
+      </button>
 
-        <button class="nav-item" data-section="fiscalidad" title="Fiscalidad">
-          <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-percent"/></svg></span>
-          <span class="nav-label">Fiscalidad</span>
-        </button>
-      </div>
+      <button class="nav-item" data-section="fiscalidad" title="Fiscalidad">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-percent"/></svg></span>
+        <span class="nav-label">Fiscalidad</span>
+      </button>
 
       <button class="nav-item" data-section="ai" title="Asesor IA">
         <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-sparkles"/></svg></span>
@@ -651,7 +646,12 @@
               <h3 class="card-title">Gastos por categoría</h3>
               <span class="card-title-sub" id="dash-expense-month"></span>
             </div>
-            <div id="dash-expense-cats"></div>
+            <p class="chart-subtext">Pulsa una porción para ver el detalle</p>
+            <div class="chart-wrapper chart-donut-wrapper">
+              <canvas id="chart-dash-expcats" role="img" aria-label="Gráfico de gastos por categoría del mes, interactivo — pulsa una porción para ver el detalle"></canvas>
+              <div id="dash-expcats-empty" class="empty-state" style="display:none;padding:24px 0;text-align:center;font-size:13px">Sin gastos este mes</div>
+            </div>
+            <div class="chart-legend" id="dash-expcats-legend"></div>
           </div>
         </div>
 
@@ -808,8 +808,21 @@
           <div class="chart-wrapper"><canvas id="chart-income-expense" role="img" aria-label="Gráfico de ingresos versus gastos por mes"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-header"><h3>Gastos por categoría</h3></div>
-          <div class="chart-wrapper chart-donut-wrapper"><canvas id="chart-expense-category" role="img" aria-label="Gráfico de distribución de gastos por categoría"></canvas></div>
+          <div class="chart-header">
+            <h3>Gastos por categoría</h3>
+            <div class="chart-scale-btns" id="expcat-scale-btns">
+              <button class="catchart-scale-btn" data-scale="1m">1M</button>
+              <button class="catchart-scale-btn" data-scale="3m">3M</button>
+              <button class="catchart-scale-btn" data-scale="6m">6M</button>
+              <button class="catchart-scale-btn" data-scale="1y">1A</button>
+              <button class="catchart-scale-btn active" data-scale="all">Todo</button>
+            </div>
+          </div>
+          <p class="chart-subtext">Pulsa una porción o su nombre en la leyenda para ver el detalle de esos gastos</p>
+          <div class="chart-wrapper chart-donut-wrapper">
+            <canvas id="chart-expense-category" role="img" aria-label="Gráfico de distribución de gastos por categoría, interactivo — pulsa una porción para ver el detalle"></canvas>
+            <div id="chart-expense-category-empty" class="empty-state" style="display:none;padding:40px;text-align:center">Sin gastos en el periodo seleccionado</div>
+          </div>
         </div>
       </div>
 

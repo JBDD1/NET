@@ -1613,6 +1613,8 @@ ul  { list-style: none; }
 .chart-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 16px; }
 .legend-item  { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-secondary); }
 .legend-dot   { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.legend-item--clickable { cursor: pointer; border-radius: var(--r-xs); padding: 2px 4px; margin: -2px -4px; transition: background var(--transition), color var(--transition); }
+.legend-item--clickable:hover, .legend-item--clickable:focus-visible { background: var(--bg-hover); color: var(--text-primary); }
 
 /* ─────────────────────────────────────────────────────────────
    CARD GENÉRICA
@@ -3152,35 +3154,6 @@ body.dash-dragging-active .dash-block:not(.dash-dragging) { transition: transfor
   font-size: 11px; color: var(--text-muted); margin-top: 4px;
 }
 
-/* Gastos por categoría en dashboard */
-.dash-cat-row {
-  display: flex; align-items: center; gap: 10px;
-  margin-bottom: 10px;
-}
-.dash-cat-row:last-child { margin-bottom: 0; }
-.dash-cat-name {
-  width: 110px; font-size: 12px; color: var(--text-secondary);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  flex-shrink: 0;
-}
-.dash-cat-bar-bg {
-  flex: 1; height: 6px; border-radius: 99px;
-  background: var(--border-faint); overflow: hidden;
-}
-.dash-cat-bar-fill {
-  height: 100%; border-radius: 99px;
-  background: var(--negative);
-  opacity: 0.75;
-  transition: width .4s ease;
-}
-.dash-cat-amt {
-  font-size: 12px; font-weight: 600;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  width: 72px; text-align: right;
-}
-
 /* ─────────────────────────────────────────────────────────────
    BIZUMS
 ───────────────────────────────────────────────────────────── */
@@ -4394,6 +4367,73 @@ input[type="date"], input[type="month"] { color-scheme: light; }
   background: var(--bg-surface);
   color: var(--text-primary);
   box-shadow: var(--shadow-sm);
+}
+
+/* Botones de periodo del donut de Gastos por categoría — clase propia (no
+   .scale-btn) para no compartir el listener global de initScaleButtons(),
+   que solo conoce el gráfico de evolución del patrimonio. Estilo idéntico. */
+.catchart-scale-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-radius: 3px;
+  transition: all var(--transition);
+  cursor: pointer;
+}
+.catchart-scale-btn:hover { color: var(--text-secondary); }
+.catchart-scale-btn.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+.chart-subtext { font-size: 12px; color: var(--text-muted); margin: -4px 0 10px; }
+
+/* ── Gráfico de "Gastos por categoría" interactivo — cursor en las porciones ── */
+#chart-expense-category { cursor: pointer; }
+
+/* ── Modal ancho (detalle de gastos por categoría, catálogos, etc.) ── */
+.modal-wide { max-width: 760px; }
+
+/* ── Detalle de gastos por categoría ── */
+.cat-detail-period {
+  font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--accent); margin-bottom: 10px;
+}
+.cat-detail-summary {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.cat-detail-summary .cat-detail-period { margin-bottom: 12px; }
+.cat-detail-stats { display: flex; gap: 28px; flex-wrap: wrap; }
+.cat-detail-stat { display: flex; flex-direction: column; gap: 2px; }
+.cat-detail-stat-label { font-size: 11.5px; color: var(--text-muted); }
+.cat-detail-stat-val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cat-detail-table-wrap { max-height: 50vh; overflow-y: auto; overflow-x: auto; }
+.cat-detail-table { width: 100%; min-width: 420px; border-collapse: collapse; }
+.cat-detail-table th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--bg-surface);
+  text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-muted);
+  padding: 8px 10px; border-bottom: 1px solid var(--border-subtle);
+}
+.cat-detail-table th.text-right { text-align: right; }
+.cat-detail-table td {
+  padding: 10px; font-size: 13.5px;
+  border-bottom: 1px solid var(--border-faint);
+  vertical-align: top;
+}
+.cat-detail-table tr:last-child td { border-bottom: none; }
+.cat-detail-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+
+@media (max-width: 768px) {
+  .cat-detail-stats { gap: 18px; }
 }
 
 /* ─────────────────────────────────────────────────────────────

@@ -791,23 +791,24 @@ function _dashDeferredRender(cash, portfolio) {
   const showBizums    = _isDashBlockVisible('dash-block-bizums');
   const showLiab      = _isDashBlockVisible('dash-block-liabilities');
 
-  if (showNetworth || showDist)
+  if (showNetworth || showDist || showExpCats)
     document.querySelectorAll('#section-dashboard .chart-wrapper, #section-dashboard .chart-donut-wrapper')
       .forEach(el => el.classList.add('loading'));
   if (showActivity)  _skelList('recent-transactions',  5);
   if (showInv)       _skelList('top-investments-list', 4);
   if (showGoals)     _skelList('dash-goals-list',      3);
-  if (showExpCats)   _skelList('dash-expense-cats',    4);
   if (showDiv)       _skelList('dash-dividends-list',  3);
   if (showWatch)     _skelList('dash-watchlist-list',  3);
 
   ric(() => {
     if (showNetworth) try { renderChartNetworthHistory(); } catch(e) { console.warn('chart networth:', e); }
     if (showDist)     try { renderChartDistribution(cash, portfolio, calcAlternativesTotal(), calcPropertiesTotal()); } catch(e) { console.warn('chart dist:', e); }
+    // dash-block-expcats es un gráfico Chart.js (igual que networth/dist, no una
+    // lista) — mismo tratamiento de error: console.warn, sin tocar el lienzo.
+    if (showExpCats)  try { renderDashExpenseCats(); } catch(e) { console.warn('dash expense cats:', e); }
     if (showInv)      try { renderTopInvestments(); }  catch(e) { console.warn('top investments:', e); _dashBlockError('top-investments-list', 'renderTopInvestments'); }
     if (showActivity) try { renderRecentActivity(); }  catch(e) { console.warn('recent activity:', e); _dashBlockError('recent-transactions', 'renderRecentActivity'); }
     if (showGoals)    try { renderDashGoals(); }       catch(e) { console.warn('dash goals:', e); _dashBlockError('dash-goals-list', 'renderDashGoals'); }
-    if (showExpCats)  try { renderDashExpenseCats(); } catch(e) { console.warn('dash expense cats:', e); _dashBlockError('dash-expense-cats', 'renderDashExpenseCats'); }
     if (showDiv)      try { renderDashDividends(); }   catch(e) { console.warn('dash dividends:', e); _dashBlockError('dash-dividends-list', 'renderDashDividends'); }
     if (showWatch)    try { renderDashWatchlist(); }   catch(e) { console.warn('dash watchlist:', e); _dashBlockError('dash-watchlist-list', 'renderDashWatchlist'); }
     if (showBizums)   try { renderDashBizums(); }      catch(e) { console.warn('dash bizums:', e); _dashBlockError('dash-bizums-stats', 'renderDashBizums'); }
@@ -1355,34 +1356,78 @@ function renderDashGoals() {
   }).join('');
 }
 
+// Donut interactivo — reutiliza EXACTAMENTE expensesByCategory() de
+// transactions.js (misma función que usa el gráfico de Transacciones) con
+// scale='1m' (mes actual), así que el total que se ve aquí y el que se ve
+// al pulsar una porción (openCategoryExpenseDetail) nunca pueden divergir.
 function renderDashExpenseCats() {
-  const el     = document.getElementById('dash-expense-cats');
+  const canvas = document.getElementById('chart-dash-expcats');
   const subEl  = document.getElementById('dash-expense-month');
-  if (!el) return;
-  const currentMonth = getCurrentMonth();
+  const legendEl = document.getElementById('dash-expcats-legend');
+  const emptyEl  = document.getElementById('dash-expcats-empty');
+  if (!canvas) return;
   if (subEl) subEl.textContent = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 
-  const monthExp = APP.transactions.filter(t => t.type === 'expense' && (t.date || getCurrentMonth()).startsWith(currentMonth));
-  if (monthExp.length === 0) {
-    el.innerHTML = `<div class="dash-empty">Sin gastos este mes</div>`;
+  const byCat  = expensesByCategory('1m');
+  const sorted = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 6);
+
+  if (sorted.length === 0) {
+    Charts.destroy('dash-expcats', 'chart-dash-expcats');
+    canvas.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = '';
+    if (legendEl) legendEl.innerHTML = '';
     return;
   }
-  const byCat = {};
-  monthExp.forEach(t => { byCat[t.category] = (byCat[t.category] || 0) + t.amount; });
-  const sorted  = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const maxAmt  = sorted[0][1];
+  canvas.style.display = '';
+  if (emptyEl) emptyEl.style.display = 'none';
 
-  el.innerHTML = sorted.map(([cat, amt]) => {
-    const pct = (amt / maxAmt) * 100;
-    return `
-      <div class="dash-cat-row">
-        <div class="dash-cat-name">${escapeHtml(cat)}</div>
-        <div class="dash-cat-bar-bg">
-          <div class="dash-cat-bar-fill" style="width:${pct}%"></div>
-        </div>
-        <div class="dash-cat-amt">${formatCurrency(amt)}</div>
-      </div>`;
-  }).join('');
+  const labels = sorted.map(e => e[0]);
+  const data   = sorted.map(e => e[1]);
+  const colors = CHART_COLORS.slice(0, data.length);
+  getChartDefaults(); // sincroniza Chart.defaults.plugins.tooltip con el tema actual (dark/light)
+
+  const onSliceClick = (evt, elements, chart) => {
+    const idx = elements[0]?.index;
+    if (idx === undefined) return;
+    openCategoryExpenseDetail(chart.data.labels[idx], '1m');
+  };
+
+  const existing = Charts.get('dash-expcats');
+  if (existing) {
+    existing.data.labels = labels;
+    existing.data.datasets[0].data = data;
+    existing.data.datasets[0].backgroundColor = colors;
+    existing.options.onClick = onSliceClick;
+    existing.update('none');
+  } else {
+    Charts.destroy('dash-expcats', 'chart-dash-expcats');
+    Charts.set('dash-expcats', new Chart(canvas, {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: 'transparent', hoverOffset: 6 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '65%',
+        onClick: onSliceClick,
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${formatCurrency(ctx.raw)}` } }
+        }
+      }
+    }));
+  }
+
+  if (legendEl) {
+    legendEl.innerHTML = labels.map((l, i) => `
+      <div class="legend-item legend-item--clickable" data-cat="${escapeHtml(l)}" role="button" tabindex="0">
+        <span class="legend-dot" style="background:${colors[i]}"></span>
+        <span>${escapeHtml(l)}: ${formatCurrency(data[i])}</span>
+      </div>`).join('');
+    legendEl.querySelectorAll('[data-cat]').forEach(row => {
+      const open = () => openCategoryExpenseDetail(row.dataset.cat, '1m');
+      row.addEventListener('click', open);
+      row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    });
+  }
 }
 
 /* ─── Insight inteligente ─────────────────────────────────────── */

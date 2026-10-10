@@ -165,47 +165,253 @@ function renderChartIncomeExpense() {
   }));
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   GASTOS POR CATEGORÍA — agregación compartida por el gráfico de
+   Transacciones y el widget del Dashboard, y por el modal de detalle
+   que ambos abren al pulsar una porción. Una sola función de filtrado
+   de fecha para los tres sitios garantiza que el total del detalle
+   SIEMPRE coincide con lo que muestra el gráfico — nunca se recalcula
+   dos veces con criterios distintos.
+═══════════════════════════════════════════════════════════════ */
+
+// 'all' = todo el historial (comportamiento original, sigue siendo el
+// valor por defecto para no cambiar los cálculos existentes). El resto
+// reutiliza el mismo vocabulario que ya usa el selector de "Evolución
+// del patrimonio" del dashboard (1M/3M/6M/1A) para que resulte familiar.
+const EXP_CAT_SCALES = ['1m', '3m', '6m', '1y', 'all'];
+const EXP_CAT_SCALE_SHORT = { '1m': '1M', '3m': '3M', '6m': '6M', '1y': '1A', all: 'Todo' };
+
+function expCatScaleLabel(scale) {
+  if (scale === '1m') return new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  if (scale === '3m') return 'Últimos 3 meses';
+  if (scale === '6m') return 'Últimos 6 meses';
+  if (scale === '1y') return 'Último año';
+  return 'Todo el historial';
+}
+
+// Primer mes (YYYY-MM) incluido por esa escala, o null si no hay límite inferior.
+function _expCatScaleCutoff(scale) {
+  if (scale === 'all') return null;
+  const monthsBack = { '1m': 0, '3m': 2, '6m': 5, '1y': 11 }[scale] ?? 0;
+  const now = new Date();
+  const d   = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function _expCatInScale(dateStr, scale) {
+  const cutoff = _expCatScaleCutoff(scale);
+  if (!cutoff) return true;
+  return (dateStr || getCurrentMonth()).slice(0, 7) >= cutoff;
+}
+
+// Mismo criterio que calcMonthlyExpense/renderDashExpenseCats: solo gastos
+// (type==='expense'); Finova no modela transferencias ni reembolsos como
+// líneas separadas, así que no hay nada adicional que excluir aquí.
+function expensesByCategory(scale) {
+  const byCategory = {};
+  APP.transactions.forEach(t => {
+    if (t.type !== 'expense' || !_expCatInScale(t.date, scale)) return;
+    byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
+  });
+  return byCategory;
+}
+
+let _expCatScale = 'all';
+
 function renderChartExpenseByCategory() {
   const ctx = document.getElementById('chart-expense-category');
   if (!ctx || typeof Chart === 'undefined') return;
 
+  _initExpCatScaleButtons();
+
   const { textColor, fontFamily } = getChartDefaults();
 
-  const byCategory = {};
-  APP.transactions.filter(t => t.type === 'expense').forEach(t => {
-    byCategory[t.category] = (byCategory[t.category] || 0) + t.amount;
-  });
-
+  const byCategory = expensesByCategory(_expCatScale);
   const entries = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
   const labels  = entries.map(e => e[0]);
   const data    = entries.map(e => e[1]);
+  const colors  = CHART_COLORS.slice(0, data.length);
 
+  const emptyEl = document.getElementById('chart-expense-category-empty');
   if (data.length === 0) {
     Charts.destroy('expense-category', 'chart-expense-category');
+    ctx.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = '';
     return;
   }
+  ctx.style.display = '';
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  const onSliceClick = (evt, elements, chart) => {
+    const idx = elements[0]?.index;
+    if (idx === undefined) return;
+    openCategoryExpenseDetail(chart.data.labels[idx], _expCatScale);
+  };
 
   const ecChart = Charts.get('expense-category');
   if (ecChart) {
     ecChart.data.labels = labels;
     ecChart.data.datasets[0].data = data;
-    ecChart.data.datasets[0].backgroundColor = CHART_COLORS.slice(0, data.length);
+    ecChart.data.datasets[0].backgroundColor = colors;
     ecChart.options.plugins.legend.labels.color = textColor;
+    ecChart.options.onClick = onSliceClick;
+    ecChart.options.plugins.legend.onClick = (e, item, legend) => onSliceClick(e, [{ index: item.index }], legend.chart);
     ecChart.update('none');
     return;
   }
 
   Charts.set('expense-category', new Chart(ctx, {
     type: 'doughnut',
-    data: { labels, datasets: [{ data, backgroundColor: CHART_COLORS.slice(0, data.length), borderColor: 'transparent', hoverOffset: 6 }] },
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: 'transparent', hoverOffset: 6 }] },
     options: {
       responsive: true, maintainAspectRatio: false, cutout: '65%',
+      onClick: onSliceClick,
+      onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
       plugins: {
-        legend: { position: 'right', labels: { color: textColor, font: { family: fontFamily, size: 11 }, boxWidth: 10, padding: 10 } },
+        legend: {
+          position: 'right',
+          labels: { color: textColor, font: { family: fontFamily, size: 11 }, boxWidth: 10, padding: 10 },
+          onClick: (e, item, legend) => onSliceClick(e, [{ index: item.index }], legend.chart),
+        },
         tooltip: { callbacks: { label: ctx => `${ctx.label}: ${formatCurrency(ctx.raw)}` } }
       }
     }
   }));
+}
+
+function _initExpCatScaleButtons() {
+  const wrap = document.getElementById('expcat-scale-btns');
+  if (!wrap || wrap.dataset.wired) return;
+  wrap.dataset.wired = '1';
+  wrap.querySelectorAll('.catchart-scale-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      wrap.querySelectorAll('.catchart-scale-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _expCatScale = btn.dataset.scale;
+      // El modal de detalle (si lo hay) solo puede abrirse DESPUÉS de pulsar una
+      // porción, y su overlay bloquea los clics sobre estos botones mientras está
+      // abierto — no existe un camino real para cambiar el periodo con el detalle
+      // abierto, así que no hace falta refrescarlo desde aquí.
+      renderChartExpenseByCategory();
+    });
+  });
+}
+
+/* ─── Modal de detalle: gastos de una categoría en un periodo ───── */
+let _expDetailState = null; // { category, scale }
+
+function openCategoryExpenseDetail(category, scale) {
+  _expDetailState = { category, scale };
+  openModal(`Gastos de ${category}`, _categoryExpenseDetailHTML(), null, null);
+  document.getElementById('modal')?.classList.add('modal-wide');
+  const footer = document.getElementById('modal')?.querySelector('.modal-footer');
+  if (footer) footer.style.display = 'none';
+  _wireCategoryExpenseDetail();
+  // Mejor esfuerzo: si se abre "Editar" desde esta misma vista, openAddTransaction()
+  // sustituye este _modalOnClose por el suyo propio antes de que se dispare — no pasa
+  // nada, _expDetailState solo se lee mientras este modal está realmente abierto.
+  _modalOnClose = () => { _expDetailState = null; };
+}
+
+function _categoryExpenseTxs() {
+  if (!_expDetailState) return [];
+  const { category, scale } = _expDetailState;
+  return APP.transactions
+    .filter(t => t.type === 'expense' && t.category === category && _expCatInScale(t.date, scale))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function _categoryExpenseDetailHTML() {
+  if (!_expDetailState) return '';
+  const { category, scale } = _expDetailState;
+  const txs   = _categoryExpenseTxs();
+  const total = txs.reduce((s, t) => s + t.amount, 0);
+
+  if (txs.length === 0) {
+    return `
+      <div class="cat-detail-period">${escapeHtml(expCatScaleLabel(scale))}</div>
+      ${emptyState('📂', 'Sin gastos', `No hay gastos de ${escapeHtml(category)} en el periodo seleccionado.`, '', '')}
+    `;
+  }
+
+  return `
+    <div class="cat-detail-summary">
+      <div class="cat-detail-period">${escapeHtml(expCatScaleLabel(scale))}</div>
+      <div class="cat-detail-stats">
+        <div class="cat-detail-stat">
+          <span class="cat-detail-stat-label">Total gastado</span>
+          <span class="cat-detail-stat-val negative">${formatCurrency(total)}</span>
+        </div>
+        <div class="cat-detail-stat">
+          <span class="cat-detail-stat-label">Operaciones</span>
+          <span class="cat-detail-stat-val">${txs.length}</span>
+        </div>
+      </div>
+    </div>
+    <div class="cat-detail-table-wrap">
+      <table class="cat-detail-table">
+        <thead><tr><th>Fecha</th><th>Concepto</th><th class="text-right">Importe</th><th></th></tr></thead>
+        <tbody>${txs.map(_catDetailRowHTML).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+function _catDetailRowHTML(t) {
+  const extras = [
+    t.merchant ? `<div class="cat-detail-sub">${escapeHtml(t.merchant)}</div>` : '',
+    t.note     ? `<div class="cat-detail-sub">📝 ${escapeHtml(t.note)}</div>` : '',
+  ].join('');
+  return `
+    <tr data-id="${escapeHtml(t.id)}">
+      <td>${formatDate(t.date)}</td>
+      <td><strong>${escapeHtml(t.description)}</strong>${extras}</td>
+      <td class="text-right negative">${formatCurrency(t.amount)}</td>
+      <td>
+        <div class="action-buttons">
+          <button class="btn-edit btn-icon" data-action="cd-edit" aria-label="Editar transacción">✎</button>
+          <button class="btn-danger btn-icon" data-action="cd-delete" aria-label="Eliminar transacción">✕</button>
+        </div>
+      </td>
+    </tr>`;
+}
+
+function _refreshCategoryExpenseDetail() {
+  const body = document.getElementById('modalBody');
+  if (!body || !_expDetailState) return;
+  body.innerHTML = _categoryExpenseDetailHTML();
+  _wireCategoryExpenseDetail();
+}
+
+function _wireCategoryExpenseDetail() {
+  _delegate('modalBody', {
+    'cd-edit':   id => editTransaction(id),
+    'cd-delete': id => _categoryExpenseDetailDelete(id),
+  });
+}
+
+function _categoryExpenseDetailDelete(id) {
+  const tx = APP.transactions.find(t => t.id === id);
+  if (!tx) return;
+  const row = document.querySelector(`#modalBody tr[data-id="${id}"]`);
+  animateRowRemoval(row, () => {
+    APP.transactions = APP.transactions.filter(t => t.id !== id);
+    updateNetworthHistory();
+    saveData();
+    markDashboardDirty();
+    if (APP.activeSection === SECTIONS.TRANSACTIONS) renderTransactions();
+    renderDashboard();
+    _refreshCategoryExpenseDetail();
+    softDelete(`"${tx.description}" eliminado`, () => {
+      APP.transactions.push(tx);
+      saveData();
+      if (APP.activeSection === SECTIONS.TRANSACTIONS) renderTransactions();
+      renderDashboard();
+      _refreshCategoryExpenseDetail();
+    }, () => {
+      // Confirmado (sin deshacer) — igual que deleteTransaction(), limpia la foto de IDB
+      if (tx.photoId) deletePhoto(tx.photoId);
+    });
+  });
 }
 
 function getLast6Months() {
