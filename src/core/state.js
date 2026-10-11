@@ -177,6 +177,12 @@ let APP = {
   // Transacciones recurrentes: { id, description, category, type, amount, frequency, nextDate, active }
   recurring: [],
 
+  // Viajes: { id, name, emoji, destination, startDate, endDate, budget, notes, createdAt }
+  // El gasto de un viaje NUNCA se guarda aquí — se calcula siempre a partir de
+  // APP.transactions filtrando por tripId, para que nunca pueda desincronizarse
+  // del dato real. Las transacciones solo añaden un campo opcional `tripId`.
+  trips: [],
+
   // Clasificación 50/30/20: categoryName → 'needs' | 'wants' | 'skip' (vacío = usa DEFAULT_BUDGET_TYPE)
   categoryBudgetType: {},
 

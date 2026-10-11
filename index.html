@@ -228,6 +228,10 @@
             <span class="nav-label">Recurrentes</span>
             <span class="nav-badge" id="nav-badge-recurring" style="display:none"></span>
           </button>
+          <button class="nav-item nav-sub-item" data-section="trips">
+            <span class="nav-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span>
+            <span class="nav-label">Viajes</span>
+          </button>
         </div>
       </div>
 
@@ -845,6 +849,35 @@
       </div>
       <p class="section-sub">Plantillas de ingresos y gastos periódicos. Pulsa "Registrar" para crear la transacción en el mes actual.</p>
       <div id="recurring-list"></div>
+    </section>
+
+    <!-- ─── VIAJES ──────────────────────────────────────────────── -->
+    <section class="section" id="section-trips">
+      <div class="section-header">
+        <h1>Viajes</h1>
+        <button type="button" class="btn-primary" data-action="add-trip">+ Añadir viaje</button>
+      </div>
+      <p class="section-sub">Agrupa los gastos de un viaje asignándolo al registrar o editar una transacción de gasto.</p>
+
+      <div class="kpi-grid kpi-grid-3" id="trips-kpis">
+        <div class="kpi-card">
+          <div class="kpi-label">Viajes activos</div>
+          <div class="kpi-value" id="trip-kpi-active">0</div>
+          <div class="kpi-change" id="trip-kpi-total-count">0 en total</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Gastado en viajes</div>
+          <div class="kpi-value negative" id="trip-kpi-spent">€0</div>
+          <div class="kpi-change">En todos los viajes registrados</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Presupuesto asignado</div>
+          <div class="kpi-value" id="trip-kpi-budget">€0</div>
+          <div class="kpi-change" id="trip-kpi-budget-sub">Viajes con presupuesto definido</div>
+        </div>
+      </div>
+
+      <div id="trips-grid" class="trips-grid"></div>
     </section>
 
     <!-- ─── BIZUMS ──────────────────────────────────────────────── -->
@@ -2252,6 +2285,7 @@
           <button class="mobile-menu-item mobile-menu-subitem" data-section="transactions"><span class="mmi-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span><span class="mmi-label">Transacciones</span></button>
           <button class="mobile-menu-item mobile-menu-subitem" data-section="bizums"><span class="mmi-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span><span class="mmi-label">Bizums</span></button>
           <button class="mobile-menu-item mobile-menu-subitem" data-section="recurring"><span class="mmi-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span><span class="mmi-label">Recurrentes</span></button>
+          <button class="mobile-menu-item mobile-menu-subitem" data-section="trips"><span class="mmi-icon"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-dot"/></svg></span><span class="mmi-label">Viajes</span></button>
         </div></div>
       </div>
 
@@ -2341,6 +2375,12 @@
         <label class="form-label">Importe (€)</label>
         <input type="number" id="f-tx-amount" class="text-input" placeholder="0.00" min="0" step="0.01" />
       </div>
+    </div>
+    <div class="form-group" id="f-tx-trip-wrap">
+      <label class="form-label">Viaje</label>
+      <select id="f-tx-trip" class="select-input">
+        <option value="">Sin viaje</option>
+      </select>
     </div>
     <div class="form-group">
       <label class="form-label">Nota</label>
@@ -2538,6 +2578,7 @@
   <script src="src/core/script.js"></script>
   <script src="src/sections/transactions.js"></script>
   <script src="src/sections/recurring.js"></script>
+  <script src="src/sections/trips.js"></script>
   <script src="src/sections/goals.js"></script>
   <!-- simulator.js loaded on-demand by _lazyLoad when user navigates to the section -->
   <script src="src/sections/bizums.js"></script>

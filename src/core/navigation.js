@@ -23,10 +23,11 @@ const SECTION_TITLES = {
   ai:           'Asesor IA',
   settings:     'Ajustes',
   recurring:    'Recurrentes',
+  trips:        'Viajes',
 };
 
 const INVERSIONES_SUBS   = ['portfolio', 'watchlist', 'dividends'];
-const TRANSACCIONES_SUBS = ['transactions', 'bizums', 'recurring'];
+const TRANSACCIONES_SUBS = ['transactions', 'bizums', 'recurring', 'trips'];
 
 const _sectionScroll = {};
 
@@ -162,6 +163,7 @@ function renderSection(sectionId) {
     case 'ai':        renderAI(); setTimeout(() => document.getElementById('ai-input')?.focus(), 80); break;
     case 'settings':  renderSettings();  break;
     case 'recurring': renderRecurring(); break;
+    case 'trips':     renderTrips();     break;
     case 'admin':     if (typeof renderAdminSection === 'function') renderAdminSection(); break;
   }
   requestAnimationFrame(() => initScrollReveal());

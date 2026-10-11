@@ -2284,6 +2284,89 @@ ul  { list-style: none; }
   color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .3px;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   VIAJES
+───────────────────────────────────────────────────────────── */
+.trips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--gap);
+}
+.trip-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--r-md);
+  padding: var(--sp-6);
+  position: relative;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+  box-shadow: var(--shadow-sm);
+}
+.trip-card:hover, .trip-card:focus-visible { background: var(--bg-hover); border-color: var(--border-subtle); }
+.trip-card--past { opacity: .72; }
+.trip-card-actions {
+  position: absolute; top: 14px; right: 14px;
+  display: flex; gap: 2px;
+  opacity: 0; transition: opacity var(--transition);
+}
+.trip-card:hover .trip-card-actions,
+.trip-card:focus-within .trip-card-actions { opacity: 1; }
+@media (hover: none) { .trip-card-actions { opacity: 1; } }
+
+.trip-emoji { font-size: 24px; margin-bottom: 12px; display: block; }
+.trip-name  { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
+.trip-dest  { font-size: 12px; color: var(--text-secondary); margin-bottom: 2px; }
+.trip-dates { font-size: 11px; color: var(--text-muted); margin-bottom: 16px; }
+
+.trip-amounts { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.trip-current { font-family: var(--font-serif); font-size: 22px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.trip-target  { font-size: 12px; color: var(--text-muted); }
+
+.trip-bar {
+  height: 4px; background: var(--border-subtle); border-radius: 2px;
+  overflow: hidden; margin-bottom: 6px;
+}
+.trip-bar-fill {
+  height: 100%; background: var(--accent); border-radius: 2px;
+  transition: width .7s cubic-bezier(.4,0,.2,1);
+}
+.trip-bar-fill--over { background: var(--down); }
+.trip-pct { font-size: 11px; font-weight: 600; color: var(--accent); }
+.trip-pct--over { color: var(--down); }
+.trip-tx-count { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+
+/* Insignia de viaje en la lista de transacciones — mismo lenguaje que
+   .tx-bank-badge/.tx-recurring-badge, color propio para distinguirla */
+.trip-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 600;
+  color: #3ddc84;
+  background: rgba(61,220,132,0.1);
+  border: 1px solid rgba(61,220,132,0.3);
+  padding: 1px 7px; border-radius: 99px; white-space: nowrap; flex-shrink: 0;
+  cursor: pointer;
+}
+.trip-badge:hover { background: rgba(61,220,132,0.18); }
+
+/* Desglose por categoría dentro del detalle de un viaje */
+.cat-detail-group-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-muted); margin-bottom: 8px;
+}
+.trip-cat-breakdown { margin-bottom: 4px; }
+.trip-cat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.trip-cat-row:last-child { margin-bottom: 0; }
+.trip-cat-name {
+  width: 110px; font-size: 12px; color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0;
+}
+.trip-cat-bar-bg { flex: 1; height: 6px; border-radius: 99px; background: var(--border-faint); overflow: hidden; }
+.trip-cat-bar-fill { height: 100%; border-radius: 99px; background: var(--accent); opacity: .8; transition: width .4s ease; }
+.trip-cat-amt {
+  font-size: 12px; font-weight: 600; color: var(--text-primary);
+  font-variant-numeric: tabular-nums; white-space: nowrap; width: 72px; text-align: right;
+}
+
 .goal-insight {
   margin-top: 12px;
   padding-top: 10px;

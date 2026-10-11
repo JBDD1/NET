@@ -1037,6 +1037,7 @@ function _globalClickDispatch(e) {
     case 'tx-period-all':              _txSetPeriodPreset('all'); break;
     case 'manage-budgets':             e.preventDefault(); openManageBudgets(); break;
     case 'add-recurring':              openAddRecurring(); break;
+    case 'add-trip':                   openAddTrip(); break;
     case 'add-bizum':                  openAddBizum(); break;
     // Portfolio
     case 'export-excel':               exportPortfolioExcel(); break;
@@ -3576,6 +3577,7 @@ const SECTIONS = {
   AI:           'ai',
   RECURRING:    'recurring',
   SETTINGS:     'settings',
+  TRIPS:        'trips',
 };
 
 // Orden por defecto del menú lateral — solo se usa mientras APP.sectionOrder

@@ -69,6 +69,7 @@ function renderTransactions() {
     'delete-tx':  id => deleteTransaction(id),
     'fav-tx':     id => toggleTxFavorite(id),
     'view-photo': id => viewTransactionPhoto(id),
+    'view-trip':  id => openTripDetail(id),
   });
   updateTransactionSummary();   // renderBudgets() is called inside here
   renderTransactionTable();
@@ -474,12 +475,14 @@ function _buildVirtualRowHTML(t) {
   ].join('');
   const recurringBadge = t.recurringId   ? '<span class="tx-recurring-badge">⟳ Recurrente</span>' : '';
   const bankBadge      = t.bankImported  ? '<span class="tx-bank-badge">🏦 Banco</span>' : '';
+  const trip            = t.tripId ? (APP.trips || []).find(tp => tp.id === t.tripId) : null;
+  const tripBadge        = trip ? `<span class="trip-badge" data-action="view-trip" data-id="${escapeHtml(trip.id)}">${escapeHtml(trip.emoji || '✈')} ${escapeHtml(trip.name)}</span>` : '';
   const sign = t.type === 'income' ? '+' : '-';
   const favLabel = t.favorite ? 'Quitar de favoritos' : 'Añadir a favoritos';
   const rowCls = ['tx-row-' + t.type, t.favorite ? 'tx-row-fav' : ''].filter(Boolean).join(' ');
   return `<tr data-id="${t.id}" class="${rowCls}" tabindex="0">
     <td>${formatDate(t.date)}</td>
-    <td><span class="tx-desc-wrap"><strong>${escapeHtml(t.description)}</strong>${recurringBadge}${bankBadge}${indicators ? `<span class="tx-indicators">${indicators}</span>` : ''}</span></td>
+    <td><span class="tx-desc-wrap"><strong>${escapeHtml(t.description)}</strong>${recurringBadge}${bankBadge}${tripBadge}${indicators ? `<span class="tx-indicators">${indicators}</span>` : ''}</span></td>
     <td>${escapeHtml(t.category)}</td>
     <td><span class="badge badge-${t.type}">${t.type === 'income' ? 'Ingreso' : 'Gasto'}</span></td>
     <td class="text-right pvt ${t.type === 'income' ? 'positive' : 'negative'}">${sign}${formatCurrency(t.amount)}</td>
@@ -642,6 +645,19 @@ function _txModalFill(tx) {
     catSel.appendChild(o);
   });
   frag.querySelector('#f-tx-photo').addEventListener('change', function() { onTxPhotoChange(this); });
+
+  const tripSel = frag.querySelector('#f-tx-trip');
+  if (tripSel) {
+    (APP.trips || []).forEach(trip => {
+      const o = document.createElement('option');
+      o.value = trip.id; o.textContent = trip.name;
+      if (trip.id === tx.tripId) o.selected = true;
+      tripSel.appendChild(o);
+    });
+    const tripWrap = frag.querySelector('#f-tx-trip-wrap');
+    if (tripWrap) tripWrap.style.display = (tx.type || 'expense') === 'income' ? 'none' : '';
+  }
+
   // Build autocomplete datalist from unique historical descriptions
   const uniqueDescs = [...new Set(APP.transactions.map(t => t.description))].sort();
   let dl = document.getElementById('tx-desc-datalist');
@@ -658,6 +674,8 @@ async function _txSave(prefill, isEdit) {
   const amount      = parseFloat(document.getElementById('f-tx-amount').value);
   const note        = document.getElementById('f-tx-note')?.value.trim() || '';
   const favorite    = document.getElementById('f-tx-fav')?.checked || false;
+  // Vínculo a un viaje: solo para gastos, campo opcional ("Sin viaje" = '')
+  const tripId      = type === 'expense' ? (document.getElementById('f-tx-trip')?.value || '') : '';
 
   if (!description) return showToast('La descripción es obligatoria', 'error');
   if (!date)        return showToast('La fecha es obligatoria', 'error');
@@ -674,12 +692,14 @@ async function _txSave(prefill, isEdit) {
       _oldTxSnapshot = { ...APP.transactions[idx] };
       const updated = { ...prefill, type, date, description, category, amount, note, favorite };
       if (photoId !== undefined) updated.photoId = photoId || undefined;
+      if (tripId) updated.tripId = tripId; else delete updated.tripId;
       delete updated.photo;
       APP.transactions[idx] = updated;
     }
   } else {
     const entry = { id: generateId(), type, date, description, category, amount, note, favorite };
     if (photoId) entry.photoId = photoId;
+    if (tripId)  entry.tripId  = tripId;
     APP.transactions.push(entry);
     if (typeof _notifyGoalProgress === 'function') _notifyGoalProgress(entry);
   }
@@ -765,6 +785,7 @@ function _txModalSetupListeners(tx) {
   });
   document.getElementById('f-tx-type')?.addEventListener('change', () => {
     updateTxCategoryOptions();
+    _txUpdateTripFieldVisibility();
     const desc = descInput.value.trim();
     if (desc.length >= 2) autoSuggestCategory(desc);
   });
@@ -820,6 +841,14 @@ function updateTxCategoryOptions() {
   if (!sel || !type) return;
   const cats = type === 'income' ? APP.categories.income : APP.categories.expense;
   sel.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+}
+
+// El vínculo a un viaje solo tiene sentido en gastos (un ingreso, p.ej. un
+// reembolso, no "pertenece" al presupuesto de viaje de la misma forma).
+function _txUpdateTripFieldVisibility() {
+  const type = document.getElementById('f-tx-type')?.value;
+  const wrap = document.getElementById('f-tx-trip-wrap');
+  if (wrap) wrap.style.display = type === 'income' ? 'none' : '';
 }
 
 function editTransaction(id) {

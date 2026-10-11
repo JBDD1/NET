@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'finova-v26';
+const CACHE_NAME = 'finova-v27';
 const API_CACHE  = 'finova-api-v1';
 const API_TTL    = 3_600_000; // 1 hour in ms
 const API_PATHS  = ['/api/yahoo', '/api/fx'];
@@ -56,6 +56,7 @@ const CRITICAL_ASSETS = [
   './src/sections/dashboard.js',
   './src/sections/transactions.js',
   './src/sections/recurring.js',
+  './src/sections/trips.js',
   './src/sections/networth.js',
   './src/sections/portfolio.js',
   './src/sections/goals.js',
