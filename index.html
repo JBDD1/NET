@@ -1821,9 +1821,16 @@
           <button type="button" class="btn-primary" data-action="open-dashboard-editor">Editar</button>
         </div>
 
-        <div class="settings-section-label" style="margin-top:20px">Menú lateral</div>
-        <p style="font-size:12px;color:var(--text-muted);margin:6px 0 12px">Activa, desactiva o arrastra ≡ para reordenar las secciones</p>
-        <div id="section-visibility-list"></div>
+        <details class="settings-collapsible" style="margin-top:20px">
+          <summary class="settings-collapsible-summary">
+            <div>
+              <div class="settings-section-label" style="margin:0">Menú lateral</div>
+              <p style="font-size:12px;color:var(--text-muted);margin:4px 0 0">Activa, desactiva o arrastra ≡ para reordenar las secciones</p>
+            </div>
+            <svg class="icon icon-sm settings-collapsible-chevron" aria-hidden="true"><use href="#icon-chevron-right"/></svg>
+          </summary>
+          <div id="section-visibility-list" style="margin-top:12px"></div>
+        </details>
       </div>
 
       <!-- Notificaciones -->

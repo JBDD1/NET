@@ -4354,6 +4354,19 @@ input[type="date"], input[type="month"] { color-scheme: light; }
   border-bottom: 1px solid var(--border-faint);
 }
 
+/* Bloque "Menú lateral" de Ajustes — colapsado por defecto en vez de
+   mostrar siempre las 10 secciones reordenables ocupando toda la tarjeta. */
+.settings-collapsible-summary {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.settings-collapsible-summary::-webkit-details-marker { display: none; }
+.settings-collapsible-summary .settings-section-label { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.settings-collapsible-chevron { color: var(--text-muted); flex-shrink: 0; transition: transform var(--transition); }
+.settings-collapsible[open] .settings-collapsible-chevron { transform: rotate(90deg); }
+
 .settings-cat-card-header {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 16px;
