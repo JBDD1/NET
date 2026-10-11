@@ -113,17 +113,64 @@ function renderTrips() {
   });
 }
 
+/* ─── Selector de emoji ──────────────────────────────────────── */
+// Reutiliza el componente .emoji-picker-* ya existente (usado por el
+// selector de icono de las alertas personalizadas en el dashboard) — mismas
+// clases y mismo patrón de apertura/cierre, solo con ids e id del conjunto
+// de emojis propios de Viajes. _toggleEmojiPicker()/_selectAlertEmoji() de
+// dashboard.js están codificados a los ids de esa alerta en concreto, así
+// que no son reutilizables tal cual; estas son su equivalente para Viajes.
+const TRIP_EMOJI_SET = [
+  '✈️','🏖️','🏔️','🗺️','🧳','🌍','🌎','🌏',
+  '🚗','🚆','🚢','🏕️','🏨','🎒','🗽','🗼',
+  '🏛️','🌄','🌅','🏝️','⛰️','🎡','🎢','📸',
+];
+
+function _toggleTripEmojiPicker() {
+  const dd = document.getElementById('tripEmojiDropdown');
+  if (!dd) return;
+  const isOpen = dd.style.display !== 'none';
+  dd.style.display = isOpen ? 'none' : 'grid';
+  if (!isOpen) {
+    setTimeout(() => {
+      document.addEventListener('click', function _close(e) {
+        if (!document.getElementById('tripEmojiPickerWrap')?.contains(e.target)) {
+          dd.style.display = 'none';
+          document.removeEventListener('click', _close);
+        }
+      });
+    }, 10);
+  }
+}
+
+function _selectTripEmoji(emoji) {
+  const trigger = document.getElementById('tripEmojiTrigger');
+  const input   = document.getElementById('f-trip-emoji');
+  if (trigger) trigger.textContent = emoji;
+  if (input)   input.value = emoji;
+  const dd = document.getElementById('tripEmojiDropdown');
+  if (dd) dd.style.display = 'none';
+}
+
 /* ─── Crear / editar viaje ───────────────────────────────────── */
 
 function openAddTrip(prefill = null) {
   const isEdit = !!prefill;
   const t = prefill || {};
+  const initialEmoji = t.emoji || '✈️';
 
   openModal(isEdit ? 'Editar viaje' : 'Nuevo viaje', `
     <div class="form-row">
-      <div class="form-group" style="flex:0 0 72px">
+      <div class="form-group" style="flex:0 0 auto">
         <label class="form-label">Emoji</label>
-        <input type="text" id="f-trip-emoji" class="text-input" placeholder="✈" value="${escapeHtml(t.emoji || '✈')}" maxlength="2" style="text-align:center;font-size:22px" />
+        <div class="emoji-picker-wrap" id="tripEmojiPickerWrap">
+          <button type="button" class="emoji-picker-trigger" id="tripEmojiTrigger" style="height:48px"
+            onclick="_toggleTripEmojiPicker()" title="Elegir emoji">${escapeHtml(initialEmoji)}</button>
+          <input type="hidden" id="f-trip-emoji" value="${escapeHtml(initialEmoji)}" />
+          <div class="emoji-picker-dropdown" id="tripEmojiDropdown" style="display:none">
+            ${TRIP_EMOJI_SET.map(em => `<button type="button" class="emoji-picker-item" onclick="_selectTripEmoji('${em}')">${em}</button>`).join('')}
+          </div>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">Nombre *</label>
@@ -153,7 +200,7 @@ function openAddTrip(prefill = null) {
       <textarea id="f-trip-notes" class="text-input" rows="2" placeholder="Detalles adicionales...">${escapeHtml(t.notes || '')}</textarea>
     </div>
   `, () => {
-    const emoji       = document.getElementById('f-trip-emoji').value.trim() || '✈';
+    const emoji       = document.getElementById('f-trip-emoji').value.trim() || '✈️';
     const name        = document.getElementById('f-trip-name').value.trim();
     const destination = document.getElementById('f-trip-dest').value.trim();
     const startDate   = document.getElementById('f-trip-start').value;
