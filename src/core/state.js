@@ -35,6 +35,12 @@ let APP = {
   // Cuentas de efectivo: { id, name, amount }
   cashAccounts: [],
 
+  // Si no es null, id de la cuenta de cashAccounts que los ingresos/gastos
+  // ajustan automáticamente (ingreso suma, gasto resta) al añadir, editar o
+  // eliminar una transacción. null = ninguna — el patrimonio neto sigue
+  // siendo un snapshot manual, como por defecto.
+  transactionCashAccountId: null,
+
   // Activos alternativos: { id, name, category, buyPrice, currentPrice, purchaseDate, notes }
   alternatives: [],
 

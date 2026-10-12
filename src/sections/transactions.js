@@ -11,6 +11,20 @@
  */
 let _txPhotoState = null;
 
+// Ajusta la cuenta de efectivo vinculada a transacciones (ver
+// APP.transactionCashAccountId), si el usuario ha elegido una — un ingreso
+// suma, un gasto resta. sign=1 al añadir una transacción, sign=-1 al
+// quitarla (eliminar, o deshacer una edición/alta). No hace nada si no hay
+// ninguna cuenta vinculada: el patrimonio neto sigue siendo un snapshot
+// manual por defecto, igual que antes de esta función existir.
+function _applyTxCashImpact(tx, sign) {
+  if (!APP.transactionCashAccountId || !tx) return;
+  const acct = (APP.cashAccounts || []).find(a => a.id === APP.transactionCashAccountId);
+  if (!acct) return;
+  const delta = tx.type === 'income' ? tx.amount : -tx.amount;
+  acct.amount = (parseFloat(acct.amount) || 0) + delta * sign;
+}
+
 function _txUpdateMonthLabel() {
   const monthEl = document.getElementById('tx-filter-month');
   const labelEl = document.getElementById('tx-month-label');
@@ -396,6 +410,7 @@ function _categoryExpenseDetailDelete(id) {
   const row = document.querySelector(`#modalBody tr[data-id="${id}"]`);
   animateRowRemoval(row, () => {
     APP.transactions = APP.transactions.filter(t => t.id !== id);
+    _applyTxCashImpact(tx, -1);
     updateNetworthHistory();
     saveData();
     markDashboardDirty();
@@ -404,6 +419,7 @@ function _categoryExpenseDetailDelete(id) {
     _refreshCategoryExpenseDetail();
     softDelete(`"${tx.description}" eliminado`, () => {
       APP.transactions.push(tx);
+      _applyTxCashImpact(tx, 1);
       saveData();
       if (APP.activeSection === SECTIONS.TRANSACTIONS) renderTransactions();
       renderDashboard();
@@ -692,6 +708,7 @@ async function _txSave(prefill, isEdit) {
   catch { showToast('Error guardando la foto. La transacción se guardará sin ella.', 'error'); photoId = null; }
 
   let _oldTxSnapshot = null;
+  let _updatedTx      = null;
   if (isEdit) {
     const idx = APP.transactions.findIndex(t => t.id === prefill.id);
     if (idx >= 0) {
@@ -701,12 +718,16 @@ async function _txSave(prefill, isEdit) {
       if (tripId) updated.tripId = tripId; else delete updated.tripId;
       delete updated.photo;
       APP.transactions[idx] = updated;
+      _updatedTx = updated;
+      _applyTxCashImpact(_oldTxSnapshot, -1);
+      _applyTxCashImpact(updated, 1);
     }
   } else {
     const entry = { id: generateId(), type, date, description, category, amount, note, favorite };
     if (photoId) entry.photoId = photoId;
     if (tripId)  entry.tripId  = tripId;
     APP.transactions.push(entry);
+    _applyTxCashImpact(entry, 1);
     if (typeof _notifyGoalProgress === 'function') _notifyGoalProgress(entry);
   }
 
@@ -721,6 +742,8 @@ async function _txSave(prefill, isEdit) {
       const i = APP.transactions.findIndex(t => t.id === prefill.id);
       if (i >= 0) {
         APP.transactions[i] = _oldTxSnapshot;
+        _applyTxCashImpact(_updatedTx, -1);
+        _applyTxCashImpact(_oldTxSnapshot, 1);
         saveData(); renderTransactions();
         if (APP.activeSection === SECTIONS.DASHBOARD) renderDashboard();
       }
@@ -874,12 +897,14 @@ function deleteTransaction(id) {
 
   animateRowRemoval(row, () => {
     APP.transactions = APP.transactions.filter(t => t.id !== id);
+    _applyTxCashImpact(tx, -1);
     updateNetworthHistory();
     renderTransactions();
     markDashboardDirty();
     renderDashboard();
     softDelete(`"${tx.description}" eliminado`, () => {
       APP.transactions.push(tx);
+      _applyTxCashImpact(tx, 1);
       saveData();
       renderTransactions();
       renderDashboard();
@@ -1179,13 +1204,19 @@ function _qaPickCategory(ids, onPicked = null) {
   _qaPickCallback = onPicked;
   const allCats = [...APP.categories.income, ...APP.categories.expense].filter(c => c !== UNCLASSIFIED_CATEGORY);
   const intro = onPicked
-    ? '<p class="modal-help-text">No he podido reconocer la categoría automáticamente — elige una para guardar la transacción.</p>'
+    ? '<p class="modal-help-text">No he podido reconocer la categoría automáticamente. Elegirla ahora es recomendable, pero puedes dejarla para más tarde.</p>'
+    : '';
+  // "Más tarde" solo tiene sentido en el flujo que pregunta antes de guardar
+  // (onPicked) — es lo que lo hace opcional en vez de obligatorio.
+  const laterBtn = onPicked
+    ? `<button type="button" class="btn-ghost-sm" style="margin-top:10px" onclick="_qaSkipCategory('${escapeHtml(ids.input)}')">Guardar sin clasificar — lo haré más tarde</button>`
     : '';
   openModal(onPicked ? '¿Qué categoría es?' : 'Cambiar categoría', `
     ${intro}
     <div style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 0">
       ${allCats.map(c => `<button class="cat-pick-btn" onclick="_qaSetCategory('${escapeHtml(ids.input)}','${escapeHtml(c)}')">${escapeHtml(c)}</button>`).join('')}
-    </div>`, null);
+    </div>
+    ${laterBtn}`, null);
   document.getElementById('modal')?.querySelector('.modal-footer')?.style.setProperty('display', 'none');
 }
 
@@ -1193,6 +1224,15 @@ function _qaSetCategory(inputId, category) {
   _qaOverrides[inputId] = { ...(_qaOverrides[inputId] || {}), category };
   const ids = Object.values(_QA_IDS).find(i => i.input === inputId);
   if (ids) _qaUpdateUI(ids);
+  closeModal();
+  if (_qaPickCallback) { const cb = _qaPickCallback; _qaPickCallback = null; cb(); }
+}
+
+// El usuario decide explícitamente posponer la categorización — se guarda
+// igualmente como "Sin clasificar" (nunca se inventa una), y el badge en la
+// lista de transacciones lo deja visible para clasificarlo cuando quiera.
+function _qaSkipCategory(inputId) {
+  _qaOverrides[inputId] = { ...(_qaOverrides[inputId] || {}), skipCategoryCheck: true };
   closeModal();
   if (_qaPickCallback) { const cb = _qaPickCallback; _qaPickCallback = null; cb(); }
 }
@@ -1222,10 +1262,11 @@ function _qaSubmit(ids) {
   const type     = ov.type     || parsed.type;
   const category = ov.category || parsed.category;
 
-  // No se guarda nunca "Sin clasificar" en silencio — si no hay una
-  // categoría clara, se pregunta antes de guardar (en cuanto el usuario
-  // elija, este mismo guardado se reanuda automáticamente).
-  if (category === UNCLASSIFIED_CATEGORY) {
+  // Si no hay una categoría clara, se recomienda elegirla antes de guardar
+  // — pero es opcional: si el usuario ya pulsó "lo haré más tarde"
+  // (skipCategoryCheck), se guarda igualmente como "Sin clasificar" sin
+  // volver a preguntar para esta misma transacción.
+  if (category === UNCLASSIFIED_CATEGORY && !ov.skipCategoryCheck) {
     _qaPickCategory(ids, () => _qaSubmit(ids));
     return;
   }
@@ -1233,6 +1274,7 @@ function _qaSubmit(ids) {
   const qaTx = { id: generateId(), type, date: parsed.date, description: parsed.description, category, amount: parsed.amount };
   if (type === 'expense' && ov.tripId) qaTx.tripId = ov.tripId;
   APP.transactions.push(qaTx);
+  _applyTxCashImpact(qaTx, 1);
   if (typeof _notifyGoalProgress === 'function') _notifyGoalProgress(qaTx);
   // Solo "aprender" el patrón cuando la categoría viene de una señal real:
   // el usuario la eligió a mano (ov.category) o coincidió con un patrón ya

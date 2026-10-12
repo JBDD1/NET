@@ -259,11 +259,13 @@ function applyRecurring(id, silent = false) {
     recurringId: r.id,
   };
   APP.transactions.push(tx);
+  _applyTxCashImpact(tx, 1);
 
   // Flush save now — if storage is full, roll back the transaction and stop
   const saved = _debouncedSaveNow.flush();
   if (saved === false) {
     APP.transactions.pop();
+    _applyTxCashImpact(tx, -1);
     return;
   }
 

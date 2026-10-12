@@ -107,10 +107,11 @@ function _sparkDraw(id, rawData, isHero) {
 
 function renderNetworth() {
   _delegate('section-networth', {
-    'edit-cash':     id => editCashAccount(id),
-    'delete-cash':   id => deleteCashAccount(id),
-    'edit-prop':     id => editProperty(id),
-    'delete-prop':   id => deleteProperty(id),
+    'edit-cash':        id => editCashAccount(id),
+    'delete-cash':      id => deleteCashAccount(id),
+    'toggle-tx-account': id => toggleTransactionCashAccount(id),
+    'edit-prop':        id => editProperty(id),
+    'delete-prop':      id => deleteProperty(id),
   });
   const cash         = calcCashTotal();
   const investments  = calcPortfolioValue();
@@ -184,16 +185,38 @@ function renderCashAccounts() {
     return;
   }
   const sorted = [...APP.cashAccounts].sort((a, b) => (b.amount || 0) - (a.amount || 0));
-  el.innerHTML = sorted.map(acc => `
-    <div class="cash-entry" data-id="${acc.id}">
-      <div class="cash-entry-name">${escapeHtml(acc.name)}</div>
+  el.innerHTML = sorted.map(acc => {
+    const isLinked = acc.id === APP.transactionCashAccountId;
+    return `
+    <div class="cash-entry${isLinked ? ' cash-entry--linked' : ''}" data-id="${acc.id}">
+      <div class="cash-entry-name">
+        ${escapeHtml(acc.name)}
+        ${isLinked ? '<span class="cash-entry-linked-badge" title="Los ingresos y gastos ajustan el saldo de esta cuenta automáticamente">⇄ Transacciones</span>' : ''}
+      </div>
       <div class="cash-entry-amount">${formatCurrency(acc.amount)}</div>
       <div class="cash-entry-actions">
+        <button class="btn-ghost-sm" data-action="toggle-tx-account" title="${isLinked ? 'Dejar de vincular ingresos/gastos a esta cuenta' : 'Vincular ingresos y gastos a esta cuenta'}">${isLinked ? '✓ Vinculada' : 'Vincular'}</button>
         <button class="btn-edit btn-icon" data-action="edit-cash" aria-label="Editar cuenta ${escapeHtml(acc.name)}">✎</button>
         <button class="btn-danger btn-icon" data-action="delete-cash" aria-label="Eliminar cuenta ${escapeHtml(acc.name)}">✕</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
+}
+
+function toggleTransactionCashAccount(id) {
+  const wasLinked = APP.transactionCashAccountId === id;
+  APP.transactionCashAccountId = wasLinked ? null : id;
+  saveData();
+  renderCashAccounts();
+  if (APP.activeSection === SECTIONS.DASHBOARD) renderDashboard();
+  const acct = APP.cashAccounts.find(a => a.id === id);
+  showToast(
+    wasLinked
+      ? 'Los ingresos y gastos ya no ajustan ninguna cuenta automáticamente'
+      : `Ingresos y gastos ajustarán el saldo de "${acct?.name || ''}" automáticamente`,
+    'success'
+  );
 }
 
 function openAddCashAccount(prefill = null) {
@@ -235,11 +258,14 @@ function editCashAccount(id) {
 function deleteCashAccount(id) {
   const acc = APP.cashAccounts.find(x => x.id === id);
   if (!acc) return;
+  const wasLinked = APP.transactionCashAccountId === id;
   APP.cashAccounts = APP.cashAccounts.filter(x => x.id !== id);
+  if (wasLinked) APP.transactionCashAccountId = null;
   updateNetworthHistory();
   renderNetworth();
   softDelete(`Cuenta "${acc.name}" eliminada`, () => {
     APP.cashAccounts.push(acc);
+    if (wasLinked) APP.transactionCashAccountId = id;
     saveData();
     renderNetworth();
   });

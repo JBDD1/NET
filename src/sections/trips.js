@@ -387,6 +387,7 @@ function _tripDetailDeleteTx(id) {
   const row = document.querySelector(`#modalBody tr[data-id="${id}"]`);
   animateRowRemoval(row, () => {
     APP.transactions = APP.transactions.filter(t => t.id !== id);
+    _applyTxCashImpact(tx, -1);
     updateNetworthHistory();
     saveData();
     markDashboardDirty();
@@ -395,6 +396,7 @@ function _tripDetailDeleteTx(id) {
     _refreshTripDetail();
     softDelete(`"${tx.description}" eliminado`, () => {
       APP.transactions.push(tx);
+      _applyTxCashImpact(tx, 1);
       saveData();
       if (APP.activeSection === SECTIONS.TRANSACTIONS) renderTransactions();
       renderDashboard();
