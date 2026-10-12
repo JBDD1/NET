@@ -5324,6 +5324,14 @@ input[type="date"], input[type="month"] { color-scheme: light; }
   padding: 2px 9px;
   animation: fadeSection .25s ease;
 }
+/* Sin patrón aprendido ni palabra clave que coincida — nunca se inventa una
+   categoría, se marca visiblemente pendiente (mismo lenguaje que "⚠
+   Pendiente" en la revisión de importación CSV/OFX). */
+.cat-ai-badge--unclassified {
+  background: none;
+  color: var(--text-muted);
+  border-color: var(--border-faint);
+}
 
 /* ── Quick-add transaction ─────────────────────────────── */
 .quick-add-card { padding: 12px 18px; }

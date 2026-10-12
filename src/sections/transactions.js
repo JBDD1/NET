@@ -638,10 +638,16 @@ function _txModalFill(tx) {
   frag.querySelector('#f-tx-fav').checked = !!tx.favorite;
   const cats = tx.type === 'income' ? APP.categories.income : APP.categories.expense;
   const catSel = frag.querySelector('#f-tx-category');
+  // Una transacción nueva no tiene categoría todavía — si no se marca ninguna
+  // opción como selected, el <select> cae por defecto en la PRIMERA de la
+  // lista (Vivienda) sin que eso signifique nada. Se parte siempre de
+  // UNCLASSIFIED_CATEGORY y autoSuggestCategory() la sobrescribe si encuentra
+  // una coincidencia real.
+  const initialCategory = tx.category || UNCLASSIFIED_CATEGORY;
   cats.forEach(c => {
     const o = document.createElement('option');
     o.value = c; o.textContent = c;
-    if (c === tx.category) o.selected = true;
+    if (c === initialCategory) o.selected = true;
     catSel.appendChild(o);
   });
   frag.querySelector('#f-tx-photo').addEventListener('change', function() { onTxPhotoChange(this); });
@@ -840,7 +846,12 @@ function updateTxCategoryOptions() {
   const sel  = document.getElementById('f-tx-category');
   if (!sel || !type) return;
   const cats = type === 'income' ? APP.categories.income : APP.categories.expense;
-  sel.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  // Las categorías de Gasto e Ingreso son listas distintas — al cambiar de
+  // tipo, la categoría marcada antes casi nunca existe en la nueva lista.
+  // Se parte de UNCLASSIFIED_CATEGORY (igual que _txModalFill) en vez de
+  // dejar que el navegador seleccione la primera opción por accidente;
+  // autoSuggestCategory() la sustituye justo después si hay una coincidencia.
+  sel.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}"${c === UNCLASSIFIED_CATEGORY ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('');
 }
 
 // El vínculo a un viaje solo tiene sentido en gastos (un ingreso, p.ej. un
@@ -1080,8 +1091,10 @@ function parseQuickAdd(raw) {
 
   const learned = APP.categoryPatterns && _patCat(APP.categoryPatterns[txPatternKey(description)]);
   const local   = matchLocalKeywords(description, type);
-  const cats    = type === 'expense' ? APP.categories.expense : APP.categories.income;
-  const category = learned || local || cats[0] || 'Otros';
+  // Si no hay patrón aprendido ni coincidencia de palabra clave, no inventar
+  // una categoría al azar (antes caía en la primera de la lista, "Vivienda",
+  // para cualquier cosa sin clasificar: "comida", "fiesta", "copas"...).
+  const category = learned || local || UNCLASSIFIED_CATEGORY;
   const source   = learned ? 'aprendido' : (local ? 'sugerido' : null);
 
   return { description, amount, type, category, source, date: getTodayStr() };
@@ -1120,10 +1133,12 @@ function _qaUpdateUI(ids) {
   const effectiveType = ov.type     || parsed.type;
   const effectiveCat  = ov.category || parsed.category;
   if (badge) {
-    badge.textContent = effectiveCat + (parsed.source && !ov.category ? ' · ' + parsed.source : '');
+    const isUnclassified = effectiveCat === UNCLASSIFIED_CATEGORY;
+    badge.textContent = (isUnclassified ? '⚠ ' : '') + effectiveCat + (parsed.source && !ov.category ? ' · ' + parsed.source : '');
+    badge.classList.toggle('cat-ai-badge--unclassified', isUnclassified);
     badge.style.display = 'inline-block';
     badge.style.cursor = 'pointer';
-    badge.title = 'Clic para cambiar categoría';
+    badge.title = isUnclassified ? 'Sin clasificar — clic para elegir categoría' : 'Clic para cambiar categoría';
     badge.onclick = () => _qaPickCategory(ids);
   }
   if (tbadge) {
@@ -1163,10 +1178,16 @@ function _qaSubmit(ids) {
   const qaTx = { id: generateId(), type, date: parsed.date, description: parsed.description, category, amount: parsed.amount };
   APP.transactions.push(qaTx);
   if (typeof _notifyGoalProgress === 'function') _notifyGoalProgress(qaTx);
-  _patWrite(txPatternKey(parsed.description), category);
+  // Solo "aprender" el patrón cuando la categoría viene de una señal real:
+  // el usuario la eligió a mano (ov.category) o coincidió con un patrón ya
+  // aprendido / una palabra clave (parsed.source). Nunca memorizar el
+  // fallback "Sin clasificar" como si fuera una corrección confirmada.
+  if (category !== UNCLASSIFIED_CATEGORY && (ov.category || parsed.source)) {
+    _patWrite(txPatternKey(parsed.description), category);
+  }
   _qaOverrides[ids.input] = {};
   saveData();
-  showToast((parsed.type === 'income' ? 'Ingreso' : 'Gasto') + ' añadido → ' + parsed.category + ' ✓', 'success');
+  showToast((type === 'income' ? 'Ingreso' : 'Gasto') + ' añadido → ' + category + ' ✓', 'success');
   input.value = '';
   _qaUpdateUI(ids);
   renderTransactions();
