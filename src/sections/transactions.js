@@ -1101,9 +1101,10 @@ function parseQuickAdd(raw) {
 }
 
 const _QA_IDS = {
-  tx: { input: 'quick-add-input', type: 'quick-add-type-badge', cat: 'quick-add-cat-badge', hint: 'quick-add-hint', btn: 'quick-add-btn' },
+  tx: { input: 'quick-add-input', type: 'quick-add-type-badge', cat: 'quick-add-cat-badge', trip: 'quick-add-trip-badge', hint: 'quick-add-hint', btn: 'quick-add-btn' },
 };
 const _qaOverrides = {};
+let _qaPickCallback = null; // callback pendiente tras elegir categoría en el flujo de "pregunta al usuario"
 
 let _txShowFavoritesOnly = false;
 let _txSortCol = 'date';
@@ -1116,17 +1117,19 @@ function toggleTxFavorites() {
 }
 
 function _qaUpdateUI(ids) {
-  const input  = document.getElementById(ids.input);
-  const badge  = document.getElementById(ids.cat);
-  const tbadge = document.getElementById(ids.type);
-  const hint   = document.getElementById(ids.hint);
-  const btn    = document.getElementById(ids.btn);
-  const parsed = input ? parseQuickAdd(input.value) : null;
+  const input    = document.getElementById(ids.input);
+  const badge    = document.getElementById(ids.cat);
+  const tbadge   = document.getElementById(ids.type);
+  const tripBadge = ids.trip ? document.getElementById(ids.trip) : null;
+  const hint     = document.getElementById(ids.hint);
+  const btn      = document.getElementById(ids.btn);
+  const parsed   = input ? parseQuickAdd(input.value) : null;
   if (!parsed) {
-    if (badge)  badge.style.display  = 'none';
-    if (tbadge) tbadge.style.display = 'none';
-    if (hint)   hint.style.display   = 'none';
-    if (btn)    btn.disabled = true;
+    if (badge)     badge.style.display     = 'none';
+    if (tbadge)    tbadge.style.display    = 'none';
+    if (tripBadge) tripBadge.style.display = 'none';
+    if (hint)      hint.style.display      = 'none';
+    if (btn)       btn.disabled = true;
     return;
   }
   const ov = _qaOverrides[ids.input] || {};
@@ -1149,15 +1152,39 @@ function _qaUpdateUI(ids) {
     tbadge.title = 'Clic para cambiar tipo';
     tbadge.onclick = () => { _qaOverrides[ids.input] = { ...ov, type: effectiveType === 'income' ? 'expense' : 'income' }; _qaUpdateUI(ids); };
   }
+  // El viaje solo tiene sentido en gastos, y solo si existe al menos un
+  // viaje creado — igual que en el formulario completo de transacciones.
+  if (tripBadge) {
+    const showTrip = effectiveType === 'expense' && (APP.trips || []).length > 0;
+    if (showTrip) {
+      const trip = ov.tripId ? (APP.trips || []).find(t => t.id === ov.tripId) : null;
+      tripBadge.textContent = trip ? `${trip.emoji || '✈'} ${trip.name}` : '+ Viaje';
+      tripBadge.className = trip ? 'trip-badge' : 'trip-badge trip-badge--empty';
+      tripBadge.style.display = 'inline-block';
+      tripBadge.style.cursor = 'pointer';
+      tripBadge.title = 'Clic para asignar a un viaje';
+      tripBadge.onclick = () => _qaPickTrip(ids);
+    } else {
+      tripBadge.style.display = 'none';
+    }
+  }
   if (hint) { hint.textContent = parsed.description + ' · ' + formatCurrency(parsed.amount); hint.style.display = 'block'; }
   if (btn) btn.disabled = false;
 }
 
-function _qaPickCategory(ids) {
-  const allCats = [...APP.categories.income, ...APP.categories.expense];
-  openModal('Cambiar categoría', `
+// onPicked opcional: si se pasa, el flujo "pregunta al usuario" lo llama en
+// cuanto se elige una categoría, para completar el guardado que quedó en
+// espera (ver _qaSubmit). Sin onPicked, es el cambio manual de siempre.
+function _qaPickCategory(ids, onPicked = null) {
+  _qaPickCallback = onPicked;
+  const allCats = [...APP.categories.income, ...APP.categories.expense].filter(c => c !== UNCLASSIFIED_CATEGORY);
+  const intro = onPicked
+    ? '<p class="modal-help-text">No he podido reconocer la categoría automáticamente — elige una para guardar la transacción.</p>'
+    : '';
+  openModal(onPicked ? '¿Qué categoría es?' : 'Cambiar categoría', `
+    ${intro}
     <div style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 0">
-      ${allCats.map(c => `<button class="cat-pick-btn" onclick="_qaSetCategory('${escapeHtml(ids.input)}','${escapeHtml(c)}');closeModal()">${escapeHtml(c)}</button>`).join('')}
+      ${allCats.map(c => `<button class="cat-pick-btn" onclick="_qaSetCategory('${escapeHtml(ids.input)}','${escapeHtml(c)}')">${escapeHtml(c)}</button>`).join('')}
     </div>`, null);
   document.getElementById('modal')?.querySelector('.modal-footer')?.style.setProperty('display', 'none');
 }
@@ -1166,16 +1193,45 @@ function _qaSetCategory(inputId, category) {
   _qaOverrides[inputId] = { ...(_qaOverrides[inputId] || {}), category };
   const ids = Object.values(_QA_IDS).find(i => i.input === inputId);
   if (ids) _qaUpdateUI(ids);
+  closeModal();
+  if (_qaPickCallback) { const cb = _qaPickCallback; _qaPickCallback = null; cb(); }
+}
+
+function _qaPickTrip(ids) {
+  const trips = APP.trips || [];
+  openModal('Asignar a un viaje', `
+    <div style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 0">
+      <button class="cat-pick-btn" onclick="_qaSetTrip('${escapeHtml(ids.input)}','')">Sin viaje</button>
+      ${trips.map(t => `<button class="cat-pick-btn" onclick="_qaSetTrip('${escapeHtml(ids.input)}','${escapeHtml(t.id)}')">${escapeHtml(t.emoji || '✈')} ${escapeHtml(t.name)}</button>`).join('')}
+    </div>`, null);
+  document.getElementById('modal')?.querySelector('.modal-footer')?.style.setProperty('display', 'none');
+}
+
+function _qaSetTrip(inputId, tripId) {
+  _qaOverrides[inputId] = { ...(_qaOverrides[inputId] || {}), tripId: tripId || null };
+  const ids = Object.values(_QA_IDS).find(i => i.input === inputId);
+  if (ids) _qaUpdateUI(ids);
+  closeModal();
 }
 
 function _qaSubmit(ids) {
   const input  = document.getElementById(ids.input);
   const parsed = input ? parseQuickAdd(input.value) : null;
   if (!parsed) return;
-  const ov = _qaOverrides[ids.input] || {};
+  const ov       = _qaOverrides[ids.input] || {};
   const type     = ov.type     || parsed.type;
   const category = ov.category || parsed.category;
+
+  // No se guarda nunca "Sin clasificar" en silencio — si no hay una
+  // categoría clara, se pregunta antes de guardar (en cuanto el usuario
+  // elija, este mismo guardado se reanuda automáticamente).
+  if (category === UNCLASSIFIED_CATEGORY) {
+    _qaPickCategory(ids, () => _qaSubmit(ids));
+    return;
+  }
+
   const qaTx = { id: generateId(), type, date: parsed.date, description: parsed.description, category, amount: parsed.amount };
+  if (type === 'expense' && ov.tripId) qaTx.tripId = ov.tripId;
   APP.transactions.push(qaTx);
   if (typeof _notifyGoalProgress === 'function') _notifyGoalProgress(qaTx);
   // Solo "aprender" el patrón cuando la categoría viene de una señal real:

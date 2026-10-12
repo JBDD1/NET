@@ -145,7 +145,11 @@ function openAddRecurring(prefill = null) {
   const isEdit = !!prefill;
   const r = prefill || {};
   const allCats = [...APP.categories.income, ...APP.categories.expense];
-  const catOptions = allCats.map(c => `<option value="${escapeHtml(c)}" ${r.category === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+  // Una plantilla nueva no tiene categoría todavía — sin esto, ninguna
+  // <option> queda "selected" y el navegador elige la primera (Salario)
+  // por accidente, igual que pasaba en el formulario de transacciones.
+  const initialCategory = r.category || UNCLASSIFIED_CATEGORY;
+  const catOptions = allCats.map(c => `<option value="${escapeHtml(c)}" ${initialCategory === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
 
   openModal(isEdit ? 'Editar recurrente' : 'Nueva transacción recurrente', `
     <div class="form-group">
