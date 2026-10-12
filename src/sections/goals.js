@@ -21,8 +21,11 @@ function _calcGoalProgress(g, txByCategory) {
   const contribTotal = (g.contributions || []).reduce((s, c) => s + c.amount, 0);
   let auto = 0;
   if (g.linkedAccount) {
+    // Las cuentas de efectivo guardan el saldo en .amount, no .balance (ese
+    // campo nunca ha existido en el objeto) — esto hacía que un objetivo
+    // vinculado a una cuenta contara siempre 0 de progreso automático.
     const acct = APP.cashAccounts.find(a => a.id === g.linkedAccount);
-    auto = acct ? (acct.balance || 0) : 0;
+    auto = acct ? (parseFloat(acct.amount) || 0) : 0;
   } else if (g.linkedCategory) {
     // linkedSince bounds the sum — without it, 2 years of "Viajes" spending
     // would appear as "ahorrado" toward a new Japan trip goal
@@ -145,17 +148,17 @@ function renderGoals() {
       insightHtml = `<div class="goal-insight">`;
       if (monthlyNeeded !== null) {
         if (onTrack) {
-          insightHtml += `<div class="goal-insight-row goal-insight-ok">✓ Vas bien · necesitas <strong>${formatCurrency(monthlyNeeded)}/mes</strong> · tu ritmo: ~${formatCurrency(avgSurplus)}/mes</div>`;
+          insightHtml += `<div class="goal-insight-row goal-insight-ok pvt">✓ Vas bien · necesitas <strong>${formatCurrency(monthlyNeeded)}/mes</strong> · tu ritmo: ~${formatCurrency(avgSurplus)}/mes</div>`;
         } else {
-          insightHtml += `<div class="goal-insight-row">Necesitas <strong>${formatCurrency(monthlyNeeded)}/mes</strong> para llegar a tiempo</div>`;
+          insightHtml += `<div class="goal-insight-row pvt">Necesitas <strong>${formatCurrency(monthlyNeeded)}/mes</strong> para llegar a tiempo</div>`;
           if (etaStr) {
-            insightHtml += `<div class="goal-insight-row goal-insight-warn">A tu ritmo (~${formatCurrency(avgSurplus)}/mes) llegarías en <strong>${etaStr}</strong></div>`;
+            insightHtml += `<div class="goal-insight-row goal-insight-warn pvt">A tu ritmo (~${formatCurrency(avgSurplus)}/mes) llegarías en <strong>${etaStr}</strong></div>`;
           } else if (noSavings) {
             insightHtml += `<div class="goal-insight-row goal-insight-warn">Con el ahorro actual no alcanzarías este objetivo</div>`;
           }
         }
       } else if (etaStr) {
-        insightHtml += `<div class="goal-insight-row">A tu ritmo (~${formatCurrency(avgSurplus)}/mes) llegarías en <strong>${etaStr}</strong></div>`;
+        insightHtml += `<div class="goal-insight-row pvt">A tu ritmo (~${formatCurrency(avgSurplus)}/mes) llegarías en <strong>${etaStr}</strong></div>`;
       } else if (noSavings) {
         insightHtml += `<div class="goal-insight-row goal-insight-warn">Registra ingresos y gastos para calcular tu ritmo de ahorro</div>`;
       }
@@ -182,8 +185,8 @@ function renderGoals() {
         <div class="goal-deadline">${deadline}</div>
         ${sourceLabel ? `<div class="goal-link-badge">${sourceLabel}</div>` : ''}
         <div class="goal-amounts">
-          <div class="goal-current">${formatCurrency(effectiveAmount)}</div>
-          <div class="goal-target">de ${formatCurrency(g.targetAmount)}</div>
+          <div class="goal-current pvt">${formatCurrency(effectiveAmount)}</div>
+          <div class="goal-target pvt">de ${formatCurrency(g.targetAmount)}</div>
         </div>
         <div class="goal-progress-bar">
           <div class="goal-progress-fill" style="width:0%" data-pct="${pct.toFixed(2)}"></div>
@@ -191,7 +194,7 @@ function renderGoals() {
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div class="goal-progress-pct">${pct.toFixed(1)}% completado</div>
           ${remaining > 0
-            ? `<div style="font-size:12px;color:var(--text-muted)">Faltan ${formatCurrency(remaining)}</div>`
+            ? `<div class="pvt" style="font-size:12px;color:var(--text-muted)">Faltan ${formatCurrency(remaining)}</div>`
             : `<div style="font-size:12px;color:var(--positive);font-weight:700">¡Objetivo alcanzado! 🎉</div>`
           }
         </div>
@@ -199,7 +202,7 @@ function renderGoals() {
         ${g.description ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:8px;font-style:italic">${escapeHtml(g.description)}</div>` : ''}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
           ${contribCount > 0
-            ? `<span style="font-size:11px;color:var(--text-muted)">${contribCount} contribución${contribCount !== 1 ? 'es' : ''} · ${formatCurrency(contribTotal)}</span>`
+            ? `<span class="pvt" style="font-size:11px;color:var(--text-muted)">${contribCount} contribución${contribCount !== 1 ? 'es' : ''} · ${formatCurrency(contribTotal)}</span>`
             : `<span></span>`
           }
           <button class="btn-secondary" data-action="add-contrib" style="font-size:11px;padding:3px 10px">+ Contribución</button>
@@ -231,7 +234,7 @@ function openAddGoal(prefill = null) {
 
   const accountOptions = APP.cashAccounts.length
     ? APP.cashAccounts.map(a =>
-        `<option value="${escapeHtml(a.id)}"${g.linkedAccount === a.id ? ' selected' : ''}>${escapeHtml(a.name)} (${formatCurrency(a.balance || 0)})</option>`
+        `<option value="${escapeHtml(a.id)}"${g.linkedAccount === a.id ? ' selected' : ''}>${escapeHtml(a.name)} (${formatCurrency(a.amount || 0)})</option>`
       ).join('')
     : '<option value="" disabled>No hay cuentas configuradas</option>';
 

@@ -83,14 +83,14 @@ function renderTrips() {
         ${trip.destination ? `<div class="trip-dest">${escapeHtml(trip.destination)}</div>` : ''}
         ${dateLabel ? `<div class="trip-dates">${dateLabel}</div>` : ''}
         <div class="trip-amounts">
-          <div class="trip-current">${formatCurrency(spent)}</div>
-          ${hasBudget ? `<div class="trip-target">de ${formatCurrency(trip.budget)}</div>` : `<div class="trip-target">sin presupuesto</div>`}
+          <div class="trip-current pvt">${formatCurrency(spent)}</div>
+          ${hasBudget ? `<div class="trip-target pvt">de ${formatCurrency(trip.budget)}</div>` : `<div class="trip-target">sin presupuesto</div>`}
         </div>
         ${hasBudget ? `
           <div class="trip-bar">
             <div class="trip-bar-fill${over ? ' trip-bar-fill--over' : ''}" style="width:0%" data-pct="${pct.toFixed(2)}"></div>
           </div>
-          <div class="trip-pct ${over ? 'trip-pct--over' : ''}">${over ? `${formatCurrency(spent - trip.budget)} por encima` : `${pct.toFixed(0)}% del presupuesto`}</div>
+          <div class="trip-pct ${over ? 'trip-pct--over pvt' : ''}">${over ? `${formatCurrency(spent - trip.budget)} por encima` : `${pct.toFixed(0)}% del presupuesto`}</div>
         ` : ''}
         <div class="trip-tx-count">${txCount} transacción${txCount !== 1 ? 'es' : ''}</div>
       </div>`;

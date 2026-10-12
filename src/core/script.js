@@ -1144,10 +1144,18 @@ function exportPortfolioExcel() {
     const mult = { annual:1, semiannual:2, quarterly:4, monthly:12 }[d.frequency] || 1;
     return s + d.dividendPerShare * d.shares * mult;
   }, 0);
-  const cashTotal = (APP.cashAccounts||[]).reduce((s,a) => s + (a.balance||0), 0);
-  const liabTotal = (APP.liabilities||[]).reduce((s,l) => s + (l.amount||0), 0);
-  const altTotal  = (APP.alternatives||[]).reduce((s,a) => s + (a.value||0), 0);
-  const netWorth  = totalValue + cashTotal + altTotal - liabTotal;
+  // Antes recalculaba esto a mano con nombres de campo que no existen en el
+  // modelo real (cashAccounts usa .amount no .balance; liabilities usa
+  // .remainingAmount no .amount; alternatives no tiene .value, su valor se
+  // deriva con depreciación en calcAltCurrentValue) — cashTotal/liabTotal/
+  // altTotal daban siempre 0 y el patrimonio neto del resumen no incluía
+  // inmuebles. Se reutilizan las mismas funciones que usa el resto de la
+  // app para que esta cifra nunca pueda divergir de la real.
+  const cashTotal = calcCashTotal();
+  const liabTotal = calcLiabilitiesTotal();
+  const altTotal  = calcAlternativesTotal();
+  const propTotal = calcPropertiesTotal();
+  const netWorth  = calcNetWorth();
 
   // ── Helpers ──────────────────────────────────────────────────
   // xe: escapa XML + elimina caracteres de control inválidos en XML 1.0
@@ -1248,6 +1256,7 @@ ${col(240)}${col(170)}
 <Row ss:Height="10"><Cell><Data ss:Type="String"></Data></Cell></Row>
 <Row ss:Height="24"><Cell ss:StyleID="s_section" ss:MergeAcross="1"><Data ss:Type="String">  EFECTIVO Y PATRIMONIO NETO</Data></Cell></Row>
 <Row ss:Height="26"><Cell ss:StyleID="s_kl"><Data ss:Type="String">Efectivo (cuentas)</Data></Cell>${nc(cashTotal,'s_kv')}</Row>
+<Row ss:Height="26"><Cell ss:StyleID="s_kl"><Data ss:Type="String">Inmuebles</Data></Cell>${nc(propTotal,'s_kv')}</Row>
 <Row ss:Height="26"><Cell ss:StyleID="s_kl"><Data ss:Type="String">Activos alternativos</Data></Cell>${nc(altTotal,'s_kv')}</Row>
 <Row ss:Height="26"><Cell ss:StyleID="s_kl"><Data ss:Type="String">Pasivos / Deudas</Data></Cell>${nc(liabTotal,'s_kv')}</Row>
 <Row ss:Height="30"><Cell ss:StyleID="s_kl"><Data ss:Type="String">PATRIMONIO NETO TOTAL</Data></Cell>${nc(netWorth,nwStyle)}</Row>
@@ -2724,7 +2733,8 @@ const BACKUP_ARRAYS = [
   'transactions', 'portfolio', 'watchlist', 'dividends',
   'cashAccounts', 'alternatives', 'goals', 'bizums',
   'networthHistory', 'sales', 'scenarios', 'liabilities',
-  'stakingPositions', 'stakingHistory',
+  'stakingPositions', 'stakingHistory', 'properties',
+  'recurring', 'trips',
 ];
 const BACKUP_ALLOWED_KEYS = [
   ...BACKUP_ARRAYS,
@@ -3357,11 +3367,49 @@ function settingsAddCategory(type) {
 }
 
 function settingsDeleteCategory(type, name) {
-  APP.categories[type] = APP.categories[type].filter(c => c !== name);
-  saveData();
-  renderSettingsCategories();
-  if (APP.activeSection === SECTIONS.TRANSACTIONS) populateCategoryFilter();
-  showToast('Categoría eliminada', 'success');
+  // Antes borraba la categoría sin comprobar nada — las transacciones que ya
+  // la usaban se quedaban con un valor "fantasma" que ya no existe en la
+  // lista, y al editarlas el <select> no tenía ninguna opción que marcar
+  // como seleccionada, cayendo en la primera categoría de la lista sin que
+  // el usuario lo notara (el mismo bug de categoría por defecto corregido
+  // en otras partes de la app). Ahora se avisa antes y se reasignan a "Sin
+  // clasificar" — nunca se borran ni se dejan huérfanas.
+  const affectedTx  = APP.transactions.filter(t => t.type === type && t.category === name);
+  const affectedRec = (APP.recurring || []).filter(r => r.type === type && r.category === name);
+  const total = affectedTx.length + affectedRec.length;
+
+  const doDelete = () => {
+    APP.categories[type] = APP.categories[type].filter(c => c !== name);
+    affectedTx.forEach(t => { t.category = UNCLASSIFIED_CATEGORY; });
+    affectedRec.forEach(r => { r.category = UNCLASSIFIED_CATEGORY; });
+    saveData();
+    renderSettingsCategories();
+    if (APP.activeSection === SECTIONS.TRANSACTIONS) { populateCategoryFilter(); renderTransactions(); }
+    if (APP.activeSection === SECTIONS.RECURRING) renderRecurring();
+    if (APP.activeSection === SECTIONS.DASHBOARD) renderDashboard();
+    showToast(
+      total > 0
+        ? `Categoría eliminada · ${total} elemento${total !== 1 ? 's' : ''} movido${total !== 1 ? 's' : ''} a "Sin clasificar"`
+        : 'Categoría eliminada',
+      'success'
+    );
+  };
+
+  if (total === 0) { doDelete(); return; }
+
+  openModal('Eliminar categoría', `
+    <p style="font-size:14px;color:var(--text-secondary);line-height:1.6;margin:0 0 4px">
+      <strong>${escapeHtml(name)}</strong> está en uso en
+      ${affectedTx.length > 0 ? `<strong>${affectedTx.length} transacción${affectedTx.length !== 1 ? 'es' : ''}</strong>` : ''}
+      ${affectedTx.length > 0 && affectedRec.length > 0 ? ' y ' : ''}
+      ${affectedRec.length > 0 ? `<strong>${affectedRec.length} recurrente${affectedRec.length !== 1 ? 's' : ''}</strong>` : ''}.
+    </p>
+    <p style="font-size:13px;color:var(--text-muted);margin:0">
+      Si continúas, pasarán a "Sin clasificar" — nunca se eliminan, solo quedan pendientes de reclasificar a mano.
+    </p>
+  `, doDelete);
+  const btn = document.getElementById('modalConfirm');
+  if (btn) btn.textContent = 'Eliminar y mover a Sin clasificar';
 }
 
 function toggleSettingsDisclaimer(btn) {

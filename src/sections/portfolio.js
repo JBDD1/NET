@@ -373,7 +373,7 @@ function renderPortfolioTable() {
           ${escapeHtml(a.country || '—')}
           ${a.sector ? `<br><span style="font-size:10px;opacity:.65">${escapeHtml(a.sector)}</span>` : ''}
         </td>
-        <td class="text-right">${formatCurrency(a.buyPrice)}</td>
+        <td class="text-right pvt">${formatCurrency(a.buyPrice)}</td>
         <td class="text-right">
           <div class="editable-price">
             <input type="number" value="${a.currentPrice}" step="0.01" min="0"
@@ -385,10 +385,10 @@ function renderPortfolioTable() {
           ${a.dailyChangePct != null && a.dailyChangePct !== 0 ? `<div class="price-daily-change ${a.dailyChangePct >= 0 ? 'positive' : 'negative'}">${a.dailyChangePct >= 0 ? '+' : ''}${a.dailyChangePct.toFixed(2)}% hoy</div>` : ''}
           ${_isPriceStale(a) ? `<div class="price-stale" title="Precio desactualizado — pulsa ⟳ para refrescar">${a.priceDate ? _relativeTime(a.priceDate) : 'sin fecha'}</div>` : ''}
         </td>
-        <td class="text-right">${a.quantity}</td>
-        <td class="text-right">${formatCurrency(cost)}</td>
-        <td class="text-right"><strong>${formatCurrency(value)}</strong></td>
-        <td class="text-right ${cls}"><span aria-hidden="true">${gain >= 0 ? '▲' : '▼'}</span> ${formatCurrency(gain, true)}</td>
+        <td class="text-right pvt">${a.quantity}</td>
+        <td class="text-right pvt">${formatCurrency(cost)}</td>
+        <td class="text-right pvt"><strong>${formatCurrency(value)}</strong></td>
+        <td class="text-right pvt ${cls}"><span aria-hidden="true">${gain >= 0 ? '▲' : '▼'}</span> ${formatCurrency(gain, true)}</td>
         <td class="text-right ${cls}"><span aria-hidden="true">${gainPct >= 0 ? '▲' : '▼'}</span> ${formatPct(gainPct)}</td>
         <td class="text-right ${concCls}">
           ${concPct.toFixed(1)}%
@@ -418,9 +418,9 @@ function renderPortfolioTable() {
     const gcls = colorClass(totalGainAll);
     tfoot.innerHTML = `<tr class="portfolio-totals-row">
       <td colspan="6"><strong>TOTAL</strong></td>
-      <td class="text-right"><strong>${formatCurrency(totalCostAll)}</strong></td>
-      <td class="text-right"><strong>${formatCurrency(totalValueAll)}</strong></td>
-      <td class="text-right ${gcls}"><strong>${formatCurrency(totalGainAll, true)}</strong></td>
+      <td class="text-right pvt"><strong>${formatCurrency(totalCostAll)}</strong></td>
+      <td class="text-right pvt"><strong>${formatCurrency(totalValueAll)}</strong></td>
+      <td class="text-right pvt ${gcls}"><strong>${formatCurrency(totalGainAll, true)}</strong></td>
       <td class="text-right ${gcls}"><strong>${formatPct(totalGainPct)}</strong></td>
       <td colspan="4"></td>
     </tr>`;
@@ -938,7 +938,7 @@ function updateAssetPrice(id, newPrice) {
     const concCls = concPct > limit ? 'negative' : concPct > limit * 0.8 ? '' : 'positive';
 
     if (tds[7])  { tds[7].innerHTML   = `<strong>${formatCurrency(value)}</strong>`; }
-    if (tds[8])  { tds[8].textContent = formatCurrency(gain, true);  tds[8].className  = `text-right ${cls}`; }
+    if (tds[8])  { tds[8].textContent = formatCurrency(gain, true);  tds[8].className  = `text-right pvt ${cls}`; }
     if (tds[9])  { tds[9].textContent = formatPct(gainPct);          tds[9].className  = `text-right ${cls}`; }
     if (tds[10]) {
       tds[10].className = `text-right ${concCls}`;
@@ -1540,10 +1540,10 @@ function renderDividends() {
       <tr data-id="${d.id}">
         <td><strong>${escapeHtml(d.assetName)}</strong></td>
         <td><span class="ticker-chip">${escapeHtml(d.ticker)}</span></td>
-        <td class="text-right">${formatCurrency(d.dividendPerShare)}</td>
+        <td class="text-right pvt">${formatCurrency(d.dividendPerShare)}</td>
         <td class="text-right">${FREQ_LABEL[d.frequency] || '—'}</td>
-        <td class="text-right">${d.shares}</td>
-        <td class="text-right positive"><strong>${formatCurrency(annual)}</strong></td>
+        <td class="text-right pvt">${d.shares}</td>
+        <td class="text-right pvt positive"><strong>${formatCurrency(annual)}</strong></td>
         <td class="text-right ${yocCls}" title="Yield sobre precio de compra (${buyPrice ? formatCurrency(buyPrice) : '—'})">${yoc}</td>
         <td>
           <div class="action-buttons">

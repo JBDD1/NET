@@ -7,12 +7,14 @@
    26. FISCALIDAD
 ═══════════════════════════════════════════════════════════════ */
 
-// Tramos IRPF base del ahorro 2024 (España) — art. 66 LIRPF
+// Tramos IRPF base del ahorro 2024 (España) — art. 66 LIRPF, tras la
+// reforma de la Ley 31/2022 (vigente desde el ejercicio 2023): el tramo
+// 200.000-300.000€ es del 27%, no del 26% (tipo anterior a la reforma).
 const IRPF_TRAMOS = [
   { hasta:   6000, tipo: 19 },
   { hasta:  50000, tipo: 21 },
   { hasta: 200000, tipo: 23 },
-  { hasta: 300000, tipo: 26 },
+  { hasta: 300000, tipo: 27 },
   { hasta: Infinity, tipo: 28 },
 ];
 
@@ -378,10 +380,19 @@ function renderTwoMonthsRule(sales) {
     return;
   }
 
-  // Comprobar si algún activo vendido con pérdida está en cartera actualmente
-  const warnings = lossySales.filter(v =>
-    APP.portfolio.some(a => a.ticker.toUpperCase() === v.ticker.toUpperCase())
-  );
+  // Comprobar si algún activo vendido con pérdida se recompró dentro de la
+  // ventana real de ±2 meses (60 días) de la venta — antes avisaba con solo
+  // tenerlo en cartera actualmente, sin mirar la fecha de recompra, así que
+  // una recompra legítima años después seguía disparando el aviso para
+  // siempre.
+  const warnings = lossySales.filter(v => {
+    const sellTs = new Date(v.sellDate + 'T00:00:00').getTime();
+    return APP.portfolio.some(a => {
+      if (a.ticker.toUpperCase() !== v.ticker.toUpperCase() || !a.buyDate) return false;
+      const buyTs = new Date(a.buyDate + 'T00:00:00').getTime();
+      return Math.abs(buyTs - sellTs) / 86400000 <= 60;
+    });
+  });
 
   if (warnings.length === 0) {
     el.innerHTML = `

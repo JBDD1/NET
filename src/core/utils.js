@@ -249,6 +249,7 @@ async function refreshAllPrices(silent = false) {
 
   let updated = 0, failed = 0;
   const updatedPortfolioIds = new Set();
+  const reachedAlerts = [];
 
   for (const t of targets) {
     const q   = quotes[t.ticker];
@@ -262,6 +263,10 @@ async function refreshAllPrices(silent = false) {
       if (t.arr === 'portfolio') {
         recordAssetPriceHistory(APP.portfolio[idx]);
         updatedPortfolioIds.add(t.id);
+      }
+      if (t.arr === 'watchlist') {
+        const w = APP[t.arr][idx];
+        if (_checkWatchlistTargetAlert(w)) reachedAlerts.push(w);
       }
       updated++;
     } else {
@@ -287,6 +292,14 @@ async function refreshAllPrices(silent = false) {
 
   _refreshBtnDone(btn);
 
+  // Las alertas de precio objetivo se muestran siempre, incluso en refresh
+  // silencioso (automático cada 10 min) — es la única forma de que el
+  // usuario se entere si no está mirando la sección Watchlist en ese momento.
+  reachedAlerts.forEach(w => {
+    const dirLabel = (w.alertType || 'above') === 'below' ? 'por debajo de' : 'por encima de';
+    showToast(`🔔 ${w.ticker} ha alcanzado tu objetivo: ${formatCurrency(w.currentPrice)} (${dirLabel} ${formatCurrency(w.targetPrice)})`, 'success');
+  });
+
   if (!silent) {
     if (fetchError && updated === 0) {
       showToast('No se pudo obtener precios — usando últimos datos disponibles.', 'error');
@@ -298,6 +311,19 @@ async function refreshAllPrices(silent = false) {
       showToast(`${updated} precio${updated !== 1 ? 's' : ''} actualizados ✓`, 'success');
     }
   }
+}
+
+// Devuelve true solo en la transición de "no alcanzado" a "alcanzado" (no
+// repite el aviso cada 10 min mientras el precio se mantenga por encima/
+// debajo del objetivo) y se resetea si el precio vuelve a alejarse.
+function _checkWatchlistTargetAlert(w) {
+  const hasTarget = w.targetPrice && w.targetPrice > 0;
+  if (!hasTarget) { w.alertFired = false; return false; }
+  const alertType = w.alertType || 'above';
+  const reached = alertType === 'below' ? w.currentPrice <= w.targetPrice : w.currentPrice >= w.targetPrice;
+  if (reached && !w.alertFired) { w.alertFired = true; return true; }
+  if (!reached) w.alertFired = false;
+  return false;
 }
 
 function _refreshBtnDone(btn) {

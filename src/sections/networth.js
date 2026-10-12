@@ -193,7 +193,7 @@ function renderCashAccounts() {
         ${escapeHtml(acc.name)}
         ${isLinked ? '<span class="cash-entry-linked-badge" title="Los ingresos y gastos ajustan el saldo de esta cuenta automáticamente">⇄ Transacciones</span>' : ''}
       </div>
-      <div class="cash-entry-amount">${formatCurrency(acc.amount)}</div>
+      <div class="cash-entry-amount pvt">${formatCurrency(acc.amount)}</div>
       <div class="cash-entry-actions">
         <button class="btn-ghost-sm" data-action="toggle-tx-account" title="${isLinked ? 'Dejar de vincular ingresos/gastos a esta cuenta' : 'Vincular ingresos y gastos a esta cuenta'}">${isLinked ? '✓ Vinculada' : 'Vincular'}</button>
         <button class="btn-edit btn-icon" data-action="edit-cash" aria-label="Editar cuenta ${escapeHtml(acc.name)}">✎</button>
@@ -339,8 +339,8 @@ function renderPropertiesList() {
                 onchange="updatePropertyValue('${p.id}', this.value)"
                 style="width:120px;text-align:right;font-size:15px;font-weight:600" />
             </div>
-            <div class="property-entry-gain ${cls}">${formatCurrency(gain, true)} (${formatPct(gainPct)})</div>
-            ${p.monthlyRent ? `<div class="property-entry-rent">Renta: ${formatCurrency(p.monthlyRent)}/mes</div>` : ''}
+            <div class="property-entry-gain pvt ${cls}">${formatCurrency(gain, true)} (${formatPct(gainPct)})</div>
+            ${p.monthlyRent ? `<div class="property-entry-rent pvt">Renta: ${formatCurrency(p.monthlyRent)}/mes</div>` : ''}
           </div>
         </div>
         <div class="property-entry-actions">
@@ -536,15 +536,15 @@ function renderAlternatives() {
         <div class="alt-price-row">
           <div>
             <div class="alt-price-label">Precio compra</div>
-            <div class="alt-price-val">${formatCurrency(a.buyPrice)}</div>
+            <div class="alt-price-val pvt">${formatCurrency(a.buyPrice)}</div>
           </div>
           <div>
             <div class="alt-price-label">Valor actual${hasDepreciation ? ' <span class="alt-dep-badge" title="Calculado por depreciación anual">⟳</span>' : ''}</div>
-            <div class="alt-price-val">${formatCurrency(curVal)}</div>
+            <div class="alt-price-val pvt">${formatCurrency(curVal)}</div>
           </div>
         </div>
         ${hasDepreciation ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Depreciación: ${a.depreciationPct}% anual</div>` : ''}
-        <div class="alt-gain ${cls}">${formatCurrency(gain, true)} · ${formatPct(gainPct)}</div>
+        <div class="alt-gain pvt ${cls}">${formatCurrency(gain, true)} · ${formatPct(gainPct)}</div>
         ${a.purchaseDate ? `<div style="font-size:11px;color:var(--text-muted);margin-top:8px">Comprado: ${formatDate(a.purchaseDate)}</div>` : ''}
         ${a.notes ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:6px;font-style:italic">${escapeHtml(a.notes)}</div>` : ''}
       </div>
@@ -772,9 +772,9 @@ function renderPasivos() {
           ${l.notes ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${escapeHtml(l.notes)}</div>` : ''}
         </td>
         <td><span class="ticker-chip">${LIABILITY_LABELS[l.type] || escapeHtml(l.type)}</span></td>
-        <td class="text-right">${formatCurrency(l.originalAmount)}</td>
-        <td class="text-right negative" style="font-weight:600">${formatCurrency(l.remainingAmount)}</td>
-        <td class="text-right">${formatCurrency(l.monthlyPayment)}/mes</td>
+        <td class="text-right pvt">${formatCurrency(l.originalAmount)}</td>
+        <td class="text-right pvt negative" style="font-weight:600">${formatCurrency(l.remainingAmount)}</td>
+        <td class="text-right pvt">${formatCurrency(l.monthlyPayment)}/mes</td>
         <td class="text-right">${l.interestRate ? l.interestRate + '%' : '—'}</td>
         <td>
           <div style="display:flex;align-items:center;gap:6px">
