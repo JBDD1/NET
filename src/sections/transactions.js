@@ -99,8 +99,11 @@ function updateTransactionSummary() {
   const monthFilter = document.getElementById('tx-filter-month')?.value;
   const month       = monthFilter || getCurrentMonth();
 
-  const income  = APP.transactions.filter(t => t.type === 'income'  && (t.date || getCurrentMonth()).startsWith(month)).reduce((s, t) => s + t.amount, 0);
-  const expense = APP.transactions.filter(t => t.type === 'expense' && (t.date || getCurrentMonth()).startsWith(month)).reduce((s, t) => s + t.amount, 0);
+  // Mismo filtro que antes, pero reutilizando calcs.js: una única fuente de
+  // verdad con el dashboard (y ya blindadas contra importes guardados como
+  // string, que aquí se concatenaban: 0 + "750" + "120" → "0750120").
+  const income  = calcMonthlyIncome(month);
+  const expense = calcMonthlyExpense(month);
   const balance = income - expense;
 
   const [y, m] = month.split('-');
@@ -550,7 +553,9 @@ function _txApplyFilters() {
   if (categoryFilter !== 'all') txs = txs.filter(t => t.category === categoryFilter);
   if (monthFilter)              txs = txs.filter(t => (t.date || getCurrentMonth()).startsWith(monthFilter));
   if (_txShowFavoritesOnly)     txs = txs.filter(t => t.favorite);
-  if (searchQuery)              txs = txs.filter(t => t.description.toLowerCase().includes(searchQuery) || (t.note || '').toLowerCase().includes(searchQuery) || t.category.toLowerCase().includes(searchQuery));
+  // (t.description || '') — una fila importada o corrupta sin descripción
+  // lanzaba TypeError y dejaba la tabla entera en blanco al teclear en el buscador.
+  if (searchQuery)              txs = txs.filter(t => (t.description || '').toLowerCase().includes(searchQuery) || (t.note || '').toLowerCase().includes(searchQuery) || (t.category || '').toLowerCase().includes(searchQuery));
   const col = _txSortCol;
   const dir = _txSortAsc ? 1 : -1;
   txs.sort((a, b) => {
@@ -637,9 +642,19 @@ function renderTransactionTable() {
 function populateCategoryFilter() {
   const sel = document.getElementById('tx-filter-category');
   if (!sel) return;
-  const uniqueUsed = [...new Set(APP.transactions.map(t => t.category))];
+  // Reconstruir el <select> borraba la selección activa: al añadir o editar
+  // una transacción (cualquier cosa que llame a renderTransactions) el filtro
+  // de categoría se perdía en silencio — la tabla seguía mostrando las filas
+  // filtradas pero el desplegable decía "Todas las categorías", y exportar
+  // sacaba TODAS las transacciones creyendo el usuario que el filtro seguía
+  // puesto. Se preserva el valor y solo cae a "all" si esa categoría ya no
+  // existe en ninguna transacción.
+  const prev = sel.value;
+  const uniqueUsed = [...new Set(APP.transactions.map(t => t.category).filter(Boolean))];
   sel.innerHTML = '<option value="all">Todas las categorías</option>' +
     uniqueUsed.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  if (prev && prev !== 'all' && uniqueUsed.includes(prev)) sel.value = prev;
+  sel.classList.toggle('filter-active', sel.value !== 'all');
 }
 
 /* ─── CRUD Transacciones ─────────────────────────────────────── */
@@ -1015,11 +1030,15 @@ function renderBudgets() {
   }
 
   const budgetData = APP.budgets.map(b => {
-    const spent = APP.transactions.filter(t => t.type === 'expense' && t.category === b.category && (t.date || getCurrentMonth()).startsWith(m)).reduce((s, t) => s + t.amount, 0);
-    const pct   = b.monthlyAmount > 0 ? Math.min(100, (spent / b.monthlyAmount) * 100) : 0;
+    const spent = APP.transactions.filter(t => t.type === 'expense' && t.category === b.category && (t.date || getCurrentMonth()).startsWith(m)).reduce((s, t) => s + _num(t.amount), 0);
+    // pct va limitado a 100 para que la barra no desborde su carril, pero
+    // pctReal es el de verdad: con 215 € gastados de 200 el aviso decía
+    // "100 % utilizado" en vez de "108 %", que es el dato que importa.
+    const pctReal = b.monthlyAmount > 0 ? (spent / b.monthlyAmount) * 100 : 0;
+    const pct   = Math.min(100, pctReal);
     const over  = spent > b.monthlyAmount;
     const left  = b.monthlyAmount - spent;
-    return { b, spent, pct, over, left };
+    return { b, spent, pct, pctReal, over, left };
   });
 
   container.innerHTML = budgetData.map(({ b, spent, pct, over, left }) => `
@@ -1045,13 +1064,18 @@ function renderBudgets() {
   // Budget 80% alerts — one toast per category per month
   APP.dismissedAlerts = APP.dismissedAlerts || {};
   let alertsFired = false;
-  budgetData.forEach(({ b, pct }) => {
-    if (b.monthlyAmount <= 0 || pct < 80) return;
+  budgetData.forEach(({ b, pctReal, over }) => {
+    if (b.monthlyAmount <= 0 || pctReal < 80) return;
     const alertKey = `budget80-${m}-${b.category}`;
     if (!APP.dismissedAlerts[alertKey]) {
       APP.dismissedAlerts[alertKey] = true;
       alertsFired = true;
-      showToast(`⚠ Presupuesto "${escapeHtml(b.category)}": ${pct.toFixed(0)}% utilizado`, 'error');
+      showToast(
+        over
+          ? `⚠ Presupuesto "${escapeHtml(b.category)}" SUPERADO: ${pctReal.toFixed(0)}% (${formatCurrency(b.monthlyAmount)} de límite)`
+          : `⚠ Presupuesto "${escapeHtml(b.category)}": ${pctReal.toFixed(0)}% utilizado`,
+        'error'
+      );
     }
   });
   if (alertsFired) setTimeout(saveData, 0);
@@ -1109,8 +1133,10 @@ function parseQuickAdd(raw) {
   const description = (text.slice(0, m.index) + text.slice(m.index + m[0].length))
     .replace(/\s+/g, ' ').trim() || 'Transacción';
 
-  const normDesc = description.toLowerCase()
-    .split('').filter(function(c){var cc=c.charCodeAt(0);return cc<768||cc>879;}).join('');
+  // _stripAccents (script.js) normaliza a NFD antes de quitar las marcas: sin
+  // eso, "Nómina" precompuesta no coincidía con la keyword 'nomina' y la
+  // nómina del usuario se guardaba como GASTO.
+  const normDesc = _stripAccents(description);
   const incomeKws = ['nomina', 'salario', 'sueldo', 'ingreso', 'dividendo', 'dividendos', 'bonus', 'reembolso', 'devolucion', 'venta'];
   const type = incomeKws.some(kw => normDesc.includes(kw)) ? 'income' : 'expense';
 

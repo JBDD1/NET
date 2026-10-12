@@ -2039,7 +2039,13 @@ ul  { list-style: none; }
 .btn-fav { color: var(--text-muted); font-size: 15px; transition: color var(--transition), transform 0.15s; }
 .btn-fav:hover { color: #e05c7a; transform: scale(1.15); }
 .btn-fav--on   { color: #e05c7a !important; }
-.tx-desc-wrap  { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* min-width:0 + overflow-wrap: una descripción larguísima SIN espacios (p.ej.
+   "COMPRA*TARJETA*123456789*COMERCIO…" de un extracto bancario, o un pegote de
+   500 caracteres) es una sola palabra inquebrantable: estiraba la columna hasta
+   dejar el importe y los botones fuera de la pantalla. Ahora parte por donde
+   haga falta; las descripciones normales se ven exactamente igual. */
+.tx-desc-wrap  { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; overflow-wrap: anywhere; }
+.tx-desc-wrap > strong { min-width: 0; overflow-wrap: anywhere; }
 .tx-indicators { display: flex; gap: 2px; font-size: 12px; flex-shrink: 0; opacity: 0.7; }
 .tx-recurring-badge {
   display: inline-flex;

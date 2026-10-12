@@ -682,6 +682,7 @@ async function init() {
     if (!el) return;
     el.addEventListener('change', () => {
       el.classList.toggle('filter-active', el.value !== 'all' && el.value !== '');
+      updateBizumKPIs();   // los KPIs deben seguir al filtro, igual que la tabla
       renderBizumTable();
     });
   });
@@ -2554,9 +2555,32 @@ function _detectBankCols(rawHdrs) {
 
   if (descCol < 0) descCol = (dateCol === 0 ? 1 : 0); // último recurso
 
+  // Columna de tipo explícita (tipo/type/movimiento/D-C). Muchos exports NO
+  // llevan signo en el importe y marcan gasto/ingreso en una columna aparte:
+  // sin esto, "Zara;89;gasto" se importaba como INGRESO de 89 € por ser
+  // positivo. Solo se usa si su VALOR está en el vocabulario conocido (ver
+  // _csvTypeHint), así que una columna "Type" de Revolut con valores tipo
+  // CARD_PAYMENT no altera nada y los extractos con signo siguen igual.
+  const typeCol = col(/^tipo$|^type$|^movimiento$|^operacion$|^d\/c$|debe.*haber/);
+
   return amtCol >= 0
-    ? { dateCol, descCol, amtCol }
-    : { dateCol, descCol, debitCol, creditCol };
+    ? { dateCol, descCol, amtCol, typeCol }
+    : { dateCol, descCol, debitCol, creditCol, typeCol };
+}
+
+// Devuelve 'income' | 'expense' | null a partir del valor de una columna de
+// tipo. null = no reconocido, y entonces manda el signo del importe.
+function _csvTypeHint(raw) {
+  const v = String(raw ?? '').toLowerCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g, '').replace(/[^a-z/]/g, '').trim();
+  if (!v) return null;
+  const EXPENSE = ['gasto', 'gastos', 'expense', 'expenses', 'debit', 'debito', 'cargo', 'cargos',
+                   'salida', 'pago', 'pagos', 'retirada', 'out', 'd'];
+  const INCOME  = ['ingreso', 'ingresos', 'income', 'credit', 'credito', 'abono', 'abonos',
+                   'entrada', 'cobro', 'cobros', 'in', 'c'];
+  if (EXPENSE.includes(v)) return 'expense';
+  if (INCOME.includes(v))  return 'income';
+  return null;
 }
 
 // Convierte filas ya separadas en columnas (de CSV o de Excel, SIN separar
@@ -2577,7 +2601,7 @@ function _rowsToBankTransactions(allRows) {
     txs._diag = `No se reconocieron las columnas de fecha/importe. Cabeceras encontradas: ${cleanHdrs.join(', ') || '(sin cabecera detectada)'}`;
     return txs;
   }
-  const { dateCol, descCol, amtCol, debitCol, creditCol } = cols;
+  const { dateCol, descCol, amtCol, debitCol, creditCol, typeCol } = cols;
   const neededCols = [dateCol, descCol, amtCol, debitCol, creditCol].filter(c => typeof c === 'number' && c >= 0);
   const maxCol = Math.max(...neededCols);
 
@@ -2600,7 +2624,10 @@ function _rowsToBankTransactions(allRows) {
         return;
       }
       if (amount === 0) { zeroAmtCount++; return; }
-      const type = amount > 0 ? 'income' : 'expense';
+      // Un importe NEGATIVO ya es inequívoco (manda el signo, como siempre).
+      // Si viene sin signo y hay columna de tipo reconocible, manda esa.
+      const typeHint = (typeof typeCol === 'number' && typeCol >= 0) ? _csvTypeHint(row[typeCol]) : null;
+      const type = amount < 0 ? 'expense' : (typeHint || 'income');
       const cls  = _classifyLocal(desc, type);
       const merch = _extractMerchant(desc);
       txs.push({
@@ -2628,6 +2655,11 @@ function _rowsToBankTransactions(allRows) {
     const parts = [`Columnas usadas: fecha="${cleanHdrs[dateCol] || '?'}", descripción="${cleanHdrs[descCol] || '?'}", importe="${amtCol >= 0 ? (cleanHdrs[amtCol] || '?') : `${cleanHdrs[creditCol] || '?'} / ${cleanHdrs[debitCol] || '?'}`}".`];
     if (badDateCount) parts.push(`${badDateCount} fila(s) con fecha no reconocida (ej: "${firstBadDateSample}").`);
     if (zeroAmtCount) parts.push(`${zeroAmtCount} fila(s) con importe 0 o no numérico.`);
+    // Las filas descartadas por excepción solo se avisaban en un toast aparte:
+    // si fallaban TODAS, el diagnóstico decía únicamente qué columnas se usaron
+    // y no daba ninguna pista de que hubiera habido errores.
+    if (skippedRows.length) parts.push(`${skippedRows.length} fila(s) descartadas por un error al procesarlas.`);
+    if (!badDateCount && !zeroAmtCount && !skippedRows.length) parts.push('Ninguna fila contenía datos aprovechables.');
     txs._diag = parts.join(' ');
   }
 
@@ -3703,9 +3735,21 @@ const _TX_STOPWORDS = new Set([
   'slu', 'sau', 'ses', 'soc', 'corp', 'group', 'grup', 'ltd', 'inc',
 ]);
 
+// Quita acentos de verdad. El filtro de marcas combinantes (U+0300–U+036F)
+// solo funciona sobre texto DESCOMPUESTO (NFD): "Nómina" escrita con cualquier
+// teclado real llega precompuesta (la "ó" es un único U+00F3), así que sin el
+// normalize('NFD') previo el filtro no hacía nada y 'nómina'.includes('nomina')
+// era false. Resultado: "Nómina 2267" se clasificaba como GASTO en vez de
+// ingreso (la nómina restaba del balance), y todas las keywords escritas sin
+// tilde ('nomina', 'devolucion', 'interes', 'matricula', 'formacion'…) fallaban
+// en cuanto el usuario escribía la palabra bien acentuada.
+function _stripAccents(s) {
+  return String(s == null ? '' : s).toLowerCase().normalize('NFD')
+    .split('').filter(function(c){var cc=c.charCodeAt(0);return cc<768||cc>879;}).join('');
+}
+
 function txPatternKey(description) {
-  const norm = description.toLowerCase()
-    .split('').filter(function(c){var cc=c.charCodeAt(0);return cc<768||cc>879;}).join('')
+  const norm = _stripAccents(description)
     .replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
   const words = norm.split(/\s+/);
   const meaningful = words.filter(w => w.length >= 3 && !_TX_STOPWORDS.has(w) && !/^\d+$/.test(w));
@@ -3726,8 +3770,7 @@ function _patWrite(key, cat) {
 }
 
 function matchLocalKeywords(description, type) {
-  const norm = description.toLowerCase()
-    .split('').filter(function(c){var cc=c.charCodeAt(0);return cc<768||cc>879;}).join('');
+  const norm = _stripAccents(description);
 
   const map       = CATEGORY_KEYWORDS[type] || {};
   const available = type === 'income' ? APP.categories.income : APP.categories.expense;

@@ -18,8 +18,25 @@ function renderBizums() {
   populateBizumPersonFilter();
 }
 
+// Lista filtrada por los selectores activos (dirección/estado/persona). La
+// usan los KPIs y la tabla, así que ambos cuentan siempre lo mismo: antes los
+// KPIs se calculaban sobre TODOS los bizums y al filtrar por una persona la
+// tabla mostraba sus 30 € mientras el balance seguía anunciando el global
+// (+55 €). En Transacciones los KPIs ya seguían al filtro de mes; esto lo
+// deja coherente entre secciones.
+function _bizumApplyFilters() {
+  const dirFilter    = document.getElementById('biz-filter-dir')?.value    || 'all';
+  const statusFilter = document.getElementById('biz-filter-status')?.value || 'all';
+  const personFilter = document.getElementById('biz-filter-person')?.value || 'all';
+  let list = APP.bizums;
+  if (dirFilter    !== 'all') list = list.filter(b => b.direction === dirFilter);
+  if (statusFilter !== 'all') list = list.filter(b => b.status    === statusFilter);
+  if (personFilter !== 'all') list = list.filter(b => b.person    === personFilter);
+  return list;
+}
+
 function updateBizumKPIs() {
-  const bizums = APP.bizums;
+  const bizums = _bizumApplyFilters();
 
   const pendingIn  = bizums.filter(b => b.direction === 'in'  && b.status === 'pending');
   const pendingOut = bizums.filter(b => b.direction === 'out' && b.status === 'pending');
@@ -43,14 +60,7 @@ function renderBizumTable() {
   const tbody = document.getElementById('bizums-tbody');
   if (!tbody) return;
 
-  const dirFilter    = document.getElementById('biz-filter-dir')?.value    || 'all';
-  const statusFilter = document.getElementById('biz-filter-status')?.value || 'all';
-  const personFilter = document.getElementById('biz-filter-person')?.value || 'all';
-
-  let list = [...APP.bizums].sort((a, b) => b.date.localeCompare(a.date));
-  if (dirFilter    !== 'all') list = list.filter(b => b.direction === dirFilter);
-  if (statusFilter !== 'all') list = list.filter(b => b.status    === statusFilter);
-  if (personFilter !== 'all') list = list.filter(b => b.person    === personFilter);
+  const list = [..._bizumApplyFilters()].sort((a, b) => b.date.localeCompare(a.date));
 
   if (list.length === 0) {
     tbody.innerHTML = emptyRow(7, '⇄', 'Sin bizums',
