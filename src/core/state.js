@@ -115,6 +115,12 @@ let APP = {
   // Patrones aprendidos: { keyword → category }
   categoryPatterns: {},
 
+  // Migración única: limpia patrones aprendidos antes de la fecha en que se
+  // corrigió el bug de Quick Add que "aprendía" la categoría por defecto
+  // (la primera de la lista) para cualquier gasto sin clasificar. true tras
+  // ejecutarse una vez, para no volver a tocar patrones futuros legítimos.
+  quickAddPatternsCleaned: false,
+
   // Modo privacidad
   privacyMode: false,
 

@@ -844,6 +844,10 @@ async function init() {
   // renderización para que getEffectiveDashLayout() ya la vea.
   if (typeof _dashMigrateLegacyLayoutConfig === 'function' && _dashMigrateLegacyLayoutConfig()) saveData();
 
+  // Limpia, una sola vez, los patrones aprendidos corruptos por el bug de
+  // Quick Add ya corregido (ver _migrateCorruptedQuickAddPatterns).
+  if (_migrateCorruptedQuickAddPatterns()) saveData();
+
   // El arranque siempre aterriza en Dashboard, aunque la sesión anterior
   // se cerrara en otra sección (APP.activeSection queda persistido para
   // otros usos en runtime, p.ej. qué submenú abrir arriba).
@@ -3606,17 +3610,20 @@ const NAV_SECTIONS = [
 
 const CATEGORY_KEYWORDS = {
   expense: {
-    'Alimentación':  ['mercadona', 'carrefour', 'lidl', 'aldi', 'dia ', ' dia', 'alcampo', 'eroski', 'consum', 'spar', 'supermercado', 'hipercor', 'ahorra mas', 'froiz', 'supercor', 'covirán', 'masymas', 'bonarea', 'panaderia', 'fruteria', 'pescaderia', 'carniceria', 'verduleria', 'colmado'],
+    'Alimentación':  ['mercadona', 'carrefour', 'lidl', 'aldi', 'dia ', ' dia', 'alcampo', 'eroski', 'consum', 'spar', 'supermercado', 'hipercor', 'ahorra mas', 'froiz', 'supercor', 'covirán', 'masymas', 'bonarea', 'panaderia', 'fruteria', 'pescaderia', 'carniceria', 'verduleria', 'colmado', 'barbacoa'],
     'Restaurantes':  ['restaurante', 'cafeteria', 'mcdonalds', 'burger king', 'kfc', 'telepizza', 'dominos', 'pizzeria', 'sushi', 'kebab', 'taberna', 'mesón', 'glovo', 'just eat', 'deliveroo', 'uber eats', 'bar ', 'tapas', 'hamburgueseria'],
-    'Transporte':    ['gasolinera', 'gasolina', 'repsol', 'cepsa', 'bp ', 'shell', 'renfe', 'metro', 'cabify', 'uber', 'bolt', 'blablacar', 'autopista', 'peaje', 'parking', 'aparcamiento', 'itv', 'taller', 'autobus', 'avion', 'vueling', 'iberia', 'ryanair', 'easyjet'],
+    'Transporte':    ['gasolinera', 'gasolina', 'repsol', 'cepsa', 'bp ', 'shell', 'renfe', 'metro', 'cabify', 'uber', 'bolt', 'blablacar', 'autopista', 'peaje', 'parking', 'aparcamiento', 'itv', 'taller', 'autobus', 'avion', 'vueling', 'iberia', 'ryanair', 'easyjet', 'taxi', 'bus', 'furgoneta', 'cercanias'],
     'Vivienda':      ['alquiler', 'hipoteca', 'comunidad', 'endesa', 'iberdrola', 'naturgy', 'agua ', 'gas nat', 'vodafone', 'movistar', 'orange ', 'jazztel', 'masmovil', 'internet', 'adsl', 'fibra', 'seguro hogar', 'ikea', 'leroy merlin', 'bricomart'],
     'Salud':         ['farmacia', 'medico', 'dentista', 'clinica', 'hospital', 'sanitas', 'adeslas', 'asisa', 'mapfre salud', 'fisioterapia', 'optica', 'gym', 'gimnasio', 'sport', 'wellness'],
-    'Ocio':          ['cine', 'teatro', 'concierto', 'museo', 'parque', 'viaje', 'hotel', 'airbnb', 'booking', 'expedia', 'steam', 'playstation', 'xbox', 'nintendo', 'twitch'],
+    // 'tenis' se mantiene como deporte (uso peninsular) — en español
+    // latinoamericano también significa "zapatillas", pero Finova está
+    // orientado a fiscalidad/bancos españoles en el resto de la app.
+    'Ocio':          ['cine', 'teatro', 'concierto', 'museo', 'parque', 'viaje', 'hotel', 'airbnb', 'booking', 'expedia', 'steam', 'playstation', 'xbox', 'nintendo', 'twitch', 'futbol', 'fútbol', 'padel', 'pádel', 'tenis', 'baloncesto', 'escape room'],
     'Suscripciones': ['netflix', 'spotify', 'hbo', 'disney', 'amazon prime', 'prime video', 'apple', 'icloud', 'dropbox', 'adobe', 'microsoft 365', 'google one', 'youtube premium', 'dazn', 'filmin'],
     'Ropa':          ['zara', 'h&m', 'mango', 'pull&bear', 'bershka', 'stradivarius', 'massimo dutti', 'primark', 'el corte ingles', 'decathlon', 'nike', 'adidas', 'zapateria'],
     'Educación':     ['universidad', 'academia', 'udemy', 'coursera', 'master', 'matricula', 'formacion', 'libro', 'fnac', 'casa del libro'],
     'Seguros':       ['seguro', 'axa', 'mapfre', 'mutua madrilena', 'allianz', 'generali', 'zurich', 'helvetia'],
-    'Fiesta':        ['discoteca', 'club ', 'botellon', 'copa ', 'chupito', 'nightclub'],
+    'Fiesta':        ['discoteca', 'club ', 'botellon', 'copa ', 'copas', 'chupito', 'nightclub', 'fiesta', 'fiestas', 'cumpleaños', 'cumpleanos', 'cumple', 'boda', 'barra libre'],
   },
   income: {
     'Salario':    ['nomina', 'salario', 'sueldo', 'empresa', 'trabajo', 'mensual'],
@@ -3682,6 +3689,34 @@ function matchLocalKeywords(description, type) {
     if (keywords.some(kw => norm.includes(kw))) return cat;
   }
   return null;
+}
+
+// Migración única — antes de corregir parseQuickAdd(), Quick Add "aprendía"
+// como patrón confirmado la categoría por defecto (la primera de la lista,
+// p.ej. "Vivienda") para CUALQUIER descripción sin coincidencia real. Esos
+// patrones corruptos seguían aplicándose después de arreglar el bug, porque
+// un patrón aprendido tiene prioridad sobre las palabras clave al sugerir
+// categoría — por eso "fiesta"/"copas" seguían cayendo en Vivienda aunque
+// "futbol"/"padel" (nunca escritos antes del fix) ya caían bien en "Sin
+// clasificar". Se borra un patrón solo si: (a) su categoría es exactamente
+// la que hacía de fallback por entonces, Y (b) su propia clave no coincide
+// con ninguna palabra clave real de esa categoría — así nunca se toca una
+// clasificación legítima (si coincide con una keyword, nunca fue el bug).
+function _migrateCorruptedQuickAddPatterns() {
+  if (APP.quickAddPatternsCleaned || !APP.categoryPatterns) { APP.quickAddPatternsCleaned = true; return false; }
+  const fallbackCat = (APP.categories?.expense || [])[0];
+  let changed = false;
+  if (fallbackCat) {
+    Object.keys(APP.categoryPatterns).forEach(key => {
+      if (_patCat(APP.categoryPatterns[key]) !== fallbackCat) return;
+      if (!matchLocalKeywords(key, 'expense')) {
+        delete APP.categoryPatterns[key];
+        changed = true;
+      }
+    });
+  }
+  APP.quickAddPatternsCleaned = true;
+  return changed;
 }
 
 async function autoSuggestCategory(description) {

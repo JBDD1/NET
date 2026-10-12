@@ -45,7 +45,7 @@ function loadScripts() {
   vm.runInContext(SCRIPT_SRC, context, { filename: 'script.js' });
   vm.runInContext(TX_SRC, context, { filename: 'transactions.js' });
 
-  fns = vm.runInContext('({parseQuickAdd, UNCLASSIFIED_CATEGORY, _patWrite})', context);
+  fns = vm.runInContext('({parseQuickAdd, UNCLASSIFIED_CATEGORY, _patWrite, _patCat, matchLocalKeywords, _migrateCorruptedQuickAddPatterns})', context);
   APP = vm.runInContext('APP', context);
   return context;
 }
@@ -59,18 +59,30 @@ describe('parseQuickAdd — nunca inventa categoría cuando nada coincide', () =
     expect(r.category).not.toBe('Vivienda');
   });
 
-  test('"fiesta 20" → Sin clasificar', () => {
+  // "fiesta"/"copas"/"barbacoa" ahora SÍ tienen palabra clave real (ver
+  // CATEGORY_KEYWORDS) — antes caían en Sin clasificar porque esas keywords
+  // no existían, no por diseño. Confirmar que reconocen la categoría
+  // correcta real, no que se queden sin clasificar.
+  test('"fiesta 20" → Fiesta (palabra clave real, no el fallback de antes)', () => {
     const r = fns.parseQuickAdd('fiesta 20');
-    expect(r.category).toBe(fns.UNCLASSIFIED_CATEGORY);
+    expect(r.category).toBe('Fiesta');
+    expect(r.category).not.toBe('Vivienda');
   });
 
-  test('"copas 20" → Sin clasificar', () => {
+  test('"copas 20" → Fiesta', () => {
     const r = fns.parseQuickAdd('copas 20');
-    expect(r.category).toBe(fns.UNCLASSIFIED_CATEGORY);
+    expect(r.category).toBe('Fiesta');
+    expect(r.category).not.toBe('Vivienda');
   });
 
-  test('"barbacoa 50" → Sin clasificar', () => {
+  test('"barbacoa 50" → Alimentación', () => {
     const r = fns.parseQuickAdd('barbacoa 50');
+    expect(r.category).toBe('Alimentación');
+    expect(r.category).not.toBe('Vivienda');
+  });
+
+  test('un término genuinamente sin keyword (no "fiesta"/"copas"/"barbacoa") sigue cayendo en Sin clasificar', () => {
+    const r = fns.parseQuickAdd('xyzqwerty 15');
     expect(r.category).toBe(fns.UNCLASSIFIED_CATEGORY);
   });
 
@@ -105,5 +117,65 @@ describe('Quick Add nunca "aprende" el fallback Sin clasificar como si fuera una
     const r = fns.parseQuickAdd('cosa rara sin ninguna pista 30');
     expect(r.category).toBe(fns.UNCLASSIFIED_CATEGORY);
     expect(r.source).toBeNull();
+  });
+});
+
+describe('Reconocimiento ampliado de palabras clave (CATEGORY_KEYWORDS)', () => {
+  test.each([
+    ['futbol 20', 'Ocio'],
+    ['padel 30', 'Ocio'],
+    ['tenis 15', 'Ocio'],
+    ['baloncesto 10', 'Ocio'],
+    ['cumpleaños 40', 'Fiesta'],
+    ['boda 300', 'Fiesta'],
+    ['taxi 12', 'Transporte'],
+    ['bus 2', 'Transporte'],
+  ])('"%s" → %s', (input, expected) => {
+    expect(fns.parseQuickAdd(input).category).toBe(expected);
+  });
+
+  test('términos genuinamente ambiguos como "comida" NO se fuerzan a una categoría — mejor sin clasificar que adivinar', () => {
+    // "comida" puede ser supermercado (Alimentación) o comer fuera
+    // (Restaurantes) — adivinar cualquiera de las dos sería inventar.
+    expect(fns.parseQuickAdd('comida 50').category).toBe(fns.UNCLASSIFIED_CATEGORY);
+  });
+});
+
+describe('_migrateCorruptedQuickAddPatterns — limpia solo lo que el bug realmente creó', () => {
+  test('borra un patrón que apunta a la categoría-fallback (Vivienda) sin ninguna keyword real de respaldo', () => {
+    // Palabras sin ninguna keyword real que las respalde — simulan lo que
+    // "fiesta"/"copas" eran ANTES de ampliar CATEGORY_KEYWORDS: el bug
+    // viejo las habría "aprendido" como Vivienda sin ninguna base real.
+    APP.categoryPatterns['xyzqwerty']  = { cat: 'Vivienda', hits: 2 };
+    APP.categoryPatterns['zzztestword'] = { cat: 'Vivienda', hits: 1 };
+    const changed = fns._migrateCorruptedQuickAddPatterns();
+    expect(changed).toBe(true);
+    expect(APP.categoryPatterns['xyzqwerty']).toBeUndefined();
+    expect(APP.categoryPatterns['zzztestword']).toBeUndefined();
+  });
+
+  test('NUNCA borra un patrón legítimo — una clave que sí coincide con una keyword real de Vivienda se conserva', () => {
+    APP.categoryPatterns['alquiler'] = { cat: 'Vivienda', hits: 10 };
+    fns._migrateCorruptedQuickAddPatterns();
+    expect(APP.categoryPatterns['alquiler']).toEqual({ cat: 'Vivienda', hits: 10 });
+  });
+
+  test('NUNCA toca patrones de otras categorías, aunque tampoco tengan keyword de respaldo', () => {
+    APP.categoryPatterns['mipeluqueria'] = { cat: 'Salud', hits: 1 };
+    fns._migrateCorruptedQuickAddPatterns();
+    expect(APP.categoryPatterns['mipeluqueria']).toEqual({ cat: 'Salud', hits: 1 });
+  });
+
+  test('se ejecuta una sola vez — no vuelve a borrar nada en una segunda pasada aunque haya más Vivienda sin keyword', () => {
+    fns._migrateCorruptedQuickAddPatterns(); // primera pasada, marca quickAddPatternsCleaned
+    APP.categoryPatterns['portero'] = { cat: 'Vivienda', hits: 1 }; // elegido a mano DESPUÉS del fix — legítimo
+    const changedAgain = fns._migrateCorruptedQuickAddPatterns();
+    expect(changedAgain).toBe(false);
+    expect(APP.categoryPatterns['portero']).toEqual({ cat: 'Vivienda', hits: 1 });
+  });
+
+  test('no revienta si no hay patrones guardados', () => {
+    APP.categoryPatterns = {};
+    expect(() => fns._migrateCorruptedQuickAddPatterns()).not.toThrow();
   });
 });
