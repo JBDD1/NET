@@ -1241,7 +1241,6 @@ function _qaPickTrip(ids) {
   const trips = APP.trips || [];
   openModal('Asignar a un viaje', `
     <div style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 0">
-      <button class="cat-pick-btn" onclick="_qaSetTrip('${escapeHtml(ids.input)}','')">Sin viaje</button>
       ${trips.map(t => `<button class="cat-pick-btn" onclick="_qaSetTrip('${escapeHtml(ids.input)}','${escapeHtml(t.id)}')">${escapeHtml(t.emoji || '✈')} ${escapeHtml(t.name)}</button>`).join('')}
     </div>`, null);
   document.getElementById('modal')?.querySelector('.modal-footer')?.style.setProperty('display', 'none');
