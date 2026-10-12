@@ -1141,9 +1141,12 @@ function exportPortfolioExcel() {
   const totalCost    = APP.portfolio.reduce((s,a) => s + a.buyPrice * a.quantity * (a.exchangeRate > 0 ? a.exchangeRate : 1), 0);
   const totalGain    = totalValue - totalCost;
   const totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
+  // _divFxRate(d) igual que renderDividends() y el dashboard: sin él, un
+  // dividendo de un activo en USD se exportaba SIN convertir a euros y el
+  // Excel no cuadraba con lo que muestra la app (≈+8,7 % con el USD a 0,92).
   const annualDiv    = APP.dividends.reduce((s,d) => {
     const mult = { annual:1, semiannual:2, quarterly:4, monthly:12 }[d.frequency] || 1;
-    return s + d.dividendPerShare * d.shares * mult;
+    return s + d.dividendPerShare * d.shares * mult * _divFxRate(d);
   }, 0);
   // Antes recalculaba esto a mano con nombres de campo que no existen en el
   // modelo real (cashAccounts usa .amount no .balance; liabilities usa
@@ -1291,10 +1294,10 @@ ${portfolioRows}
   // ── Hoja Dividendos ───────────────────────────────────────────
   const FREQ_L = { annual:'Anual', semiannual:'Semestral', quarterly:'Trimestral', monthly:'Mensual' };
   const FREQ_M = { annual:1, semiannual:2, quarterly:4, monthly:12 };
-  const divHdr = ['Activo','Ticker','Divid./Acción (€)','Frecuencia','Acciones','Divid. Anual (€)','Divid. Mensual Est. (€)'];
+  const divHdr = ['Activo','Ticker','Divid./Acción por pago (€)','Frecuencia','Acciones','Divid. Anual (€)','Divid. Mensual Est. (€)'];
   const divRows = APP.dividends.map((d,i) => {
     const mult = FREQ_M[d.frequency]||1;
-    const ann  = d.dividendPerShare * d.shares * mult;
+    const ann  = d.dividendPerShare * d.shares * mult * _divFxRate(d);
     const s    = i%2===0 ? 'e' : 'o';
     return `<Row ss:Height="20">${sc(d.assetName||'',`s_${s}`)}${sc(d.ticker||'-',`s_${s}`)}${nc(d.dividendPerShare,`s_n${s}`)}${sc(FREQ_L[d.frequency]||d.frequency,`s_${s}`)}${nc(d.shares,`s_n${s}`)}${nc(ann,`s_e${s}`)}${nc(ann/12,`s_e${s}`)}</Row>`;
   }).join('');

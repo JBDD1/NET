@@ -238,8 +238,12 @@ function renderPortfolio() {
     setText('worst-investment-name', worst.name);
     setText('worst-investment-val',  `${formatCurrency(worst.gain, true)} (${formatPct(worst.pct)})`);
 
-    document.getElementById('best-investment-val').className  = 'highlight-value positive';
-    document.getElementById('worst-investment-val').className = 'highlight-value negative';
+    // El color sale del signo real, no de la etiqueta: la "peor" inversión
+    // puede estar en GANANCIA (aquí Coca-Cola, +200 € / +7,4 %) y se pintaba
+    // en rojo como si fuera una pérdida; y si toda la cartera cae, la "mejor"
+    // es una pérdida y se pintaba en verde.
+    document.getElementById('best-investment-val').className  = 'highlight-value ' + colorClass(best.gain);
+    document.getElementById('worst-investment-val').className = 'highlight-value ' + colorClass(worst.gain);
   } else {
     setText('best-investment-name',  '—');
     setText('best-investment-val',   '—');
@@ -918,8 +922,8 @@ function updateAssetPrice(id, newPrice) {
     setText('worst-investment-val',  `${formatCurrency(worst.gain, true)} (${formatPct(worst.pct)})`);
     const bv = document.getElementById('best-investment-val');
     const wv = document.getElementById('worst-investment-val');
-    if (bv) bv.className = 'highlight-value positive';
-    if (wv) wv.className = 'highlight-value negative';
+    if (bv) bv.className = 'highlight-value ' + colorClass(best.gain);
+    if (wv) wv.className = 'highlight-value ' + colorClass(worst.gain);
   }
 
   // Celdas de cada fila: td[7]=Valor actual, td[8]=G/P€, td[9]=G/P%, td[10]=% Cartera
@@ -1694,12 +1698,13 @@ function openAddDividend(prefill = null) {
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Dividendo por acción (€)</label>
-        <input type="number" id="f-d-div" class="text-input" placeholder="0.00" value="${d.dividendPerShare || ''}" step="0.001" min="0" />
+        <label class="form-label">Dividendo por acción <strong>en cada pago</strong> (€)</label>
+        <input type="number" id="f-d-div" class="text-input" placeholder="0.00" value="${d.dividendPerShare || ''}" step="0.001" min="0" oninput="_divLivePreview()" />
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Importe de UN pago, no el total del año</div>
       </div>
       <div class="form-group">
         <label class="form-label">Frecuencia de pago</label>
-        <select id="f-d-freq" class="select-input">
+        <select id="f-d-freq" class="select-input" onchange="_divLivePreview()">
           <option value="annual"     ${d.frequency === 'annual'     ? 'selected' : ''}>Anual</option>
           <option value="semiannual" ${d.frequency === 'semiannual' ? 'selected' : ''}>Semestral</option>
           <option value="quarterly"  ${d.frequency === 'quarterly'  ? 'selected' : ''}>Trimestral</option>
@@ -1710,7 +1715,7 @@ function openAddDividend(prefill = null) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Número de acciones / participaciones</label>
-        <input type="number" id="f-d-shares" class="text-input" placeholder="0" value="${d.shares || ''}" step="any" min="0" />
+        <input type="number" id="f-d-shares" class="text-input" placeholder="0" value="${d.shares || ''}" step="any" min="0" oninput="_divLivePreview()" />
       </div>
       <div class="form-group">
         <label class="form-label">Retención en origen (%)</label>
@@ -1728,6 +1733,7 @@ function openAddDividend(prefill = null) {
         <input type="date" id="f-d-nextpay" class="text-input" value="${d.nextPayDate || ''}" />
       </div>
     </div>
+    <div id="f-d-preview" class="div-live-preview" aria-live="polite"></div>
   `, () => {
     const assetName        = document.getElementById('f-d-name').value.trim();
     const ticker           = document.getElementById('f-d-ticker').value.trim().toUpperCase();
@@ -1754,7 +1760,39 @@ function openAddDividend(prefill = null) {
     saveData();
     closeModal();
     renderDividends();
-  });
+  }, () => _divLivePreview()); // al editar, muestra el anual ya calculado de entrada
+}
+
+// Vista previa en vivo del total anual mientras se rellena el formulario.
+// El campo "dividendo por acción" es POR PAGO y se multiplica por la
+// frecuencia, pero casi todas las fuentes públicas (Yahoo, screeners,
+// brókeres) publican el dividendo ANUAL por acción: quien copiaba ese dato y
+// marcaba "Trimestral" se registraba 4× sus ingresos reales (KO: 288 €/año en
+// vez de 72 €, con un yield del 9,9 % en vez del 2,5 %) sin ninguna señal de
+// que algo iba mal. Mostrar el anual calculado hace el error evidente al
+// instante, sin cambiar el modelo de datos de quien ya tiene dividendos
+// guardados.
+const _DIV_FREQ_MULT  = { annual: 1, semiannual: 2, quarterly: 4, monthly: 12 };
+const _DIV_FREQ_LABEL = { annual: '1 pago al año', semiannual: '2 pagos al año', quarterly: '4 pagos al año', monthly: '12 pagos al año' };
+
+function _divLivePreview() {
+  const el = document.getElementById('f-d-preview');
+  if (!el) return;
+  const perPay = parseFloat(document.getElementById('f-d-div')?.value);
+  const shares = parseFloat(document.getElementById('f-d-shares')?.value);
+  const freq   = document.getElementById('f-d-freq')?.value || 'annual';
+  const mult   = _DIV_FREQ_MULT[freq] || 1;
+
+  if (!(perPay > 0) || !(shares > 0)) { el.innerHTML = ''; return; }
+
+  const perShareYear = perPay * mult;
+  const totalYear    = perShareYear * shares;
+  el.innerHTML = `
+    <div class="div-live-preview-main">≈ <strong>${formatCurrency(totalYear)}</strong> al año
+      · ${formatCurrency(totalYear / 12)} al mes</div>
+    <div class="div-live-preview-sub">${_DIV_FREQ_LABEL[freq]} de ${formatCurrency(perPay)}
+      × ${shares} ${shares === 1 ? 'acción' : 'acciones'}
+      = ${formatCurrency(perShareYear)} por acción y año</div>`;
 }
 
 function autoFillDividendShares(tickerId, sharesId) {

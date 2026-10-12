@@ -1619,6 +1619,20 @@ ul  { list-style: none; }
    activos brutos, no sobre el patrimonio neto. */
 .legend-item--total { width: 100%; margin-top: 2px; padding-top: 7px; border-top: 1px solid var(--border-faint); color: var(--text-muted); }
 
+/* Vista previa del dividendo anual calculado en el formulario — hace evidente
+   al instante si se ha confundido el importe por pago con el anual. */
+.div-live-preview:empty { display: none; }
+.div-live-preview {
+  margin-top: 4px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--r-sm);
+}
+.div-live-preview-main { font-size: 13.5px; color: var(--text-primary); }
+.div-live-preview-sub  { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; line-height: 1.5; }
+
 /* ─────────────────────────────────────────────────────────────
    CARD GENÉRICA
 ───────────────────────────────────────────────────────────── */
