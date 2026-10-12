@@ -13,7 +13,7 @@ const IRPF_TRAMOS = [
   { hasta:   6000, tipo: 19 },
   { hasta:  50000, tipo: 21 },
   { hasta: 200000, tipo: 23 },
-  { hasta: 300000, tipo: 26 },
+  { hasta: 300000, tipo: 27 },
   { hasta: Infinity, tipo: 28 },
 ];
 
@@ -132,12 +132,12 @@ describe('calcIRPF', () => {
   });
 
   test('cuarto tramo: 250000', () => {
-    const expected = 6000 * 0.19 + 44000 * 0.21 + 150000 * 0.23 + 50000 * 0.26;
+    const expected = 6000 * 0.19 + 44000 * 0.21 + 150000 * 0.23 + 50000 * 0.27;
     expect(calcIRPF(250000)).toBeCloseTo(expected);
   });
 
   test('quinto tramo: 350000', () => {
-    const expected = 6000 * 0.19 + 44000 * 0.21 + 150000 * 0.23 + 100000 * 0.26 + 50000 * 0.28;
+    const expected = 6000 * 0.19 + 44000 * 0.21 + 150000 * 0.23 + 100000 * 0.27 + 50000 * 0.28;
     expect(calcIRPF(350000)).toBeCloseTo(expected);
   });
 

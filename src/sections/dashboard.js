@@ -180,7 +180,7 @@ function toggleDashboardEditMode() {
 
 function _dashEnterEditMode() {
   if (_dashEditMode) return;
-  if (APP.transactions.length === 0 && APP.portfolio.length === 0) {
+  if (_dashHasNoData()) {
     showToast('Añade algún dato antes de personalizar el dashboard', 'info');
     return;
   }
@@ -592,6 +592,18 @@ function _dashBlockError(containerId, retryFnName) {
 let _dashboardDirty = true;
 function markDashboardDirty() { _dashboardDirty = true; _heatmapCache = null; }
 
+// La pantalla de bienvenida solo debe salir cuando NO hay absolutamente nada
+// que mostrar. Antes se miraba solo transactions+portfolio, así que quien
+// empezaba registrando cuentas de efectivo y/o deudas (un caso de alta muy
+// normal: 12.700 € en dos bancos y un préstamo de coche) veía "Empieza
+// añadiendo tus primeros datos" con su patrimonio real ya calculado y oculto
+// detrás. Cualquier dato que alimente un KPI o un widget cuenta como "hay datos".
+function _dashHasNoData() {
+  const keys = ['transactions', 'portfolio', 'cashAccounts', 'liabilities',
+                'alternatives', 'properties', 'goals', 'bizums', 'dividends', 'watchlist'];
+  return keys.every(k => !Array.isArray(APP[k]) || APP[k].length === 0);
+}
+
 // Returns true when a block should be rendered (default visible when no layout saved)
 function _isDashBlockVisible(blockId) {
   const layout = APP.dashboardLayout;
@@ -931,7 +943,7 @@ function renderDashboard() {
   // original vuelve a aparecer solo con ocultar/mostrar en cuanto haya datos.
   const emptyEl  = document.getElementById('dash-empty-state');
   const blocksEl = document.getElementById('dash-blocks-container');
-  const isEmpty  = APP.transactions.length === 0 && APP.portfolio.length === 0;
+  const isEmpty  = _dashHasNoData();
   if (emptyEl) {
     emptyEl.style.display = isEmpty ? '' : 'none';
     if (isEmpty) {
@@ -1117,11 +1129,29 @@ function renderChartNetworthHistory() {
   const N = { '1m': 2, '3m': 3, '6m': 6, '1y': 12 }[_networthScale];
   const history = N ? APP.networthHistory.slice(-N) : APP.networthHistory;
 
+  // Estado vacío NO destructivo: antes se hacía
+  // ctx.parentElement.innerHTML = '…', lo que borraba el propio <canvas> del
+  // DOM. A partir de ahí getElementById devolvía null y el gráfico no volvía
+  // nunca en esa sesión (todos los renders siguientes salían por el `if (!ctx)
+  // return`), ni al añadir datos ni al cambiar de periodo. Ahora se oculta el
+  // lienzo y se muestra un aviso hermano, reversible.
+  let emptyEl = document.getElementById('nw-history-empty');
+  if (!emptyEl) {
+    emptyEl = document.createElement('div');
+    emptyEl.id = 'nw-history-empty';
+    emptyEl.className = 'empty-state';
+    emptyEl.style.cssText = 'padding:40px;text-align:center';
+    ctx.insertAdjacentElement('afterend', emptyEl);
+  }
   if (history.length === 0) {
     Charts.destroy('networth-history', 'chart-networth-history');
-    ctx.parentElement.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center">Sin historial de patrimonio</div>';
+    ctx.style.display = 'none';
+    emptyEl.textContent = 'Sin historial de patrimonio';
+    emptyEl.style.display = '';
     return;
   }
+  ctx.style.display = '';
+  emptyEl.style.display = 'none';
 
   const labels = history.map(h => {
     const [y, m] = h.date.split('-');
@@ -1209,6 +1239,18 @@ function renderChartDistribution(cash, portfolio, alternatives, properties = 0) 
   const labels = allLabels.filter((_, i) => allValues[i] > 0);
   const filteredColors = colors.filter((_, i) => allValues[i] > 0);
 
+  // Sin ningún activo el donut quedaba como un hueco en blanco con la leyenda
+  // vacía (p. ej. alguien que solo ha registrado deudas todavía).
+  const legendElEmpty = document.getElementById('dist-legend');
+  if (data.length === 0) {
+    Charts.destroy('distribution', 'chart-distribution');
+    ctx.style.display = 'none';
+    if (legendElEmpty) legendElEmpty.innerHTML =
+      `<div class="dash-empty">Sin activos registrados — <span class="link-btn" onclick="navigateTo('networth')">Añadir cuenta o inversión</span></div>`;
+    return;
+  }
+  ctx.style.display = '';
+
   const distChart = Charts.get('distribution');
   if (distChart) {
     distChart.data.labels = labels;
@@ -1249,12 +1291,20 @@ function renderChartDistribution(cash, portfolio, alternatives, properties = 0) 
   const legendEl = document.getElementById('dist-legend');
   if (legendEl) {
     const total = data.reduce((s, v) => s + v, 0);
+    // El % es sobre ACTIVOS BRUTOS, no sobre el patrimonio neto (que resta la
+    // deuda). Sin decirlo, el reparto no cuadraba con el KPI "Patrimonio neto"
+    // y parecía un error de cálculo: con 12.700 € de efectivo y 20.810 € de
+    // cartera, "Efectivo 37,9 %" es sobre 33.510 € de activos, no sobre los
+    // 25.110 € de patrimonio. La deuda tiene su propio widget (Pasivos).
     legendEl.innerHTML = labels.map((l, i) => `
       <div class="legend-item">
         <span class="legend-dot" style="background:${filteredColors[i]}"></span>
         <span>${l}: ${total > 0 ? ((data[i] / total) * 100).toFixed(1) : 0}%</span>
       </div>
-    `).join('');
+    `).join('') + `
+      <div class="legend-item legend-item--total" title="Los porcentajes se calculan sobre el total de activos, sin restar la deuda">
+        <span>Total activos: <strong class="pvt">${formatCurrency(total)}</strong></span>
+      </div>`;
   }
 }
 

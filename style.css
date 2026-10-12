@@ -1615,6 +1615,9 @@ ul  { list-style: none; }
 .legend-dot   { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .legend-item--clickable { cursor: pointer; border-radius: var(--r-xs); padding: 2px 4px; margin: -2px -4px; transition: background var(--transition), color var(--transition); }
 .legend-item--clickable:hover, .legend-item--clickable:focus-visible { background: var(--bg-hover); color: var(--text-primary); }
+/* Base de cálculo del donut de distribución: aclara que los % son sobre
+   activos brutos, no sobre el patrimonio neto. */
+.legend-item--total { width: 100%; margin-top: 2px; padding-top: 7px; border-top: 1px solid var(--border-faint); color: var(--text-muted); }
 
 /* ─────────────────────────────────────────────────────────────
    CARD GENÉRICA

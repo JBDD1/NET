@@ -8,8 +8,13 @@
 ═══════════════════════════════════════════════════════════════ */
 
 /** Per-asset value and cost helpers — single source of truth for the formula */
-function assetValue(a) { return a.currentPrice * a.quantity * (a.exchangeRate > 0 ? a.exchangeRate : 1); }
-function assetCost(a)  { return a.buyPrice     * a.quantity * (a.exchangeRate > 0 ? a.exchangeRate : 1); }
+// parseFloat(...)||0 igual que calcCashTotal/calcLiabilitiesTotal: un precio o
+// cantidad corrupta (string no numérico tras editar localStorage a mano, o un
+// import mal parseado) daba NaN y contaminaba TODO el patrimonio neto, que se
+// mostraba como "NaN €" en el dashboard. Un valor numérico válido pasa igual.
+function _num(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; }
+function assetValue(a) { return _num(a.currentPrice) * _num(a.quantity) * (a.exchangeRate > 0 ? a.exchangeRate : 1); }
+function assetCost(a)  { return _num(a.buyPrice)     * _num(a.quantity) * (a.exchangeRate > 0 ? a.exchangeRate : 1); }
 
 /* Per-render cache for the two most expensive aggregations.
    Invalidated by saveData() so it never serves stale values across data mutations. */
@@ -78,16 +83,19 @@ function calcPortfolioCAGR() {
   return (Math.pow(totalValue / totalCost, 1 / years) - 1) * 100;
 }
 
+// _num() en el reduce: un amount guardado como string ("750") hacía
+// concatenación en vez de suma (0 + "750" + "198" → "0750198"), así que los
+// gastos del mes y el balance salían completamente disparatados sin dar error.
 function calcMonthlyIncome(month = getCurrentMonth()) {
   return APP.transactions
     .filter(t => t.type === 'income' && (t.date || getCurrentMonth()).startsWith(month))
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + _num(t.amount), 0);
 }
 
 function calcMonthlyExpense(month = getCurrentMonth()) {
   return APP.transactions
     .filter(t => t.type === 'expense' && (t.date || getCurrentMonth()).startsWith(month))
-    .reduce((sum, t) => sum + t.amount, 0);
+    .reduce((sum, t) => sum + _num(t.amount), 0);
 }
 
 /** Media mensual de (ingresos − gastos) de los últimos N meses completos */
@@ -99,8 +107,8 @@ function calcAvgMonthlySurplus(months = 12) {
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const txs = APP.transactions.filter(t => (t.date || getCurrentMonth()).startsWith(key));
     if (!txs.length) continue;
-    const inc = txs.filter(t => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
-    const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+    const inc = txs.filter(t => t.type === 'income').reduce((s, t)  => s + _num(t.amount), 0);
+    const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + _num(t.amount), 0);
     surpluses.push(inc - exp);
   }
   if (!surpluses.length) return 0;
