@@ -293,4 +293,19 @@ function checkDueRecurring() {
     ? `"${due[0].description}"`
     : `${due.length} transacciones recurrentes`;
   showToast(`⟳ ${label} pendiente${due.length > 1 ? 's' : ''} de registrar — ${formatCurrency(total)} en Recurrentes`, 'info');
+
+  // Notificación del sistema — como mucho una al día, no una por cada
+  // recarga de la pestaña mientras el ítem siga vencido. No es una alarma
+  // a las 9:00 (Finova no tiene servidor de push para despertar el
+  // dispositivo con la app cerrada): avisa de verdad la próxima vez que se
+  // abre la app ese día, lo cual sigue siendo útil y es lo que de verdad
+  // se puede prometer sin backend.
+  if (APP.lastRecurringPushDate !== today && typeof sendLocalNotification === 'function') {
+    APP.lastRecurringPushDate = today;
+    saveData();
+    sendLocalNotification(
+      `⟳ ${label} pendiente${due.length > 1 ? 's' : ''}`,
+      `${formatCurrency(total)} en Recurrentes — vencía el ${formatDate(due[0].nextDate)}`
+    );
+  }
 }

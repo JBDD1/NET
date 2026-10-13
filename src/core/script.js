@@ -360,6 +360,31 @@ function setVariant(newVariant) {
 }
 
 
+/* ═══════════════════════════════════════════════════════════════
+   NOTIFICACIONES DEL SISTEMA (Notification API — locales, sin servidor
+   push: Finova no tiene backend de push, así que esto NO despierta el
+   dispositivo con la app cerrada a una hora exacta. Lo que sí hace:
+   avisa de verdad la siguiente vez que se abre la app (recurrentes
+   vencidas) y al instante al registrar un gasto (presupuesto al 90%),
+   sin necesidad de tener la pestaña de Finova en primer plano para
+   verlo — por eso vale la pena aunque no sea una alarma programada.
+═══════════════════════════════════════════════════════════════ */
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied')  return false;
+  const permission = await Notification.requestPermission();
+  return permission === 'granted';
+}
+
+function sendLocalNotification(title, body) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try { new Notification(title, { body, icon: 'icon-192.png', badge: 'icon-192.png' }); }
+  catch (_) { /* algunos navegadores móviles exigen pasar por el Service Worker */
+    navigator.serviceWorker?.getRegistration().then(reg => reg?.showNotification(title, { body, icon: 'icon-192.png' })).catch(() => {});
+  }
+}
+
 function togglePrivacy() {
   APP.privacyMode = !APP.privacyMode;
   applyPrivacy();
@@ -1090,6 +1115,7 @@ function _globalClickDispatch(e) {
     case 'toggle-theme-btn':           e.stopPropagation(); toggleTheme(); break;
     case 'download-backup-btn':        e.stopPropagation(); downloadBackup(); break;
     case 'open-search':                openSearch(); break;
+    case 'open-notifications':         openNotificationsManager(); break;
     case 'toggle-privacy':             togglePrivacy(); break;
     // Dashboard
     case 'export-monthly-pdf':         _withPdf('exportMonthlyPDF'); break;

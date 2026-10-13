@@ -1747,7 +1747,8 @@ function calcAlerts() {
       const key = `neg-balance-${currentMonth}`;
       if (!_isAlertDismissed(key)) {
         alerts.push({ key, type: 'danger', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-trending-down"></use></svg>',
-          text: `Tu balance de este mes es negativo: <strong>${formatCurrency(balance)}</strong> — gastos por encima de ingresos` });
+          text: `Tu balance de este mes es negativo: <strong>${formatCurrency(balance)}</strong> — gastos por encima de ingresos`,
+          action: { label: 'Ver transacciones', section: 'transactions' } });
       }
     }
   }
@@ -1784,19 +1785,39 @@ function calcAlerts() {
       const names = dueRec.slice(0, 2).map(r => escapeHtml(r.description)).join(', ');
       const extra = dueRec.length > 2 ? ` y ${dueRec.length - 2} más` : '';
       alerts.push({ key, type: 'info', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-refresh"></use></svg>',
-        text: `Tienes <strong>${dueRec.length} transacción${dueRec.length > 1 ? 'es' : ''} recurrente${dueRec.length > 1 ? 's' : ''}</strong> pendiente${dueRec.length > 1 ? 's' : ''} de registrar: ${names}${extra} — <strong>${formatCurrency(total)}</strong>` });
+        text: `Tienes <strong>${dueRec.length} transacción${dueRec.length > 1 ? 'es' : ''} recurrente${dueRec.length > 1 ? 's' : ''}</strong> pendiente${dueRec.length > 1 ? 's' : ''} de registrar: ${names}${extra} — <strong>${formatCurrency(total)}</strong>`,
+        action: { label: 'Ver recurrentes', section: 'recurring' } });
     }
   }
 
   // Budget overrun alerts
   (APP.budgets || []).forEach(b => {
-    const spent = APP.transactions.filter(t => t.type === 'expense' && t.category === b.category && (t.date || getCurrentMonth()).startsWith(currentMonth)).reduce((s, t) => s + t.amount, 0);
+    const spent = APP.transactions.filter(t => t.type === 'expense' && t.category === b.category && (t.date || getCurrentMonth()).startsWith(currentMonth)).reduce((s, t) => s + _num(t.amount), 0);
     if (spent <= b.monthlyAmount) return;
     const key = `budget-over-${b.category}-${currentMonth}`;
     if (!_isAlertDismissed(key)) {
       const over = spent - b.monthlyAmount;
       alerts.push({ key, type: 'warning', icon: '<svg class="icon icon-sm" aria-hidden="true"><use href="#icon-alert-triangle"></use></svg>',
-        text: `Presupuesto de <strong>${escapeHtml(b.category)}</strong> superado en <strong>${formatCurrency(over)}</strong> este mes` });
+        text: `Presupuesto de <strong>${escapeHtml(b.category)}</strong> superado en <strong>${formatCurrency(over)}</strong> este mes`,
+        action: { label: 'Ver transacciones', section: 'transactions' } });
+    }
+  });
+
+  // Budget casi agotado (80-99%) — complementa el aviso de arriba, que solo
+  // salta al superarlo. Usa su propia clave de descarte (distinta de
+  // budget-over) para que descartar uno no oculte el otro, y no sustituye
+  // al toast puntual de renderBudgets() (transactions.js): ese avisa una vez
+  // al cruzar el 80%, este queda visible en el widget mientras siga en rango.
+  (APP.budgets || []).forEach(b => {
+    if (!(b.monthlyAmount > 0)) return;
+    const spent = APP.transactions.filter(t => t.type === 'expense' && t.category === b.category && (t.date || getCurrentMonth()).startsWith(currentMonth)).reduce((s, t) => s + _num(t.amount), 0);
+    const pct = (spent / b.monthlyAmount) * 100;
+    if (pct < 80 || pct >= 100) return;
+    const key = `budget-near-${b.category}-${currentMonth}`;
+    if (!_isAlertDismissed(key)) {
+      alerts.push({ key, type: 'warning', icon: '⚠️',
+        text: `Presupuesto de <strong>${escapeHtml(b.category)}</strong> al <strong>${pct.toFixed(0)}%</strong> — quedan <strong>${formatCurrency(b.monthlyAmount - spent)}</strong>`,
+        action: { label: 'Ver transacciones', section: 'transactions' } });
     }
   });
 
@@ -1845,18 +1866,47 @@ function calcAlerts() {
     });
   }
 
-  // Tax 2-month holding period countdown (regla de los 2 meses, España)
+  // Tax 2-month holding period countdown (regla de los 2 meses, España).
+  // Disparaba para CUALQUIER activo comprado en los últimos 60 días, sin
+  // comprobar si había una venta con pérdidas real detrás — un usuario que
+  // compra un valor por primera vez (sin historial de ventas) recibía un
+  // aviso fiscal sin sentido, ya que no hay ninguna pérdida que proteger.
+  // Misma condición que renderTwoMonthsRule() (fiscal.js): solo aplica si
+  // ese mismo ticker tiene una venta con pérdidas en APP.sales dentro de
+  // ±60 días de la fecha de recompra.
   (APP.portfolio || []).forEach(a => {
-    if (!a.buyDate) return;
-    const buyTs   = new Date(a.buyDate + 'T00:00:00').getTime();
+    if (!a.buyDate || !a.ticker) return;
+    const buyTs     = new Date(a.buyDate + 'T00:00:00').getTime();
     const daysSince = Math.floor((today.getTime() - buyTs) / 86400000);
     if (daysSince < 0 || daysSince >= 60) return;
+    const lossSale = (APP.sales || []).find(s =>
+      s.ticker && s.ticker.toUpperCase() === a.ticker.toUpperCase() &&
+      (s.sellPrice - s.buyPrice) * s.quantity < 0 &&
+      Math.abs(buyTs - new Date(s.sellDate + 'T00:00:00').getTime()) / 86400000 <= 60
+    );
+    if (!lossSale) return;
     const daysLeft  = 60 - daysSince;
     const alertKey  = `tax-hold-${a.id}`;
     if (!_isAlertDismissed(alertKey)) {
-      const ticker = a.ticker ? ` (${escapeHtml(a.ticker)})` : '';
-      alerts.push({ key: alertKey, type: 'info', icon: '⏱',
-        text: `Quedan <strong>${daysLeft} días</strong> para que puedas vender <strong>${escapeHtml(a.name)}${ticker}</strong> sin infringir la regla de los 2 meses` });
+      const ticker = ` (${escapeHtml(a.ticker)})`;
+      alerts.push({ key: alertKey, type: 'warning', icon: '⏱',
+        text: `Recompraste <strong>${escapeHtml(a.name)}${ticker}</strong> cerca de una venta con pérdidas del ${formatDate(lossSale.sellDate)} — Hacienda puede no permitirte deducir esa pérdida en el IRPF`,
+        action: { label: 'Ver fiscalidad', section: 'fiscalidad' } });
+    }
+  });
+
+  // Bizum pendiente desde hace más de 7 días — direction:'in' = te deben,
+  // 'out' = debes tú (no 'they-owe'/'i-owe', que no existe en el modelo real).
+  (APP.bizums || []).filter(b => b.status === 'pending').forEach(b => {
+    if (!b.date) return;
+    const daysPending = Math.floor((today.getTime() - new Date(b.date + 'T00:00:00').getTime()) / 86400000);
+    if (daysPending <= 7) return;
+    const alertKey = `bizum-pending-${b.id}`;
+    if (!_isAlertDismissed(alertKey)) {
+      const who = b.direction === 'in' ? `<strong>${escapeHtml(b.person)}</strong> te debe` : `Le debes a <strong>${escapeHtml(b.person)}</strong>`;
+      alerts.push({ key: alertKey, type: 'info', icon: '💸',
+        text: `${who} <strong>${formatCurrency(b.amount)}</strong> — ${escapeHtml(b.concept)}, pendiente desde hace <strong>${daysPending} días</strong>`,
+        action: { label: 'Ver bizums', section: 'bizums' } });
     }
   });
 
@@ -2185,15 +2235,31 @@ function openRule5030Settings() {
   );
 }
 
+// Badge de la campana en la topbar — independiente de #dash-alerts-container
+// (que vive en la sección Dashboard) para que el contador sea correcto
+// aunque el usuario esté en cualquier otra sección. #dash-alerts-container
+// es marcado estático en index.html (nunca se destruye al navegar), así
+// que calcAlerts() ya se recalculaba igual estando o no en el Dashboard;
+// esto solo añade el reflejo visual en la campana.
+function updateNotifBellBadge(alerts) {
+  const badge = document.getElementById('topbarBellBadge');
+  if (!badge) return;
+  const n = (alerts || calcAlerts()).length;
+  badge.textContent = n > 99 ? '99+' : String(n);
+  badge.style.display = n > 0 ? '' : 'none';
+}
+
 function renderDashboardAlerts() {
+  const alerts = calcAlerts();
+  updateNotifBellBadge(alerts);
   const el = document.getElementById('dash-alerts-container');
   if (!el) return;
-  const alerts = calcAlerts();
   if (!alerts.length) { el.innerHTML = ''; return; }
   el.innerHTML = alerts.map(a => `
     <div class="dash-alert dash-alert-${a.type}">
       <span class="dash-alert-icon">${a.icon}</span>
       <span class="dash-alert-text">${a.text}</span>
+      ${a.action ? `<button class="dash-alert-action" data-action="navigate" data-section="${escapeHtml(a.action.section)}">${escapeHtml(a.action.label)}</button>` : ''}
       <button class="dash-alert-dismiss" onclick="dismissAlert('${escapeHtml(a.key)}')" title="Descartar"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-close"></use></svg></button>
     </div>
   `).join('');
@@ -2615,6 +2681,7 @@ function _renderNotifManager() {
       <div class="dash-alert dash-alert-${a.type}" style="position:relative">
         <span class="dash-alert-icon">${a.icon}</span>
         <span class="dash-alert-text">${a.text}</span>
+        ${a.action ? `<button class="dash-alert-action" onclick="closeModal();navigateTo('${escapeHtml(a.action.section)}')">${escapeHtml(a.action.label)}</button>` : ''}
         <button class="dash-alert-dismiss"
           onclick="dismissAlert('${escapeHtml(a.key)}');_renderNotifManager()"
           title="Descartar"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-close"></use></svg></button>
@@ -2727,7 +2794,43 @@ function _renderNotifManager() {
         <span style="font-size:13px;color:var(--text-muted)">%</span>
         <button class="btn-secondary" style="font-size:12px" onclick="_saveNotifConfig()">Guardar</button>
       </div>
+      ${_pushPermissionRowHtml()}
     </div>`;
+}
+
+// Fila de permiso de notificaciones del sistema — estado real de
+// Notification.permission (el navegador lo recuerda; Finova no intenta
+// llevar la cuenta por su lado). 'default' es el único estado en el que
+// pedir permiso tiene sentido: una vez en 'denied', el navegador ignora
+// requestPermission() en silencio, así que solo queda explicar cómo
+// reactivarlo desde los ajustes del propio navegador.
+function _pushPermissionRowHtml() {
+  if (!('Notification' in window)) {
+    return `<div class="notif-config-row" style="margin-top:10px">
+      <span class="notif-config-label">Notificaciones del sistema</span>
+      <span style="font-size:12px;color:var(--text-muted)">No soportadas en este navegador</span>
+    </div>`;
+  }
+  const perm = Notification.permission;
+  const statusHtml = perm === 'granted'
+    ? `<span style="font-size:12px;color:var(--up)">✓ Activadas</span>`
+    : perm === 'denied'
+      ? `<span style="font-size:12px;color:var(--text-muted)">Bloqueadas — actívalas desde los ajustes del navegador</span>`
+      : `<button class="btn-secondary" style="font-size:12px" onclick="_requestPushPermission()">Activar</button>`;
+  return `<div class="notif-config-row" style="margin-top:10px">
+    <span class="notif-config-label">Notificaciones del sistema</span>
+    ${statusHtml}
+  </div>
+  <p style="font-size:11px;color:var(--text-muted);margin:6px 0 0;line-height:1.5">
+    Avisan de recurrentes vencidas al abrir la app y de presupuestos al 90% al registrar un gasto.
+    No funcionan como una alarma con la app cerrada — Finova no tiene servidor de notificaciones push.
+  </p>`;
+}
+
+async function _requestPushPermission() {
+  const granted = await requestNotificationPermission();
+  showToast(granted ? 'Notificaciones activadas ✓' : 'No se han activado las notificaciones', granted ? 'success' : 'info');
+  _renderNotifManager();
 }
 
 function _alertTypeLabel(type) {

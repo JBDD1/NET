@@ -1075,7 +1075,7 @@ function renderBudgets() {
   // Budget 80% alerts — one toast per category per month
   APP.dismissedAlerts = APP.dismissedAlerts || {};
   let alertsFired = false;
-  budgetData.forEach(({ b, pctReal, over }) => {
+  budgetData.forEach(({ b, spent, pctReal, over }) => {
     if (b.monthlyAmount <= 0 || pctReal < 80) return;
     const alertKey = `budget80-${m}-${b.category}`;
     if (!APP.dismissedAlerts[alertKey]) {
@@ -1087,6 +1087,21 @@ function renderBudgets() {
           : `⚠ Presupuesto "${escapeHtml(b.category)}": ${pctReal.toFixed(0)}% utilizado`,
         'error'
       );
+    }
+    // Notificación del sistema al cruzar el 90% — clave propia (budget90,
+    // no budget80) para que no dependa de si el toast de arriba ya se
+    // mostró o se descartó; se dispara en el momento real de guardar la
+    // transacción que lo cruza, no en una recarga posterior.
+    const pushKey = `budget90-${m}-${b.category}`;
+    if (pctReal >= 90 && !APP.dismissedAlerts[pushKey]) {
+      APP.dismissedAlerts[pushKey] = true;
+      alertsFired = true;
+      if (typeof sendLocalNotification === 'function') {
+        sendLocalNotification(
+          `Presupuesto de ${b.category} casi agotado`,
+          `Has gastado ${formatCurrency(spent)} de ${formatCurrency(b.monthlyAmount)} (${pctReal.toFixed(0)}%)`
+        );
+      }
     }
   });
   if (alertsFired) setTimeout(saveData, 0);
