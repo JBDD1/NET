@@ -1081,19 +1081,30 @@ function requireAccountFor(actionLabel) {
 // invoca la función por nombre, para no capturar una referencia que todavía
 // no existe. Las tres exportaciones son async y ya muestran su propio aviso
 // mientras cargan la librería jsPDF.
-function _withPdf(fnName) {
+// btn (opcional): el botón pulsado, para mostrar "Generando…" + deshabilitarlo
+// mientras dura la carga de pdf.js/jsPDF (solo la primera vez, vía CDN) Y la
+// generación en sí — evita que un doble clic dispare dos exportaciones a la
+// vez y le da al usuario la misma señal visual que pedía el encargo, pero
+// reutilizable por los 4 botones que ya llaman a _withPdf en vez de
+// duplicar la lógica de spinner en cada uno.
+async function _withPdf(fnName, btn) {
   if (!requireAccountFor('exportar a PDF')) return;
-  const run = () => {
+  const original = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
+  try {
+    if (typeof window[fnName] !== 'function') {
+      showToast('Preparando el PDF…', 'info');
+      await _lazyLoad(_LAZY_SCRIPTS.pdf);
+    }
     const fn = typeof window !== 'undefined' ? window[fnName] : undefined;
-    if (typeof fn === 'function') fn();
+    if (typeof fn === 'function') await fn();
     else showToast('No se pudo cargar el generador de PDF', 'error');
-  };
-  if (typeof window[fnName] === 'function') { run(); return; }
-  showToast('Preparando el PDF…', 'info');
-  _lazyLoad(_LAZY_SCRIPTS.pdf).then(run).catch(err => {
+  } catch (err) {
     console.error(err);
     showToast('No se pudo cargar el generador de PDF', 'error');
-  });
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = original; }
+  }
 }
 
 function _globalClickDispatch(e) {
@@ -1118,8 +1129,8 @@ function _globalClickDispatch(e) {
     case 'open-notifications':         openNotificationsManager(); break;
     case 'toggle-privacy':             togglePrivacy(); break;
     // Dashboard
-    case 'export-monthly-pdf':         _withPdf('exportMonthlyPDF'); break;
-    case 'monthly-briefing':           _withPdf('exportMonthlyBriefingPDF'); break;
+    case 'export-monthly-pdf':         _withPdf('exportMonthlyPDF', el); break;
+    case 'monthly-briefing':           _withPdf('exportMonthlyBriefingPDF', el); break;
     case 'quick-add-nav':              navigateTo('transactions'); setTimeout(() => document.getElementById('quick-add-input')?.focus(), 120); break;
     case 'navigate':                   navigateTo(el.dataset.section); break;
     case 'rule5030-settings':          openRule5030Settings(); break;
@@ -1161,7 +1172,7 @@ function _globalClickDispatch(e) {
     case 'add-goal':                   openAddGoal(); break;
     case 'run-simulator':              runSimulator(); break;
     case 'save-scenario':              saveSimulatorScenario(); break;
-    case 'export-fiscal-pdf':          _withPdf('exportFiscalPDF'); break;
+    case 'export-fiscal-pdf':          _withPdf('exportFiscalPDF', el); break;
     case 'add-sale':                   openAddSale(); break;
     case 'add-crypto-sale':            openAddSale(null, true); break;
     case 'run-fiscal-sim':             runFiscalSimulator(); break;
