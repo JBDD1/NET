@@ -212,7 +212,9 @@ function buildFinancialSnapshot() {
     .map(([name, amount]) => ({ name, amount }));
 
   const portfRaw = [...APP.portfolio]
-    .map(a => ({ ticker: a.ticker || a.name, sector: a.sector || '', value: a.currentPrice * a.quantity, gain: (a.currentPrice - a.buyPrice) * a.quantity }))
+    .map(a => ({ ticker: a.ticker || a.name, sector: a.sector || '', value: a.currentPrice * a.quantity,
+                 gain: (a.currentPrice - a.buyPrice) * a.quantity,
+                 gainPct: a.buyPrice > 0 ? ((a.currentPrice - a.buyPrice) / a.buyPrice) * 100 : 0 }))
     .sort((a, b) => b.value - a.value).slice(0, 5);
 
   const divAnual = APP.dividends.reduce((s, d) =>
@@ -224,15 +226,27 @@ function buildFinancialSnapshot() {
     target:  g.targetAmount,
   }));
 
+  const t = APP.trabajo || {};
+  const year = typeof getFiscalYear === 'function' ? getFiscalYear() : new Date().getFullYear();
+
   return {
     date:           new Date().toLocaleDateString('es-ES'),
     month:          m,
-    patrimony:      cash + inv + alt + prop,
+    // patrimony incluía solo activos: sin restar la deuda no coincidía con el
+    // patrimonio neto que ve el usuario en el dashboard.
+    patrimony:      cash + inv + alt + prop - calcLiabilitiesTotal(),
+    grossAssets:    cash + inv + alt + prop,
+    liabilities:    calcLiabilitiesTotal(),
     cashTotal:      cash,
     investTotal:    inv,
     altTotal:       alt,
     propTotal:      prop,
     propCount:      (APP.properties || []).length,
+    // Datos fiscales — misma información que _buildFiscalContextLine()
+    fiscalYear:     year,
+    salaryGross:    parseFloat(t.salarioBruto) || 0,
+    salaryWithheld: parseFloat(t.retencionEmpresa) || 0,
+    socialSecurity: parseFloat(t.seguridadSocial) || 0,
     portfolioCount: APP.portfolio.length,
     monthlyIncome:  inc,
     monthlyExpenses: exp,
@@ -251,7 +265,11 @@ function buildFinancialContext() {
   const inv   = calcPortfolioValue();
   const alt   = calcAlternativesTotal();
   const prop  = calcPropertiesTotal();
-  const total = cash + inv + alt + prop;
+  // calcNetWorth() resta la deuda. Antes era cash+inv+alt+prop a secas y se
+  // etiquetaba como "Patrimonio", así que la IA recibía los activos BRUTOS:
+  // con 33.510 € de activos y 8.400 € de préstamo le decía al usuario que su
+  // patrimonio era 33.510 € cuando el dashboard mostraba 25.110 €.
+  const total = calcNetWorth();
 
   const m       = getCurrentMonth();
   const safeTransactions = APP.transactions.map(({ photo, photoId, ...rest }) => rest);
@@ -265,11 +283,14 @@ function buildFinancialContext() {
   const topCats = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 5)
     .map(([c, a]) => `${c}:${formatCurrency(a)}`).join(', ');
 
-  // Top 5 activos por valor
+  // Top 5 activos por valor. Se incluye el % de rentabilidad además del
+  // importe: preguntas como "¿cuál es mi activo más rentable?" van sobre el
+  // porcentaje, y antes había que deducirlo del valor y la ganancia.
   const topPortfolio = [...APP.portfolio]
-    .map(a => ({ ...a, val: a.currentPrice * a.quantity, gain: (a.currentPrice - a.buyPrice) * a.quantity }))
+    .map(a => ({ ...a, val: a.currentPrice * a.quantity, gain: (a.currentPrice - a.buyPrice) * a.quantity,
+                 pct: a.buyPrice > 0 ? ((a.currentPrice - a.buyPrice) / a.buyPrice) * 100 : 0 }))
     .sort((a, b) => b.val - a.val).slice(0, 5)
-    .map(a => `${a.ticker || a.name}${a.sector ? '[' + a.sector + ']' : ''}:${formatCurrency(a.val)}(${a.gain >= 0 ? '+' : ''}${formatCurrency(a.gain)})`).join(', ')
+    .map(a => `${a.ticker || a.name}${a.sector ? '[' + a.sector + ']' : ''}:${formatCurrency(a.val)}(${a.gain >= 0 ? '+' : ''}${formatCurrency(a.gain)}, ${a.pct >= 0 ? '+' : ''}${a.pct.toFixed(1)}%)`).join(', ')
     || 'Sin activos';
 
   // Dividendos anuales
@@ -287,14 +308,49 @@ function buildFinancialContext() {
   const propsCtx = (APP.properties || []).length > 0
     ? `, inmuebles:${formatCurrency(prop)}(${APP.properties.length})`
     : '';
+
+  // Deuda: sin esto el patrimonio del contexto no se podía reconciliar con
+  // sus componentes (efectivo + inversión + alt + inmuebles ≠ patrimonio).
+  const liab = calcLiabilitiesTotal();
+  const liabCtx = liab > 0 ? `, deuda:−${formatCurrency(liab)}` : '';
+
+  // Datos fiscales: faltaban por completo, así que una pregunta como
+  // "¿cuánto IRPF voy a pagar este año?" solo podía responderse de forma
+  // genérica aunque el usuario tuviera su salario y sus retenciones
+  // guardados en la sección Fiscalidad.
+  const fiscalCtx = _buildFiscalContextLine();
+
   return `[FINOVA ${new Date().toLocaleDateString('es-ES')}]
-Patrimonio: ${formatCurrency(total)} (efectivo:${formatCurrency(cash)}, inversión:${formatCurrency(inv)}, alt:${formatCurrency(alt)}${propsCtx})
+Patrimonio: ${formatCurrency(total)} (efectivo:${formatCurrency(cash)}, inversión:${formatCurrency(inv)}, alt:${formatCurrency(alt)}${propsCtx}${liabCtx})
 Mes ${m}: ingresos ${formatCurrency(inc)}, gastos ${formatCurrency(exp)}, balance ${formatCurrency(inc - exp)}
 Top gastos: ${topCats || 'ninguno'}
 Cartera (${APP.portfolio.length}): ${topPortfolio}
 Dividendos anuales: ${formatCurrency(divAnual)}
-Objetivos: ${goals}
+Objetivos: ${goals}${fiscalCtx}
 Transacciones: ${safeTransactions.length} | Watchlist: ${APP.watchlist.length} | Bizums pendientes: ${APP.bizums.filter(b => b.status === 'pending').length}`;
+}
+
+// Línea de contexto fiscal (vacía si el usuario no ha introducido nada, para
+// no gastar tokens ni inventar cifras). La usan buildFinancialContext() y
+// buildFinancialSnapshot(), que deben decir siempre lo mismo.
+function _buildFiscalContextLine() {
+  const t = APP.trabajo || {};
+  const bruto = parseFloat(t.salarioBruto) || 0;
+  const parts = [];
+  if (bruto > 0) {
+    const reten = parseFloat(t.retencionEmpresa) || 0;
+    const ss    = parseFloat(t.seguridadSocial) || 0;
+    parts.push(`salario bruto ${formatCurrency(bruto)}`);
+    if (reten) parts.push(`retención ${formatCurrency(reten)}`);
+    if (ss)    parts.push(`SS ${formatCurrency(ss)}`);
+  }
+  const year  = typeof getFiscalYear === 'function' ? getFiscalYear() : new Date().getFullYear();
+  const sales = (APP.sales || []).filter(s => s.sellDate?.startsWith(String(year)));
+  if (sales.length) {
+    const net = sales.reduce((s, v) => s + (v.sellPrice - v.buyPrice) * v.quantity, 0);
+    parts.push(`${sales.length} venta(s) ${year}, resultado ${net >= 0 ? '+' : ''}${formatCurrency(net)}`);
+  }
+  return parts.length ? `\nFiscal ${year}: ${parts.join(', ')}` : '';
 }
 
 function buildSystemPrompt() {

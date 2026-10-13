@@ -2776,13 +2776,27 @@ const BACKUP_ARRAYS = [
   'cashAccounts', 'alternatives', 'goals', 'bizums',
   'networthHistory', 'sales', 'scenarios', 'liabilities',
   'stakingPositions', 'stakingHistory', 'properties',
-  'recurring', 'trips',
+  'recurring', 'trips', 'budgets', 'customAlerts', 'hiddenSections',
 ];
 const BACKUP_ALLOWED_KEYS = [
   ...BACKUP_ARRAYS,
   'categories', 'trabajo', 'minimos',
   'theme', 'privacyMode', 'activeSection',
   'syncCode', 'lastBackupDate', 'portfolioSnapshots',
+  // Faltaban todas estas y se perdían al restaurar un backup o al sincronizar
+  // entre dispositivos (el fichero SÍ las contenía: las descartaba esta lista
+  // blanca). Las dos primeras son las graves:
+  //  · budgets                   → los presupuestos mensuales por categoría
+  //  · transactionCashAccountId  → qué cuenta ajustan los ingresos/gastos; al
+  //    perderse, tras restaurar las transacciones dejaban de mover el saldo
+  //    sin que nada lo indicara.
+  // (budgets y customAlerts van además en BACKUP_ARRAYS para que se valide
+  // que llegan como array.)
+  'transactionCashAccountId',
+  'categoryBudgetType', 'categoryPatterns',
+  'achievedMilestones', 'achievedBehaviorMilestones', 'milestoneDates',
+  'dashboardLayout', 'dashboardKpis', 'sectionOrder', 'layoutConfig',
+  'userName', 'dismissedAlerts', 'customAlerts',
 ];
 
 function validateBackup(data) {
@@ -3550,21 +3564,28 @@ function searchAll(q) {
     }
   });
 
-  // Objetivos
+  // Objetivos — el progreso sale de _calcGoalProgress (cuenta vinculada,
+  // categoría o contribuciones), no del campo manual currentAmount: un
+  // objetivo vinculado a una cuenta salía aquí al 0 % aunque la app lo
+  // mostrara al 56,7 % en su propia sección.
   APP.goals.forEach(g => {
     if (g.name?.toLowerCase().includes(ql)) {
-      const pct = g.targetAmount > 0 ? ((g.currentAmount / g.targetAmount) * 100).toFixed(0) : 0;
+      const prog = typeof _calcGoalProgress === 'function' ? _calcGoalProgress(g) : (g.currentAmount || 0);
+      const pct  = g.targetAmount > 0 ? ((prog / g.targetAmount) * 100).toFixed(0) : 0;
       results.push({ type: 'goal', icon: '◎', badge: 'Objetivo',
-        title: `${g.emoji || ''} ${g.name}`, sub: `${pct}% completado · ${formatCurrency(g.currentAmount)} / ${formatCurrency(g.targetAmount)}`,
+        title: `${g.emoji || ''} ${g.name}`, sub: `${pct}% completado · ${formatCurrency(prog)} / ${formatCurrency(g.targetAmount)}`,
         section: 'goals' });
     }
   });
 
-  // Activos alternativos
+  // Activos alternativos — calcAltCurrentValue aplica la depreciación; con
+  // a.currentPrice a secas, un activo valorado por depreciación (que no
+  // guarda currentPrice) aparecía con valor 0.
   APP.alternatives.forEach(a => {
     if (a.name?.toLowerCase().includes(ql)) {
+      const val = typeof calcAltCurrentValue === 'function' ? calcAltCurrentValue(a) : (a.currentPrice || 0);
       results.push({ type: 'alt', icon: '◇', badge: 'Alternativo',
-        title: a.name, sub: `${a.category || ''} · ${formatCurrency(a.currentPrice || 0)}`,
+        title: a.name, sub: `${a.category || ''} · ${formatCurrency(val)}`,
         section: 'alternatives' });
     }
   });
@@ -3576,6 +3597,49 @@ function searchAll(q) {
         title: `${b.person} — ${b.concept}`,
         sub: `${formatCurrency(b.amount)} · ${b.status === 'pending' ? 'Pendiente' : 'Liquidado'}`,
         section: 'bizums' });
+    }
+  });
+
+  // Viajes — faltaban por completo: buscar "Roma" no encontraba el viaje
+  // aunque tuviera gastos asignados y su propia sección.
+  (APP.trips || []).forEach(t => {
+    if ([t.name, t.destination, t.notes].some(f => f?.toLowerCase().includes(ql))) {
+      const spent = typeof calcTripSpent === 'function' ? calcTripSpent(t.id) : 0;
+      results.push({ type: 'trip', icon: t.emoji || '✈', badge: 'Viaje',
+        title: t.name,
+        sub: [t.destination, `${formatCurrency(spent)} gastado`, t.budget > 0 ? `de ${formatCurrency(t.budget)}` : null]
+          .filter(Boolean).join(' · '),
+        section: 'trips' });
+    }
+  });
+
+  // Pasivos — tampoco estaban: "préstamo coche" no se encontraba.
+  (APP.liabilities || []).forEach(l => {
+    if ([l.name, l.notes].some(f => f?.toLowerCase().includes(ql))) {
+      results.push({ type: 'liability', icon: '⊖', badge: 'Pasivo',
+        title: l.name,
+        sub: `${formatCurrency(l.remainingAmount || 0)} pendiente${l.monthlyPayment ? ` · ${formatCurrency(l.monthlyPayment)}/mes` : ''}`,
+        section: 'pasivos' });
+    }
+  });
+
+  // Inmuebles
+  (APP.properties || []).forEach(p => {
+    if ([p.name, p.address, p.notes].some(f => f?.toLowerCase().includes(ql))) {
+      results.push({ type: 'property', icon: '⌂', badge: 'Inmueble',
+        title: p.name,
+        sub: `${formatCurrency(p.currentValue || 0)}${p.monthlyRent ? ` · renta ${formatCurrency(p.monthlyRent)}/mes` : ''}`,
+        section: 'networth' });
+    }
+  });
+
+  // Recurrentes
+  (APP.recurring || []).forEach(r => {
+    if ([r.description, r.category].some(f => f?.toLowerCase().includes(ql))) {
+      results.push({ type: 'recurring', icon: '⟳', badge: 'Recurrente',
+        title: r.description,
+        sub: `${formatCurrency(r.amount)} · ${r.category}${r.active === false ? ' · pausada' : ''}`,
+        section: 'recurring' });
     }
   });
 
