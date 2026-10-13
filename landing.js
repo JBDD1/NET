@@ -641,3 +641,11 @@ const _LP_FEAT_DATA = {
   goals:        { ic:'🎯', title:'Objetivos financieros', tag:'Convierte tus metas en planes concretos',   mock:_mockGoals,        pts:['Define objetivos con cantidad objetivo y fecha límite','Seguimiento del progreso en tiempo real','Proyecciones basadas en tu capacidad de ahorro actual','Alertas al alcanzar hitos importantes'] },
   transactions: { ic:'💳', title:'Transacciones',         tag:'Control total de cada euro que entra y sale',mock:_mockTransactions, pts:['Importa CSV desde cualquier banco español en segundos','Categorización automática por tipo de gasto','Búsqueda y filtrado avanzado por fecha o categoría','Exporta en PDF, Excel o CSV cuando quieras'] },
 };
+
+/* ── Año del footer ──────────────────────────────────────────────
+   Estaba cableado a mano en el HTML ("© 2025") y se quedaba obsoleto
+   cada 1 de enero. Se rellena con el año real del navegador. */
+(function () {
+  const el = document.getElementById('year');
+  if (el) el.textContent = new Date().getFullYear();
+})();

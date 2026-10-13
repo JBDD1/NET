@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Finova — Tu asistente financiero personal</title>
-  <meta name="description" content="Gestiona tu patrimonio, inversiones, fiscalidad IRPF y objetivos en una app elegante. Asesor con IA incluido. Gratis." />
+  <title>Finova — App de finanzas personales para la comunidad FIRE española</title>
+  <meta name="description" content="Controla tu patrimonio, inversiones e IRPF en una sola app. Gratis, sin anuncios y con Asesor IA. La alternativa española a Finary." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preload" as="style"
@@ -20,10 +20,10 @@
   <meta name="theme-color" content="#d4a960" />
   <link rel="canonical" href="https://jbdd1.github.io/NET/landing.html" />
   <meta name="robots" content="index, follow" />
-  <meta name="keywords" content="app finanzas personales España, calculadora IRPF acciones, tracker cartera inversión, gestión patrimonio, declaración renta inversiones, calculadora FIRE España, app gastos e inversiones, app finanzas iPhone iOS, instalar app finanzas sin App Store" />
+  <meta name="keywords" content="app finanzas personales España, comunidad FIRE española, independencia financiera España, calculadora IRPF acciones, tracker cartera ETFs, gestión patrimonio neto, declaración renta inversiones, calculadora FIRE España, alternativa Finary español, app gastos e inversiones, app finanzas iPhone iOS, instalar app finanzas sin App Store" />
   <!-- Open Graph -->
-  <meta property="og:title"       content="Finova — Tu asistente financiero personal" />
-  <meta property="og:description" content="Gestiona patrimonio, inversiones y fiscalidad IRPF en una sola app elegante. Calculadora IRPF, tracker de cartera, asesor IA. Gratis." />
+  <meta property="og:title"       content="Finova — Tu banca privada personal. Gratis." />
+  <meta property="og:description" content="Patrimonio, inversiones e IRPF español en una sola app. Gratis, sin anuncios y con Asesor IA. Para inversores que buscan la independencia financiera." />
   <meta property="og:image"       content="https://jbdd1.github.io/NET/icon-512.png" />
   <meta property="og:url"         content="https://jbdd1.github.io/NET/landing.html" />
   <meta property="og:type"        content="website" />
@@ -31,9 +31,11 @@
   <meta property="og:site_name"   content="Finova" />
   <!-- Twitter Card -->
   <meta name="twitter:card"        content="summary_large_image" />
-  <meta name="twitter:title"       content="Finova — Tu asistente financiero personal" />
-  <meta name="twitter:description" content="Gestiona patrimonio, inversiones y fiscalidad IRPF en una sola app. Calculadora IRPF, tracker de cartera, asesor IA. Gratis." />
-  <meta name="twitter:image"       content="https://jbdd1.github.io/NET/og-image.png" />
+  <meta name="twitter:title"       content="Finova — Tu banca privada personal. Gratis." />
+  <meta name="twitter:description" content="Patrimonio, inversiones e IRPF español en una sola app. Gratis, sin anuncios y con Asesor IA. Para inversores que buscan la independencia financiera." />
+  <!-- og-image.png NO existe en el repositorio: apuntar ahí dejaba la vista
+       previa de Twitter/X en blanco. Se usa el mismo icono que Open Graph. -->
+  <meta name="twitter:image"       content="https://jbdd1.github.io/NET/icon-512.png" />
   <!-- Security meta tags -->
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <meta http-equiv="X-Frame-Options" content="DENY" />
@@ -545,7 +547,13 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 .lp-plat svg { width:13px; height:13px; flex-shrink:0; }
 .lp-plat-sep { color:var(--text-muted); font-size:11px; }
 .lp-plat-note { font-size:11px; color:var(--text-muted); }
-.lp-ctas { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:40px; }
+.lp-ctas { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+/* Credibilidad inmediata bajo el CTA del hero */
+.lp-hero-trust {
+  font-size:12.5px; color:var(--text-muted); margin:0 0 34px;
+  display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+}
+.lp-hero-trust span { opacity:.45; }
 .btn-cta {
   padding:13px 26px; border-radius:var(--r-md);
   font-size:14px; font-weight:600; color:var(--accent-ink);
@@ -619,6 +627,143 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 .lp-lead { font-size:15px; color:var(--text-secondary); line-height:1.7; max-width:520px; margin-bottom:44px; }
 
 /* ══ FEATURES ═══════════════════════════════════════════════════ */
+/* ── Sección PROBLEMA ── */
+.lp-problem-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:18px; }
+.lp-problem {
+  padding:26px; border-radius:var(--r-lg);
+  background:var(--bg-surface); border:1px solid var(--border-subtle);
+  position:relative;
+}
+.lp-problem-n {
+  font-family:var(--font-serif); font-size:13px; letter-spacing:.08em;
+  color:var(--text-muted); margin-bottom:12px;
+}
+.lp-problem h3 { font-size:16px; font-weight:600; margin:0 0 8px; color:var(--text-primary); }
+.lp-problem p  { font-size:13.5px; line-height:1.65; color:var(--text-secondary); margin:0; }
+.lp-problem-solve {
+  margin-top:26px; padding:22px 26px; border-radius:var(--r-lg);
+  border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);
+  background:color-mix(in srgb,var(--accent) 7%,var(--bg-surface));
+  font-size:15px; line-height:1.65; color:var(--text-secondary); text-align:center;
+}
+.lp-problem-solve strong { color:var(--text-primary); font-weight:600; display:block; margin-bottom:3px; }
+
+/* ── Sección PANTALLAS (mockups CSS, mismo lenguaje que el hero) ── */
+.lp-shots { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:22px; }
+.lp-shot { margin:0; }
+.lp-shot-mock {
+  padding:18px; border-radius:var(--r-lg);
+  background:var(--bg-elevated); border:1px solid var(--border-subtle);
+  box-shadow:var(--shadow-lg);
+}
+.lp-shot-hero-n {
+  font-family:var(--font-serif); font-size:30px; line-height:1.1;
+  color:var(--text-primary); letter-spacing:-.01em;
+}
+.lp-shot-hero-l { font-size:11.5px; color:var(--text-muted); margin-top:5px; }
+.lp-shot-hd {
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:11.5px; color:var(--text-muted); margin-bottom:12px;
+  padding-bottom:9px; border-bottom:1px solid var(--border-subtle);
+}
+.lp-shot-row, .lp-shot-tr {
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:12.5px; color:var(--text-secondary); padding:6px 0;
+}
+.lp-shot-tr { gap:8px; }
+.lp-shot-tr .tk {
+  font-size:10.5px; font-weight:600; letter-spacing:.04em;
+  color:var(--text-primary); background:var(--bg-surface);
+  border:1px solid var(--border-subtle); border-radius:4px; padding:2px 6px;
+  min-width:52px; text-align:center;
+}
+.lp-shot-tr span:nth-child(2) { flex:1; text-align:right; color:var(--text-primary); }
+.lp-shot-tr span:last-child   { min-width:78px; text-align:right; }
+.lp-shot-mock .up   { color:var(--up); }
+.lp-shot-mock .down { color:var(--down); }
+.lp-shot-pill {
+  font-size:10px; padding:2px 8px; border-radius:999px;
+  background:color-mix(in srgb,var(--accent) 14%,transparent);
+  color:var(--accent); border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);
+}
+.lp-shot-foot {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-top:10px; padding-top:11px; border-top:1px solid var(--border-subtle);
+  font-size:11.5px; color:var(--text-muted);
+}
+.lp-shot-foot strong { font-family:var(--font-serif); font-size:17px; color:var(--up); }
+.lp-shot-msg {
+  font-size:12px; line-height:1.6; color:var(--text-secondary);
+  background:var(--bg-surface); border:1px solid var(--border-subtle);
+  border-radius:var(--r-md); padding:10px 12px; margin-bottom:8px;
+}
+.lp-shot-msg--me {
+  background:color-mix(in srgb,var(--accent) 12%,transparent);
+  border-color:color-mix(in srgb,var(--accent) 26%,transparent);
+  color:var(--text-primary); margin-left:22px;
+}
+.lp-shot figcaption { padding:16px 2px 0; }
+.lp-shot-badge {
+  display:inline-block; font-size:10px; font-weight:600; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 10%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);
+  border-radius:999px; padding:3px 10px; margin-bottom:10px;
+}
+.lp-shot figcaption h3 { font-size:17px; font-weight:600; margin:0 0 6px; color:var(--text-primary); }
+.lp-shot figcaption p  { font-size:13.5px; line-height:1.65; color:var(--text-secondary); margin:0; }
+
+/* ── Sección PARA QUIÉN ES ── */
+.lp-who-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:18px; }
+.lp-who {
+  padding:26px; border-radius:var(--r-lg);
+  background:var(--bg-surface); border:1px solid var(--border-subtle);
+  transition:border-color .18s, transform .18s;
+}
+.lp-who:hover { border-color:color-mix(in srgb,var(--accent) 35%,transparent); transform:translateY(-3px); }
+.lp-who-ic {
+  width:38px; height:38px; border-radius:var(--r-md);
+  display:flex; align-items:center; justify-content:center;
+  background:color-mix(in srgb,var(--accent) 12%,transparent);
+  color:var(--accent); margin-bottom:14px;
+}
+.lp-who-ic svg { width:19px; height:19px; }
+.lp-who p { font-size:14px; line-height:1.7; color:var(--text-secondary); margin:0; }
+.lp-who strong { color:var(--text-primary); font-weight:600; }
+
+/* ── Sección COMPARATIVA ── */
+.lp-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.lp-cmp-wrap { overflow-x:auto; border-radius:var(--r-lg); border:1px solid var(--border-subtle); }
+.lp-cmp { width:100%; min-width:560px; border-collapse:collapse; background:var(--bg-surface); }
+.lp-cmp th, .lp-cmp td { padding:13px 14px; text-align:center; font-size:13px; }
+.lp-cmp thead th {
+  font-size:12px; font-weight:600; color:var(--text-muted);
+  border-bottom:1px solid var(--border-subtle); white-space:nowrap;
+}
+.lp-cmp thead th.is-us {
+  color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 9%,transparent);
+}
+.lp-cmp tbody th {
+  text-align:left; font-weight:500; color:var(--text-secondary);
+  border-bottom:1px solid var(--border-faint); min-width:200px;
+}
+.lp-cmp tbody td { border-bottom:1px solid var(--border-faint); color:var(--text-secondary); }
+.lp-cmp tbody tr:last-child th, .lp-cmp tbody tr:last-child td { border-bottom:0; }
+.lp-cmp td.is-us { background:color-mix(in srgb,var(--accent) 6%,transparent); }
+.lp-cmp .yes  { color:var(--up); font-weight:700; font-size:15px; }
+.lp-cmp .no   { color:var(--text-muted); font-weight:600; font-size:15px; opacity:.6; }
+.lp-cmp .part { font-size:11.5px; color:var(--text-muted); }
+.lp-cmp-note {
+  font-size:11.5px; line-height:1.6; color:var(--text-muted);
+  text-align:center; margin:16px auto 0; max-width:620px;
+}
+.lp-cmp-note a { color:var(--accent); }
+
+.lp-cta-micro { font-size:12px; color:var(--text-muted); margin:14px 0 0; }
+.lp-footer-copy a { color:var(--text-muted); text-decoration:none; }
+.lp-footer-copy a:hover { color:var(--accent); }
+
 .lp-feats { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:18px; }
 .lp-feat {
   padding:26px; border-radius:var(--r-lg);
@@ -1387,14 +1532,13 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
     <span class="lp-logo-text">Finova</span>
   </a>
   <nav class="lp-nav">
+    <a href="#pantallas">Cómo se ve</a>
     <a href="#features">Funcionalidades</a>
-    <a href="#csv-guide">Importar CSV</a>
     <a href="#spain">IRPF &amp; España</a>
-    <a href="#themes">Temas</a>
+    <a href="#comparativa">Comparativa</a>
     <a href="#trust">Privacidad</a>
     <a href="#pricing">Precio</a>
     <a href="#faq">FAQ</a>
-    <a href="#roadmap">Roadmap</a>
   </nav>
   <div class="lp-header-btns">
     <button class="btn-ghost" id="headerLoginBtn" onclick="lpOpenModal('signin')">Iniciar sesión</button>
@@ -1413,8 +1557,10 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 
 <!-- MOBILE MENU -->
 <div class="lp-mobile-menu" id="lpMobileMenu">
+  <a href="#pantallas"   onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Cómo se ve</a>
   <a href="#features"    onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Funcionalidades</a>
   <a href="#spain"       onclick="document.getElementById('lpMobileMenu').classList.remove('open')">IRPF &amp; España</a>
+  <a href="#comparativa" onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Comparativa</a>
   <a href="#themes"      onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Temas</a>
   <a href="#trust"       onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Privacidad</a>
   <a href="#pricing"     onclick="document.getElementById('lpMobileMenu').classList.remove('open')">Precio</a>
@@ -1434,13 +1580,13 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
   <div class="lp-hero-grid">
 
     <div>
-      <div class="lp-eyebrow lp-ani"><span class="lp-chip-icon"></span>App de finanzas personales</div>
+      <div class="lp-eyebrow lp-ani"><span class="lp-chip-icon"></span>Para la comunidad FIRE española</div>
       <h1 class="lp-headline lp-ani" style="animation-delay:.08s">
-        Tus finanzas,<br><em>bajo control total</em>
+        Tu banca privada personal.<br><em>Gratis.</em>
       </h1>
-      <p class="lp-hero-tagline lp-ani" style="animation-delay:.11s">Todo tu patrimonio. <em>Una visión completa.</em></p>
+      <p class="lp-hero-tagline lp-ani" style="animation-delay:.11s">Patrimonio, cartera e IRPF. <em>En un solo lugar.</em></p>
       <p class="lp-sub lp-ani" style="animation-delay:.14s">
-        Finova reúne patrimonio, inversiones, transacciones, fiscalidad IRPF y un asesor con IA en una sola app. Elegante. Privado. Gratuito.
+        La única app que une tu cartera de inversiones, tus gastos y tu IRPF en un solo lugar. Diseñada para inversores españoles que buscan la independencia financiera.
       </p>
       <div class="lp-nobank-pill lp-ani" style="animation-delay:.18s">
         <span>🏦</span>
@@ -1464,9 +1610,14 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
         <span class="lp-plat-note">— Instala en iPhone desde Safari, sin App Store</span>
       </div>
       <div class="lp-ctas lp-ani" style="animation-delay:.22s">
-        <button class="btn-cta" onclick="lpOpenModal('signup')">Empezar gratis →</button>
-        <a href="index.html" class="btn-outline">Ver la app</a>
+        <button class="btn-cta" onclick="lpOpenModal('signup')">Empezar gratis — sin tarjeta →</button>
+        <!-- index.html?demo es el modo demo REAL de la app (carga datos de
+             ejemplo sin tocar localStorage), no un vídeo grabado. -->
+        <a href="index.html?demo" class="btn-outline">Ver demo en 2 minutos</a>
       </div>
+      <p class="lp-hero-trust lp-ani" style="animation-delay:.26s">
+        Sin anuncios <span>·</span> Sin vender tus datos <span>·</span> Tus datos son tuyos
+      </p>
       <div class="lp-stats lp-ani" style="animation-delay:.30s">
         <div>
           <div class="lp-stat-n" data-count="100" data-suffix="%">100%</div>
@@ -1509,6 +1660,139 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
       </div>
     </div>
 
+  </div>
+</section>
+
+<div class="lp-hr"></div>
+
+<!-- PROBLEMA -->
+<section class="lp-section" id="problema" style="padding-top:56px">
+  <div class="lp-inner">
+    <div style="text-align:center;margin-top:-16px">
+      <div class="lp-tag lp-ani" style="justify-content:center"><span class="lp-chip-icon"></span>El problema</div>
+      <h2 class="lp-h2 lp-ani" style="animation-delay:.06s;text-align:center;margin:0 auto 12px">¿Cuántas apps necesitas<br>para <em>controlar tu dinero</em>?</h2>
+      <p class="lp-lead lp-ani" style="animation-delay:.12s;text-align:center;margin:0 auto 44px">Si inviertes en España, probablemente hoy estés haciendo malabares con tres herramientas que no se hablan entre ellas.</p>
+    </div>
+    <div class="lp-problem-grid">
+      <div class="lp-problem lp-ani">
+        <div class="lp-problem-n">01</div>
+        <h3>La app del banco</h3>
+        <p>Para ver tus gastos. No sabe nada de tus inversiones ni de lo que vas a pagar a Hacienda.</p>
+      </div>
+      <div class="lp-problem lp-ani" style="animation-delay:.07s">
+        <div class="lp-problem-n">02</div>
+        <h3>Un Excel para tus ETFs</h3>
+        <p>Que actualizas a mano cada mes y en el que nunca sabes del todo si la fórmula sigue bien.</p>
+      </div>
+      <div class="lp-problem lp-ani" style="animation-delay:.14s">
+        <div class="lp-problem-n">03</div>
+        <h3>Un gestor para el IRPF</h3>
+        <p>Que ve tus números una vez al año, cuando ya no hay margen para optimizar nada.</p>
+      </div>
+    </div>
+    <div class="lp-problem-solve lp-ani" style="animation-delay:.2s">
+      <strong>Con Finova lo tienes todo en un lugar.</strong>
+      Y sabes exactamente cuándo puedes retirarte.
+    </div>
+  </div>
+</section>
+
+<div class="lp-hr"></div>
+
+<!-- CAPTURAS / MOSTRAR NO CONTAR -->
+<!-- Los "mockups" se dibujan con CSS reutilizando el mismo sistema que el
+     mockup del hero (.lp-mockup / .mock-*). No hay archivos de captura en el
+     repositorio: referenciar PNGs inexistentes dejaría imágenes rotas. -->
+<section class="lp-section" id="pantallas" style="padding-top:56px">
+  <div class="lp-inner">
+    <div style="text-align:center;margin-top:-16px">
+      <div class="lp-tag lp-ani" style="justify-content:center"><span class="lp-chip-icon"></span>Así se ve</div>
+      <h2 class="lp-h2 lp-ani" style="animation-delay:.06s;text-align:center;margin:0 auto 12px">Cuatro pantallas.<br><em>Todo tu dinero.</em></h2>
+      <p class="lp-lead lp-ani" style="animation-delay:.12s;text-align:center;margin:0 auto 44px">Sin menús infinitos ni configuración previa. Esto es lo que ves al abrir la app.</p>
+    </div>
+
+    <div class="lp-shots">
+      <!-- 1 · Dashboard -->
+      <figure class="lp-shot lp-ani">
+        <div class="lp-shot-mock" role="img" aria-label="Dashboard de Finova mostrando un patrimonio neto de 25.110 euros, el desglose en efectivo, cartera y deuda, y la evolución mensual">
+          <div class="lp-shot-hero-n">25.110 €</div>
+          <div class="lp-shot-hero-l">Patrimonio neto · <span class="up">+1.149 € este mes</span></div>
+          <div class="mock-chart" style="margin-top:14px">
+            <div class="mock-bar m" style="height:34%"></div><div class="mock-bar m" style="height:46%"></div>
+            <div class="mock-bar a" style="height:58%"></div><div class="mock-bar m" style="height:52%"></div>
+            <div class="mock-bar a" style="height:70%"></div><div class="mock-bar m" style="height:64%"></div>
+            <div class="mock-bar a" style="height:82%"></div><div class="mock-bar a" style="height:100%"></div>
+          </div>
+          <div class="lp-shot-row"><span>Efectivo</span><span>12.700 €</span></div>
+          <div class="lp-shot-row"><span>Cartera</span><span>20.810 €</span></div>
+          <div class="lp-shot-row"><span>Deuda</span><span class="down">−8.400 €</span></div>
+        </div>
+        <figcaption>
+          <span class="lp-shot-badge">Se actualiza al instante</span>
+          <h3>Tu patrimonio al instante</h3>
+          <p>Efectivo, inversiones, inmuebles y deudas en una sola cifra que siempre cuadra.</p>
+        </figcaption>
+      </figure>
+
+      <!-- 2 · Cartera -->
+      <figure class="lp-shot lp-ani" style="animation-delay:.06s">
+        <div class="lp-shot-mock" role="img" aria-label="Cartera de inversión de Finova con cuatro activos, su rentabilidad individual y el total de 20.810 euros con una ganancia del 69,3 por ciento">
+          <div class="lp-shot-hd"><span>Cartera</span><span class="up">+8.520 € · +69,3 %</span></div>
+          <div class="lp-shot-tr"><span class="tk">NVDA</span><span>8.900 €</span><span class="up">+323,8 %</span></div>
+          <div class="lp-shot-tr"><span class="tk">ITX</span><span>4.600 €</span><span class="up">+21,1 %</span></div>
+          <div class="lp-shot-tr"><span class="tk">VWRL</span><span>4.410 €</span><span class="up">+19,5 %</span></div>
+          <div class="lp-shot-tr"><span class="tk">KO</span><span>2.900 €</span><span class="up">+7,4 %</span></div>
+          <div class="lp-shot-row" style="border-top:1px solid var(--border-subtle);margin-top:8px;padding-top:10px">
+            <span>Dividendos proyectados</span><span>132 €/año</span>
+          </div>
+        </div>
+        <figcaption>
+          <span class="lp-shot-badge">Cotizaciones reales</span>
+          <h3>Tus inversiones en tiempo real</h3>
+          <p>Rentabilidad, CAGR, concentración y dividendos de cada activo, sin tocar una fórmula.</p>
+        </figcaption>
+      </figure>
+
+      <!-- 3 · IRPF -->
+      <figure class="lp-shot lp-ani" style="animation-delay:.12s">
+        <div class="lp-shot-mock" role="img" aria-label="Módulo de fiscalidad IRPF de Finova con la base del ahorro, la base general, las retenciones ya practicadas y el resultado estimado de la declaración">
+          <div class="lp-shot-hd"><span>IRPF 2026</span><span class="lp-shot-pill">Tramos oficiales</span></div>
+          <div class="lp-shot-row"><span>Base general (trabajo)</span><span>29.968 €</span></div>
+          <div class="lp-shot-row"><span>Base del ahorro</span><span>72 €</span></div>
+          <div class="lp-shot-row"><span>Retenciones practicadas</span><span>4.814 €</span></div>
+          <div class="lp-shot-row"><span>Regla de los 2 meses</span><span class="up">Sin conflictos</span></div>
+          <div class="lp-shot-foot">
+            <span>Resultado estimado</span>
+            <strong>−312 €</strong>
+          </div>
+        </div>
+        <figcaption>
+          <span class="lp-shot-badge">Solo en Finova</span>
+          <h3>Paga solo lo que debes</h3>
+          <p>Plusvalías, dividendos y la regla de los 2 meses calculados con la ley española vigente.</p>
+        </figcaption>
+      </figure>
+
+      <!-- 4 · Asesor IA -->
+      <figure class="lp-shot lp-ani" style="animation-delay:.18s">
+        <div class="lp-shot-mock" role="img" aria-label="Asesor con inteligencia artificial de Finova respondiendo con las cifras reales del usuario sobre su tasa de ahorro">
+          <div class="lp-shot-hd"><span>Asesor IA</span><span class="lp-shot-pill">Con tus datos</span></div>
+          <div class="lp-shot-msg lp-shot-msg--me">¿Voy bien para retirarme a los 50?</div>
+          <div class="lp-shot-msg">
+            Con 25.110 € y un ahorro de 1.149 €/mes (49,1 % de tus ingresos), tu objetivo
+            de 600.000 € está al 4,2 %. A este ritmo y con un 7 % anual, llegarías antes de los 50.
+          </div>
+          <div class="lp-shot-foot" style="border:0;padding-top:4px">
+            <span>Modo anónimo disponible</span><strong>🔒</strong>
+          </div>
+        </div>
+        <figcaption>
+          <span class="lp-shot-badge">Responde con tus cifras</span>
+          <h3>Un asesor en tu bolsillo</h3>
+          <p>Pregúntale en español sobre tus gastos, tu cartera o tu IRPF. Conoce tus números reales.</p>
+        </figcaption>
+      </figure>
+    </div>
   </div>
 </section>
 
@@ -2087,6 +2371,129 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 
 <div class="lp-hr"></div>
 
+<!-- PARA QUIÉN ES -->
+<section class="lp-section" id="para-quien" style="padding-top:56px">
+  <div class="lp-inner">
+    <div style="text-align:center;margin-top:-16px">
+      <div class="lp-tag lp-ani" style="justify-content:center"><span class="lp-chip-icon"></span>Para quién es</div>
+      <h2 class="lp-h2 lp-ani" style="animation-delay:.06s;text-align:center;margin:0 auto 12px">Finova es <em>para ti</em> si…</h2>
+      <p class="lp-lead lp-ani" style="animation-delay:.12s;text-align:center;margin:0 auto 44px">No es una app para todo el mundo. Está pensada para quien invierte y tributa en España.</p>
+    </div>
+    <div class="lp-who-grid">
+      <div class="lp-who lp-ani">
+        <div class="lp-who-ic">
+          <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="2,17 7,11 12,14 20,4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 4h5v5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <p><strong>Inviertes en ETFs o acciones</strong> y quieres ver tu rentabilidad real después de impuestos.</p>
+      </div>
+      <div class="lp-who lp-ani" style="animation-delay:.07s">
+        <div class="lp-who-ic">
+          <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M11 6v5l3.5 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <p><strong>Quieres saber en qué fecha</strong> puedes dejar de trabajar, no una sensación vaga.</p>
+      </div>
+      <div class="lp-who lp-ani" style="animation-delay:.14s">
+        <div class="lp-who-ic">
+          <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="7" y1="13" x2="15" y2="13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </div>
+        <p><strong>Presentas la declaración</strong> de la renta y quieres optimizar tus plusvalías antes de diciembre.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="lp-hr"></div>
+
+<!-- COMPARATIVA -->
+<section class="lp-section" id="comparativa" style="padding-top:56px">
+  <div class="lp-inner">
+    <div style="text-align:center;margin-top:-16px">
+      <div class="lp-tag lp-ani" style="justify-content:center"><span class="lp-chip-icon"></span>Comparativa</div>
+      <h2 class="lp-h2 lp-ani" style="animation-delay:.06s;text-align:center;margin:0 auto 12px">Cómo encaja Finova<br>frente a <em>lo que ya usas</em></h2>
+      <p class="lp-lead lp-ani" style="animation-delay:.12s;text-align:center;margin:0 auto 32px">Comparativa honesta: donde otra herramienta gana, lo decimos.</p>
+    </div>
+    <div class="lp-cmp-wrap lp-ani" style="animation-delay:.16s">
+      <table class="lp-cmp">
+        <caption class="lp-sr">Comparativa de Finova frente a Finary, Notion y Excel</caption>
+        <thead>
+          <tr>
+            <th scope="col">&nbsp;</th>
+            <th scope="col" class="is-us">Finova</th>
+            <th scope="col">Finary</th>
+            <th scope="col">Notion</th>
+            <th scope="col">Excel</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">IRPF español integrado</th>
+            <td class="is-us"><span class="yes">✓</span></td>
+            <td><span class="no">✗</span></td>
+            <td><span class="no">✗</span></td>
+            <td><span class="part">Manual</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Asesor IA sobre tus datos</th>
+            <td class="is-us"><span class="yes">✓</span></td>
+            <td><span class="part">Parcial</span></td>
+            <td><span class="part">Parcial</span></td>
+            <td><span class="no">✗</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Gratis sin límite de activos</th>
+            <td class="is-us"><span class="yes">✓</span></td>
+            <td><span class="part">Plan free limitado</span></td>
+            <td><span class="part">Parcial</span></td>
+            <td><span class="yes">✓</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Funciona sin conectar el banco</th>
+            <td class="is-us"><span class="yes">✓</span></td>
+            <td><span class="yes">✓</span></td>
+            <td><span class="yes">✓</span></td>
+            <td><span class="yes">✓</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Interfaz en español</th>
+            <td class="is-us"><span class="yes">✓</span></td>
+            <td><span class="yes">✓</span></td>
+            <td><span class="yes">✓</span></td>
+            <td><span class="yes">✓</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Cálculo de plusvalías y regla de los 2 meses</th>
+            <td class="is-us"><span class="yes">✓</span></td>
+            <td><span class="no">✗</span></td>
+            <td><span class="no">✗</span></td>
+            <td><span class="part">Manual</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Agregación bancaria automática</th>
+            <td><span class="part">En desarrollo</span></td>
+            <td class="is-them"><span class="yes">✓</span></td>
+            <td><span class="no">✗</span></td>
+            <td><span class="no">✗</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Personalización total del formato</th>
+            <td><span class="part">Parcial</span></td>
+            <td><span class="no">✗</span></td>
+            <td class="is-them"><span class="yes">✓</span></td>
+            <td class="is-them"><span class="yes">✓</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lp-cmp-note lp-ani" style="animation-delay:.22s">
+      Comparativa elaborada en octubre de 2026 con la información pública de cada producto.
+      Finary y Notion evolucionan rápido: si algo ha cambiado,
+      <a href="mailto:MyFinova1@gmail.com?subject=Correcci%C3%B3n%20en%20la%20comparativa">escríbenos y lo corregimos</a>.
+    </p>
+  </div>
+</section>
+
+<div class="lp-hr"></div>
+
 <!-- PRICING -->
 <section class="lp-section" id="pricing">
   <div class="lp-inner">
@@ -2199,11 +2606,12 @@ async function lpJoinWaitlist(e) {
       </div>
     </div>
     <div class="lp-tag lp-ani" style="justify-content:center;margin-bottom:13px"><span class="lp-chip-icon"></span>Empieza hoy</div>
-    <h2 class="lp-ani" style="animation-delay:.06s">Tus finanzas merecen<br>una app <em>a tu altura</em></h2>
-    <p class="lp-ani" style="animation-delay:.12s">Sin publicidad. Sin vender tus datos.<br>Tu información vive en tu cuenta, no en servidores de terceros.</p>
+    <h2 class="lp-ani" style="animation-delay:.06s">Empieza hoy. <em>Es gratis.</em></h2>
+    <p class="lp-ani" style="animation-delay:.12s">Sin tarjeta de crédito. Sin trucos.<br>Tus datos se quedan en tu dispositivo.</p>
     <div class="lp-cta-row lp-ani" style="animation-delay:.18s">
       <button class="btn-cta" onclick="lpOpenModal('signup')">Crear cuenta gratis →</button>
     </div>
+    <p class="lp-cta-micro lp-ani" style="animation-delay:.24s">Únete a los primeros usuarios de Finova</p>
   </div>
 </section>
 
@@ -2220,7 +2628,7 @@ async function lpJoinWaitlist(e) {
       <a href="mailto:MyFinova1@gmail.com">Contacto</a>
       <a href="index.html">Ir a la app →</a>
     </div>
-    <div class="lp-footer-copy">© 2025 Finova</div>
+    <div class="lp-footer-copy">© <span id="year">2026</span> Finova · <a href="mailto:MyFinova1@gmail.com">MyFinova1@gmail.com</a></div>
   </div>
 </footer>
 
@@ -2301,7 +2709,7 @@ async function lpJoinWaitlist(e) {
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="landing.js"></script>
+<script defer src="landing.js"></script>
 <!-- Hard fallback: reveal everything after 2 s regardless of what happened above -->
 <script>setTimeout(function(){document.querySelectorAll('.lp-ani,.lp-ani-left,.lp-ani-right').forEach(function(e){e.classList.add('in')})},2000)</script>
 </body>
