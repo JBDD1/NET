@@ -164,6 +164,17 @@ function _showLoginScreen() {
   // simultáneos. inert lo sacan del árbol de accesibilidad y del orden de
   // tabulación a la vez (soportado en Safari 15.5+/Chrome 102+/Firefox 112+).
   if (main) main.inert = true;
+  // ?signup=1 — llega desde el banner de modo demo ("Crear cuenta gratis")
+  // y desde el CTA de la landing: abre directamente el formulario de
+  // registro en vez del de inicio de sesión, para no obligar a un visitante
+  // que ya decidió registrarse a elegir "¿No tienes cuenta?" él mismo. Solo
+  // se consume la PRIMERA vez (history.replaceState) para que un F5
+  // posterior no reabra siempre en modo registro si el usuario ya cambió
+  // a "Iniciar sesión" manualmente.
+  if (new URLSearchParams(location.search).get('signup') === '1') {
+    _loginMode = 'signup';
+    history.replaceState({}, '', location.pathname);
+  }
   _renderLoginForm(_loginMode);
 }
 

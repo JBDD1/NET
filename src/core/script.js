@@ -568,7 +568,13 @@ function _showDemoBanner() {
   const b = document.createElement('div');
   b.id = 'demo-banner';
   b.className = 'demo-banner';
-  b.innerHTML = '🎭 Modo demo activo — datos ficticios, ningún cambio se guarda &nbsp;&nbsp;<a href="' + location.pathname + '" class="demo-banner-link">Salir del demo →</a>';
+  // La CTA es "Crear cuenta gratis" (lleva a ?signup=1, directo al formulario
+  // de registro — ver _showLoginScreen) y no "Salir del demo": el objetivo
+  // de este banner es convertir, no solo informar. prepend() lo deja como
+  // primer hijo de .main-content, justo antes de .topbar — mismo hermano
+  // sticky que necesita el apilado del CSS (ver .demo-banner en style.css).
+  b.innerHTML = '🎭 Modo demo — datos ficticios, nada se guarda' +
+    ' &nbsp;&nbsp;<a href="index.html?signup=1" class="demo-banner-link">Crear cuenta gratis →</a>';
   main.prepend(b);
 }
 
@@ -1016,10 +1022,42 @@ document.addEventListener('DOMContentLoaded', () => {
 ═══════════════════════════════════════════════════════════════ */
 // pdf.js (26 KB) ya no se carga en el arranque: solo hace falta cuando el
 // usuario pulsa un botón de exportar a PDF. Se trae en ese momento y se
+// Modo demo — acciones que no tienen ningún sentido sin una cuenta real:
+// exportar datos ficticios a un archivo, sincronizar un dispositivo que no
+// existe, o guardar una API key que se perdería al cerrar la pestaña (ni
+// siquiera llega a localStorage: saveApiKey() escribe ahí directamente sin
+// mirar _isDemoMode). En vez de dejar que la API key se guarde de verdad
+// pese al modo demo, o que sincronizar no haga nada en silencio, se
+// intercepta con una invitación clara a registrarse.
+//
+// Deliberadamente NO se aplica esto a guardar transacciones, cartera,
+// objetivos, etc. — eso ya es un no-op silencioso vía _isDemoMode en
+// _saveDataNow() (storage.js), y "modo demo" significa poder probar la
+// app COMPLETA sin registrarte, no una versión con un aviso de registro en
+// cada clic.
+function requireAccountFor(actionLabel) {
+  if (!_isDemoMode) return true;
+  openModal(
+    'Crea una cuenta gratis',
+    `<p style="margin:0 0 10px;font-size:14px;color:var(--text-secondary);line-height:1.6">
+       Estás en modo demo. Para ${escapeHtml(actionLabel)} necesitas una cuenta —
+       es gratis y tus datos se guardan de forma segura, accesibles desde
+       cualquier dispositivo.
+     </p>`,
+    () => { window.location.href = 'index.html?signup=1'; }
+  );
+  const btn = document.getElementById('modalConfirm');
+  if (btn) btn.textContent = 'Crear cuenta gratis →';
+  const cancelBtn = document.getElementById('modalCancel');
+  if (cancelBtn) cancelBtn.textContent = 'Seguir probando';
+  return false;
+}
+
 // invoca la función por nombre, para no capturar una referencia que todavía
 // no existe. Las tres exportaciones son async y ya muestran su propio aviso
 // mientras cargan la librería jsPDF.
 function _withPdf(fnName) {
+  if (!requireAccountFor('exportar a PDF')) return;
   const run = () => {
     const fn = typeof window !== 'undefined' ? window[fnName] : undefined;
     if (typeof fn === 'function') fn();
@@ -1143,34 +1181,17 @@ function _globalClickDispatch(e) {
 /* ═══════════════════════════════════════════════════════════════
    21. EXPORTACIÓN CSV
 ═══════════════════════════════════════════════════════════════ */
-function downloadCSV(filename, headers, rows) {
-  const esc = v => {
-    let s = String(v ?? '');
-    // Prevent CSV/formula injection: spreadsheet apps (Excel, LibreOffice) execute
-    // cells that start with =, +, -, @ as formulas. Prefix with a tab so the value
-    // is interpreted as text. The tab is invisible in most spreadsheet views.
-    if (/^[=+\-@]/.test(s)) s = '\t' + s;
-    return (s.includes(',') || s.includes('"') || s.includes('\n'))
-      ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const lines = [headers, ...rows].map(r => r.map(esc).join(','));
-  const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a   = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
-}
-
-function exportTransactionsCSV() {
-  const headers = ['Fecha', 'Descripción', 'Categoría', 'Tipo', 'Importe (€)'];
-  const rows = [...APP.transactions]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .map(t => [t.date, t.description, t.category, t.type === 'income' ? 'Ingreso' : 'Gasto', t.amount.toFixed(2)]);
-  downloadCSV(`finova-transacciones-${getTodayStr()}.csv`, headers, rows);
-  showToast(`${rows.length} transacciones exportadas ✓`, 'success');
-}
+// (La implementación real de exportTransactionsCSV vive más abajo —
+// ésta y downloadCSV() eran una versión anterior, más simple, que se
+// quedó muerta: en un script clásico redeclarar una función al mismo
+// scope es legal y la segunda declaración sustituye a la primera, así
+// que ningún caller llegó a ejecutar esta versión. Sin filtros, sin
+// protección contra inyección de fórmulas CSV y sin resumen de
+// totales — eliminada junto con downloadCSV(), que no tenía ningún
+// otro uso.)
 
 function exportPortfolioExcel() {
+  if (!requireAccountFor('exportar tu cartera a Excel')) return;
   // ── Cálculos ─────────────────────────────────────────────────
   const totalValue   = calcPortfolioValue();
   const totalCost    = APP.portfolio.reduce((s,a) => s + a.buyPrice * a.quantity * (a.exchangeRate > 0 ? a.exchangeRate : 1), 0);
@@ -2744,6 +2765,7 @@ function _parseCSVBank(text) {
    22. BACKUP
 ═══════════════════════════════════════════════════════════════ */
 function downloadBackup() {
+  if (!requireAccountFor('descargar un backup')) return;
   const { claudeApiKey, openaiApiKey, geminiApiKey, groqApiKey, ...exportable } = APP;
   const data     = JSON.stringify({ _schemaVersion: 1, ...exportable }, null, 2);
   const blob     = new Blob([data], { type: 'application/json' });
@@ -2760,6 +2782,7 @@ function downloadBackup() {
 }
 
 function exportTransactionsCSV() {
+  if (!requireAccountFor('exportar tus transacciones')) return;
   if (!APP.transactions.length) return showToast('No hay transacciones para exportar', 'info');
   const txs = typeof _txApplyFilters === 'function'
     ? _txApplyFilters().sort((a, b) => a.date.localeCompare(b.date))
@@ -2892,6 +2915,7 @@ function restoreBackup(file) {
 /* ─── Sincronización entre dispositivos ────────────────────────── */
 
 function syncGenerateCode(btn) {
+  if (!requireAccountFor('sincronizar entre dispositivos')) return;
   const arr = new Uint8Array(6);
   crypto.getRandomValues(arr);
   APP.syncCode = Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -2911,6 +2935,7 @@ function syncGenerateCode(btn) {
 }
 
 async function syncUpload() {
+  if (!requireAccountFor('sincronizar entre dispositivos')) return;
   const code = APP.syncCode;
   if (!code) return showToast('Genera un código primero', 'error');
   const btn = document.getElementById('btn-sync-upload');
@@ -2932,6 +2957,7 @@ async function syncUpload() {
 }
 
 async function syncDownload() {
+  if (!requireAccountFor('sincronizar entre dispositivos')) return;
   const input = document.getElementById('sync-code-input');
   const code  = (input?.value.trim() || APP.syncCode || '').toLowerCase();
   if (!code) return showToast('Introduce el código de sincronización', 'error');
@@ -3167,6 +3193,10 @@ function renderSettings() {
     if (!btn) return;
     btn.onclick = async () => {
       const key = (document.getElementById(inputId)?.value || '').trim();
+      // Solo se bloquea el GUARDADO de una clave nueva — borrar un campo
+      // vacío no persiste nada, así que no tiene sentido interrumpir con un
+      // aviso de registro algo que ya es un no-op en modo demo.
+      if (key && !requireAccountFor('guardar tu propia API key')) return;
       APP[field] = key;
       await saveApiKey(provider, key);
       saveData();

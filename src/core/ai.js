@@ -176,6 +176,7 @@ function renderAI() {
 
 
 async function aiSaveInlineKey() {
+  if (!requireAccountFor('guardar tu propia API key')) return;
   const input = document.getElementById('ai-inline-key');
   const key   = (input?.value || '').trim();
   if (!key) { showToast('Introduce una API Key válida', 'error'); return; }

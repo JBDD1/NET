@@ -2694,7 +2694,17 @@ body.dash-dragging-active .dash-block:not(.dash-dragging) { transition: transfor
   align-items: center;
   justify-content: center;
   gap: 14px;
+  flex-wrap: wrap;
+  text-align: center;
   border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+  /* .topbar (su hermano siguiente en el DOM, ver _showDemoBanner) ya es
+     sticky top:0 — al ser el banner el hermano ANTERIOR, el apilado nativo
+     de sticky hace que el topbar quede justo debajo sin solape ni JS
+     adicional. z-index un nivel por encima para que nada de dentro de las
+     secciones pueda pintarse por encima durante el scroll. */
+  position: sticky;
+  top: 0;
+  z-index: calc(var(--z-sticky) + 1);
 }
 .demo-banner-link {
   color: #111;
