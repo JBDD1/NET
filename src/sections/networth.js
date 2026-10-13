@@ -206,6 +206,12 @@ function renderCashAccounts() {
 
 function toggleTransactionCashAccount(id) {
   const wasLinked = APP.transactionCashAccountId === id;
+  // Solo puede haber UNA cuenta vinculada: vincular otra desvincula la
+  // anterior. Antes el aviso solo nombraba la nueva, así que el usuario no se
+  // enteraba de que su cuenta anterior dejaba de ajustarse.
+  const prev = !wasLinked && APP.transactionCashAccountId
+    ? APP.cashAccounts.find(a => a.id === APP.transactionCashAccountId)
+    : null;
   APP.transactionCashAccountId = wasLinked ? null : id;
   saveData();
   renderCashAccounts();
@@ -214,7 +220,7 @@ function toggleTransactionCashAccount(id) {
   showToast(
     wasLinked
       ? 'Los ingresos y gastos ya no ajustan ninguna cuenta automáticamente'
-      : `Ingresos y gastos ajustarán el saldo de "${acct?.name || ''}" automáticamente`,
+      : `Ingresos y gastos ajustarán el saldo de "${acct?.name || ''}"${prev ? ` — "${prev.name}" deja de estar vinculada` : ''}`,
     'success'
   );
 }
@@ -764,7 +770,13 @@ function renderPasivos() {
   }
 
   tbody.innerHTML = liabilities.map(l => {
-    const paidPct = l.originalAmount > 0 ? Math.min(((l.originalAmount - l.remainingAmount) / l.originalAmount) * 100, 100) : 0;
+    // Math.max(0, …) además del Math.min: si el saldo pendiente es MAYOR que
+    // el importe original (deuda refinanciada, intereses capitalizados, o
+    // simplemente un dato mal introducido) el porcentaje salía negativo y se
+    // mostraba "-33%" con una anchura CSS inválida.
+    const paidPct = l.originalAmount > 0
+      ? Math.max(0, Math.min(((l.originalAmount - l.remainingAmount) / l.originalAmount) * 100, 100))
+      : 0;
     return `
       <tr data-id="${l.id}">
         <td><strong>${escapeHtml(l.name)}</strong>

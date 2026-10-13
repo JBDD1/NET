@@ -2295,6 +2295,13 @@ function _confirmOFXImport() {
     tx.categoryReviewed  = false;
     tx.categoryUpdatedAt = r.categoryUpdatedAt || new Date().toISOString();
     APP.transactions.push(tx);
+    // Mismo ajuste de la cuenta vinculada que en CUALQUIER otra vía de alta
+    // (formulario, quick add, recurrentes). Era el único camino que creaba
+    // transacciones sin aplicarlo: con una cuenta vinculada, añadir un gasto a
+    // mano bajaba el saldo pero importar 50 movimientos del extracto no movía
+    // nada, y como el saldo es un acumulado sin forma de recalcularse, el
+    // desfase quedaba fijo e invisible para siempre.
+    if (typeof _applyTxCashImpact === 'function') _applyTxCashImpact(tx, 1);
   });
   APP.transactions.sort((a, b) => b.date.localeCompare(a.date));
 
