@@ -794,6 +794,26 @@ function calcIRPFGeneral(base) {
   return tax;
 }
 
+// Reducción por obtención de rendimientos del trabajo (art. 20 LIRPF), con las
+// cifras VIGENTES EN 2024 (redacción del RDL 8/2023):
+//   · rendimiento neto ≤ 14.852 €                → 7.302 €
+//   · entre 14.852 € y 19.747,50 €               → 7.302 − 1,75 × (RN − 14.852)
+//   · ≥ 19.747,50 €                              → 0
+// Antes estaba con los importes DEROGADOS de antes de 2023 (5.565 € con cortes
+// en 13.115/16.825 y coeficiente 1,5), y además duplicados en renderTrabajo() y
+// en renderResumenIRPF(), con el riesgo de que divergieran. Eso no afectaba a
+// sueldos altos (la reducción es 0 en ambas versiones), pero a un sueldo
+// medio-bajo le recortaba la reducción y le inflaba la base imponible: con un
+// rendimiento neto de 14.000 €, 5.565 € en vez de 7.302 €, es decir 1.737 € más
+// de base tributando al 19-24 %.
+// (La ley exige además no tener otras rentas > 6.500 €; Finova no modela esa
+// condición, igual que antes de este cambio.)
+function calcReduccionTrabajo(rendNeto) {
+  if (rendNeto <= 14852) return 7302;
+  if (rendNeto < 19747.5) return Math.max(0, 7302 - 1.75 * (rendNeto - 14852));
+  return 0;
+}
+
 function renderTrabajo() {
   const t = APP.trabajo || {};
 
@@ -804,13 +824,9 @@ function renderTrabajo() {
   const sindicatos= parseFloat(t.sindicatos) || 0;
   const otros     = parseFloat(t.otrosGastos) || 0;
 
-  // Reducción por rendimientos del trabajo (art. 20 LIRPF)
-  // Reducción general según rendimiento neto
-  const rendNeto = bruto - ss - dietas - sindicatos - otros;
-  let reduccion = 0;
-  if (rendNeto <= 13115)       reduccion = 5565;
-  else if (rendNeto <= 16825)  reduccion = 5565 - 1.5 * (rendNeto - 13115);
-  else                         reduccion = 0;
+  // Reducción por rendimientos del trabajo (art. 20 LIRPF) — ver calcReduccionTrabajo
+  const rendNeto  = bruto - ss - dietas - sindicatos - otros;
+  const reduccion = calcReduccionTrabajo(rendNeto);
 
   const rendNetoReducido = Math.max(rendNeto - reduccion, 0);
 
@@ -1120,10 +1136,8 @@ function renderResumenIRPF(gainsAhorro, lossesAhorro, annualDivs, retencionesDiv
   const otros      = parseFloat(t.otrosGastos) || 0;
   const retenTrab  = parseFloat(t.retencionEmpresa) || 0;
 
-  const rendNeto = bruto - ss - dietas - sindicatos - otros;
-  let reduccion = 0;
-  if (rendNeto <= 13115)      reduccion = 5565;
-  else if (rendNeto <= 16825) reduccion = 5565 - 1.5 * (rendNeto - 13115);
+  const rendNeto    = bruto - ss - dietas - sindicatos - otros;
+  const reduccion   = calcReduccionTrabajo(rendNeto); // misma función que renderTrabajo()
   const baseGeneral = Math.max(rendNeto - reduccion, 0);
 
   // Base del ahorro — art. 49 LIRPF: pérdidas solo compensan hasta el 25% de rentas positivas

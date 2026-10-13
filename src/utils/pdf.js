@@ -524,9 +524,14 @@ async function exportFiscalPDF() {
   const gains  = sales.reduce((s, v) => { const r = (v.sellPrice - v.buyPrice) * v.quantity; return r > 0 ? s + r : s; }, 0);
   const losses = sales.reduce((s, v) => { const r = (v.sellPrice - v.buyPrice) * v.quantity; return r < 0 ? s + Math.abs(r) : s; }, 0);
   const FREQ   = { annual: 1, semiannual: 2, quarterly: 4, monthly: 12 };
-  const annualDivs = APP.dividends.reduce((s, d) => s + d.dividendPerShare * d.shares * (FREQ[d.frequency] || 1), 0);
+  // _divFxRate(d) igual que fiscal.js y renderDividends(): sin él, un dividendo
+  // de un activo en USD se exportaba sin convertir a euros y el PDF fiscal no
+  // cuadraba con la pantalla de Fiscalidad (mismo desajuste que ya se corrigió
+  // en la exportación a Excel).
+  const _fx = d => (typeof _divFxRate === 'function' ? _divFxRate(d) : 1);
+  const annualDivs = APP.dividends.reduce((s, d) => s + d.dividendPerShare * d.shares * (FREQ[d.frequency] || 1) * _fx(d), 0);
   const retention  = APP.dividends.reduce((s, d) => {
-    const gross = d.dividendPerShare * d.shares * (FREQ[d.frequency] || 1);
+    const gross = d.dividendPerShare * d.shares * (FREQ[d.frequency] || 1) * _fx(d);
     return s + gross * ((d.retentionRate ?? 19) / 100);
   }, 0);
   const netCapGains = gains - losses;

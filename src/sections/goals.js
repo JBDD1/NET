@@ -17,10 +17,18 @@ function _notifyGoalProgress(tx) {
   });
 }
 
+// Valor centinela para "vincular al patrimonio neto total" en lugar de a una
+// cuenta concreta. No puede colisionar con un id real (generateId no produce
+// '__networth__').
+const GOAL_LINK_NETWORTH = '__networth__';
+
 function _calcGoalProgress(g, txByCategory) {
   const contribTotal = (g.contributions || []).reduce((s, c) => s + c.amount, 0);
   let auto = 0;
-  if (g.linkedAccount) {
+  if (g.linkedAccount === GOAL_LINK_NETWORTH) {
+    // Objetivo tipo FIRE: el progreso es el patrimonio neto completo.
+    auto = calcNetWorth();
+  } else if (g.linkedAccount) {
     // Las cuentas de efectivo guardan el saldo en .amount, no .balance (ese
     // campo nunca ha existido en el objeto) — esto hacía que un objetivo
     // vinculado a una cuenta contara siempre 0 de progreso automático.
@@ -93,10 +101,17 @@ function renderGoals() {
     const effectiveAmount = _calcGoalProgress(g, txByCategory);
     const pct       = g.targetAmount > 0 ? Math.min((effectiveAmount / g.targetAmount) * 100, 100) : 0;
     const remaining = g.targetAmount - effectiveAmount;
-    const deadline  = g.deadline ? `Fecha límite: ${formatDate(g.deadline)}` : '';
+    // Un objetivo con la fecha límite ya pasada y sin completar solo mostraba
+    // "Fecha límite: <fecha pasada>", sin ninguna señal de que había vencido.
+    const isOverdue = !!g.deadline && g.deadline < getTodayStr() && pct < 100;
+    const deadline  = g.deadline
+      ? (isOverdue ? `⚠ Vencido el ${formatDate(g.deadline)}` : `Fecha límite: ${formatDate(g.deadline)}`)
+      : '';
 
     let sourceLabel = '';
-    if (g.linkedAccount) {
+    if (g.linkedAccount === GOAL_LINK_NETWORTH) {
+      sourceLabel = '↔ Patrimonio neto total';
+    } else if (g.linkedAccount) {
       const acct = APP.cashAccounts.find(a => a.id === g.linkedAccount);
       if (acct) sourceLabel = `↔ ${escapeHtml(acct.name)}`;
     } else if (g.linkedCategory) {
@@ -182,7 +197,7 @@ function renderGoals() {
         ${daysLeft !== null ? `<div class="goal-days-badge ${daysLeftCls}">${daysLeft < 0 ? `Venció hace ${-daysLeft}d` : daysLeft === 0 ? 'Vence hoy' : `${daysLeft}d restantes`}</div>` : ''}
         <span class="goal-emoji">${escapeHtml(g.emoji || '🎯')}</span>
         <div class="goal-name">${escapeHtml(g.name)}</div>
-        <div class="goal-deadline">${deadline}</div>
+        <div class="goal-deadline${isOverdue ? ' goal-deadline--overdue' : ''}">${deadline}</div>
         ${sourceLabel ? `<div class="goal-link-badge">${sourceLabel}</div>` : ''}
         <div class="goal-amounts">
           <div class="goal-current pvt">${formatCurrency(effectiveAmount)}</div>
@@ -232,11 +247,16 @@ function openAddGoal(prefill = null) {
 
   const initSource = g.linkedAccount ? 'account' : (g.linkedCategory ? 'category' : 'manual');
 
-  const accountOptions = APP.cashAccounts.length
+  // Además de cuentas concretas, se puede seguir el PATRIMONIO NETO completo
+  // (efectivo + cartera + alternativos + inmuebles − deudas). Es lo que pide
+  // un objetivo tipo FIRE, que no va contra una cuenta sino contra el total.
+  const networthOption =
+    `<option value="${GOAL_LINK_NETWORTH}"${g.linkedAccount === GOAL_LINK_NETWORTH ? ' selected' : ''}>🏦 Patrimonio neto total (${formatCurrency(calcNetWorth())})</option>`;
+  const accountOptions = networthOption + (APP.cashAccounts.length
     ? APP.cashAccounts.map(a =>
         `<option value="${escapeHtml(a.id)}"${g.linkedAccount === a.id ? ' selected' : ''}>${escapeHtml(a.name)} (${formatCurrency(a.amount || 0)})</option>`
       ).join('')
-    : '<option value="" disabled>No hay cuentas configuradas</option>';
+    : '<option value="" disabled>No hay cuentas de efectivo configuradas</option>');
 
   const incomeCats  = APP.categories.income.map(c =>
     `<option value="${escapeHtml(c)}"${g.linkedCategory === c ? ' selected' : ''}>${escapeHtml(c)}</option>`

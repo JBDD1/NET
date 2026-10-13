@@ -20,8 +20,16 @@ function runSimulator(silent = false) {
   const initial = parseFloat(document.getElementById('sim-initial').value) || 0;
   const monthly = parseFloat(document.getElementById('sim-monthly').value) || 0;
   const rate    = parseFloat(document.getElementById('sim-rate').value) || 0;
-  const years   = parseInt(document.getElementById('sim-years').value)  || 1;
+  // parseInt(...) || 1 convertía un 0 escrito a propósito en 1 año, así que
+  // simulaba algo distinto de lo pedido sin avisar. Ahora solo el campo VACÍO
+  // (NaN) cae al valor por defecto; un 0 explícito llega a la validación y se
+  // rechaza con un mensaje claro, igual que un -5 o un 99.
+  const yearsRaw = parseInt(document.getElementById('sim-years').value, 10);
+  const years    = Number.isNaN(yearsRaw) ? 1 : yearsRaw;
 
+  // initial y monthly solo tenían min="0" en el HTML, que el navegador no
+  // impone al leer .value: un importe negativo daba resultados sin sentido.
+  if (initial < 0 || monthly < 0) return showToast('El capital inicial y la aportación no pueden ser negativos', 'error');
   if (rate < 0 || rate > 100) return showToast('La tasa debe estar entre 0% y 100%', 'error');
   if (years < 1 || years > 50) return showToast('Los años deben estar entre 1 y 50', 'error');
 

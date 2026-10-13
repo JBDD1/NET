@@ -2265,6 +2265,8 @@ ul  { list-style: none; }
 .goal-emoji    { font-size: 24px; margin-bottom: 12px; display: block; }
 .goal-name     { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
 .goal-deadline { font-size: 11px; color: var(--text-muted); margin-bottom: 18px; }
+/* Fecha límite ya pasada sin haber completado el objetivo. */
+.goal-deadline--overdue { color: var(--down); font-weight: 600; }
 
 .goal-amounts {
   display: flex; justify-content: space-between;
