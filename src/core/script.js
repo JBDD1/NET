@@ -898,7 +898,7 @@ async function init() {
         showToast(
           '📊 Informe mensual listo — ' + new Date(prevMonth + '-01').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }),
           'info',
-          { duration: 12000, action: { label: 'Descargar PDF', callback: () => exportMonthlyBriefingPDF() } }
+          { duration: 12000, action: { label: 'Descargar PDF', callback: () => _withPdf('exportMonthlyBriefingPDF') } }
         );
       }, 2500);
     }
@@ -998,6 +998,25 @@ document.addEventListener('DOMContentLoaded', () => {
    GLOBAL CLICK DISPATCHER — routes data-action attributes
    (replaces all inline onclick="..." in index.html)
 ═══════════════════════════════════════════════════════════════ */
+// pdf.js (26 KB) ya no se carga en el arranque: solo hace falta cuando el
+// usuario pulsa un botón de exportar a PDF. Se trae en ese momento y se
+// invoca la función por nombre, para no capturar una referencia que todavía
+// no existe. Las tres exportaciones son async y ya muestran su propio aviso
+// mientras cargan la librería jsPDF.
+function _withPdf(fnName) {
+  const run = () => {
+    const fn = typeof window !== 'undefined' ? window[fnName] : undefined;
+    if (typeof fn === 'function') fn();
+    else showToast('No se pudo cargar el generador de PDF', 'error');
+  };
+  if (typeof window[fnName] === 'function') { run(); return; }
+  showToast('Preparando el PDF…', 'info');
+  _lazyLoad(_LAZY_SCRIPTS.pdf).then(run).catch(err => {
+    console.error(err);
+    showToast('No se pudo cargar el generador de PDF', 'error');
+  });
+}
+
 function _globalClickDispatch(e) {
   const el = e.target.closest('[data-action]');
   if (!el) return;
@@ -1019,8 +1038,8 @@ function _globalClickDispatch(e) {
     case 'open-search':                openSearch(); break;
     case 'toggle-privacy':             togglePrivacy(); break;
     // Dashboard
-    case 'export-monthly-pdf':         exportMonthlyPDF(); break;
-    case 'monthly-briefing':           exportMonthlyBriefingPDF(); break;
+    case 'export-monthly-pdf':         _withPdf('exportMonthlyPDF'); break;
+    case 'monthly-briefing':           _withPdf('exportMonthlyBriefingPDF'); break;
     case 'quick-add-nav':              navigateTo('transactions'); setTimeout(() => document.getElementById('quick-add-input')?.focus(), 120); break;
     case 'navigate':                   navigateTo(el.dataset.section); break;
     case 'rule5030-settings':          openRule5030Settings(); break;
@@ -1062,7 +1081,7 @@ function _globalClickDispatch(e) {
     case 'add-goal':                   openAddGoal(); break;
     case 'run-simulator':              runSimulator(); break;
     case 'save-scenario':              saveSimulatorScenario(); break;
-    case 'export-fiscal-pdf':          exportFiscalPDF(); break;
+    case 'export-fiscal-pdf':          _withPdf('exportFiscalPDF'); break;
     case 'add-sale':                   openAddSale(); break;
     case 'add-crypto-sale':            openAddSale(null, true); break;
     case 'run-fiscal-sim':             runFiscalSimulator(); break;
@@ -2361,10 +2380,23 @@ function handleCSVImportFile(input) {
   reader.readAsText(file, 'UTF-8');
 }
 
-// Requiere la librería SheetJS (global `XLSX`, cargada vía <script> en index.html).
-function _importExcelBank(file) {
+const _XLSX_CDN = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+
+// SheetJS pesa ~900 KB y solo sirve para leer un extracto en Excel: se carga
+// aquí, la primera vez que hace falta, en vez de bloquear el <head> en cada
+// visita. _ensureScript cachea la promesa, así que importar un segundo
+// archivo no vuelve a descargarla.
+async function _importExcelBank(file) {
   if (typeof XLSX === 'undefined') {
-    return showToast('No se pudo cargar el lector de Excel. Recarga la página e inténtalo de nuevo.', 'error');
+    showToast('Preparando el lector de Excel…', 'info');
+    try {
+      await _ensureScript(_XLSX_CDN);
+    } catch {
+      return showToast('No se pudo cargar el lector de Excel. Comprueba tu conexión e inténtalo de nuevo.', 'error');
+    }
+    if (typeof XLSX === 'undefined') {
+      return showToast('No se pudo cargar el lector de Excel. Comprueba tu conexión e inténtalo de nuevo.', 'error');
+    }
   }
   const reader = new FileReader();
   reader.onload = async e => {
@@ -3123,7 +3155,11 @@ function renderSettings() {
       await saveApiKey(provider, key);
       saveData();
       showToast(key ? `API Key de ${label} guardada ✓` : `API Key de ${label} eliminada`, 'success');
-      if (APP.aiProvider === provider) renderAI();
+      // ai.js se carga de forma diferida: si el usuario guarda la clave desde
+      // Ajustes sin haber entrado nunca al Asesor, todavía no está cargado y
+      // no hay nada que repintar (al entrar se renderizará con la clave ya
+      // guardada). Sin la guarda, esto lanzaba ReferenceError.
+      if (APP.aiProvider === provider && typeof renderAI === 'function') renderAI();
     };
   };
   saveKey('settings-claude-key', 'claudeApiKey', 'claude', 'Claude');

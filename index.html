@@ -13,9 +13,21 @@
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" /></noscript>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet"/>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="style.css" />
+  <!-- preconnect al CDN de Chart.js: adelanta DNS + TLS del único recurso
+       externo de la ruta crítica. (NO se usa <link rel="preload"> para los
+       scripts locales: Vite interpreta esos href como entradas de Rollup y
+       genera un bundle duplicado y sin minificar que nunca se ejecuta.) -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <!-- Chart.js con defer: hace falta en el primer render del dashboard, pero
+       NO debe bloquear el parseo del HTML. Los scripts defer se ejecutan en
+       orden de documento y antes de DOMContentLoaded, que es cuando arranca
+       init(), así que sigue estando disponible a tiempo. -->
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- SheetJS (xlsx.full.min.js, ~900 KB) NO se carga aquí: solo se usa al
+       importar un extracto en Excel. Se trae en ese momento desde
+       _importExcelBank() con _ensureScript(). Era, de largo, el recurso más
+       pesado de la carga inicial y encima bloqueaba el <head>. -->
   <link rel="manifest" href="manifest.json" />
 
   <!-- Favicons -->
@@ -2572,34 +2584,37 @@
   <!-- ═══════════════════════════════════════════════════════════════ -->
 
   <!-- Firebase Auth SDK (compat) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
-  <script src="src/utils/premium.js"></script>
+  <script defer src="src/utils/premium.js"></script>
   <!-- Core modules — load in dependency order -->
-  <script src="src/core/state.js"></script>
-  <script src="src/core/api.js"></script>
-  <script src="src/core/utils.js"></script>
-  <script src="src/core/charts.js"></script>
-  <script src="src/core/calcs.js"></script>
-  <script src="src/core/storage.js"></script>
-  <script src="src/core/navigation.js"></script>
-  <script src="src/core/script.js"></script>
-  <script src="src/sections/transactions.js"></script>
-  <script src="src/sections/recurring.js"></script>
-  <script src="src/sections/trips.js"></script>
-  <script src="src/sections/goals.js"></script>
+  <script defer src="src/core/state.js"></script>
+  <script defer src="src/core/api.js"></script>
+  <script defer src="src/core/utils.js"></script>
+  <script defer src="src/core/charts.js"></script>
+  <script defer src="src/core/calcs.js"></script>
+  <script defer src="src/core/storage.js"></script>
+  <script defer src="src/core/navigation.js"></script>
+  <script defer src="src/core/script.js"></script>
+  <script defer src="src/sections/transactions.js"></script>
+  <script defer src="src/sections/recurring.js"></script>
+  <script defer src="src/sections/trips.js"></script>
+  <script defer src="src/sections/goals.js"></script>
   <!-- simulator.js loaded on-demand by _lazyLoad when user navigates to the section -->
-  <script src="src/sections/bizums.js"></script>
-  <script src="src/sections/networth.js"></script>
-  <script src="src/sections/dashboard.js"></script>
-  <script src="src/sections/portfolio.js"></script>
-  <script src="src/sections/staking.js"></script>
-  <script src="src/core/ai.js"></script>
-  <!-- fiscal.js loaded on-demand by _lazyLoad when user navigates to the section -->
-  <script src="src/utils/pdf.js"></script>
-  <script src="src/sections/admin.js"></script>
-  <script src="src/auth/auth.js"></script>
-  <script src="src/core/events.js"></script>
+  <script defer src="src/sections/bizums.js"></script>
+  <script defer src="src/sections/networth.js"></script>
+  <script defer src="src/sections/dashboard.js"></script>
+  <script defer src="src/sections/portfolio.js"></script>
+  <!-- Cargados bajo demanda por _lazyLoad / _LAZY_SCRIPTS (ver utils.js),
+       no en el arranque:
+         · fiscal.js    → al navegar a Fiscalidad
+         · simulator.js → al navegar a Simulador
+         · ai.js        → al navegar al Asesor IA
+         · admin.js     → al navegar a Admin
+         · staking.js   → al pulsar una pestaña de Dividendos/Staking
+         · pdf.js       → al pulsar un botón de exportar a PDF -->
+  <script defer src="src/auth/auth.js"></script>
+  <script defer src="src/core/events.js"></script>
 </body>
 </html>

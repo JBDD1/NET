@@ -60,8 +60,21 @@
   });
 
   // ── Dividends / staking tabs ───────────────────────────────────
-  _on('stk-tab-dividends', 'click', function () { switchDivTab('dividends'); });
-  _on('stk-tab-staking',   'click', function () { switchDivTab('staking');   });
+  // switchDivTab() vive en staking.js, que ya no se carga en el arranque:
+  // se trae la primera vez que se pulsa una de las dos pestañas. Hasta
+  // entonces el panel de Dividendos (que es el visible por defecto) no
+  // necesita nada de ese fichero.
+  function _withStaking(fn) {
+    if (typeof switchDivTab === 'function') { fn(); return; }
+    _lazyLoad(_LAZY_SCRIPTS.staking)
+      .then(fn)
+      .catch(function (e) {
+        console.error(e);
+        if (typeof showToast === 'function') showToast('No se pudo cargar el módulo de staking', 'error');
+      });
+  }
+  _on('stk-tab-dividends', 'click', function () { _withStaking(function () { switchDivTab('dividends'); }); });
+  _on('stk-tab-staking',   'click', function () { _withStaking(function () { switchDivTab('staking');   }); });
 
   // ── Goals ──────────────────────────────────────────────────────
   _on('goals-sort-select', 'change', renderGoals);

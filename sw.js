@@ -81,6 +81,10 @@ const DEFERRED_ASSETS = [
   './src/utils/bank-connect.js',
   './src/utils/onboarding.js',
   './src/utils/tests.js',
+  // staking.js ya no se carga en el arranque (se trae al pulsar la pestaña de
+  // Staking). Se precachea aquí, fuera de la ruta crítica, para que la
+  // pestaña siga funcionando sin conexión aunque no se haya abierto antes.
+  './src/sections/staking.js',
 ];
 
 self.addEventListener('install', event => {

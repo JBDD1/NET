@@ -160,11 +160,19 @@ function renderSection(sectionId) {
       if (typeof renderFiscalidad === 'function') { renderFiscalidad(); }
       else { _lazyLoad(_LAZY_SCRIPTS.fiscalidad).then(() => { renderFiscalidad(); initScrollReveal(); }).catch(console.error); }
       break;
-    case 'ai':        renderAI(); setTimeout(() => document.getElementById('ai-input')?.focus(), 80); break;
+    case 'ai': {
+      const _focusAi = () => setTimeout(() => document.getElementById('ai-input')?.focus(), 80);
+      if (typeof renderAI === 'function') { renderAI(); _focusAi(); }
+      else { _lazyLoad(_LAZY_SCRIPTS.ai).then(() => { renderAI(); _focusAi(); initScrollReveal(); }).catch(console.error); }
+      break;
+    }
     case 'settings':  renderSettings();  break;
     case 'recurring': renderRecurring(); break;
     case 'trips':     renderTrips();     break;
-    case 'admin':     if (typeof renderAdminSection === 'function') renderAdminSection(); break;
+    case 'admin':
+      if (typeof renderAdminSection === 'function') { renderAdminSection(); }
+      else { _lazyLoad(_LAZY_SCRIPTS.admin).then(() => { renderAdminSection(); initScrollReveal(); }).catch(console.error); }
+      break;
   }
   requestAnimationFrame(() => initScrollReveal());
   _trackSectionVisit(sectionId);

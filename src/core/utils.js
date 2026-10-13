@@ -62,9 +62,17 @@ function _lazyLoad(src) {
     document.head.appendChild(s);
   });
 }
+// Secciones que NO se cargan en el arranque: se traen la primera vez que el
+// usuario navega a ellas (ver renderSection en navigation.js). Dashboard,
+// Transacciones y las de Inversiones se quedan fuera a propósito: son las
+// más usadas y deben estar listas en el primer paint.
 const _LAZY_SCRIPTS = {
   fiscalidad: 'src/sections/fiscal.js',
   simulator:  'src/sections/simulator.js',
+  staking:    'src/sections/staking.js',
+  ai:         'src/core/ai.js',
+  admin:      'src/sections/admin.js',
+  pdf:        'src/utils/pdf.js',
 };
 
 /* ── _ensureScript (cache-aware dynamic loader) ── */
