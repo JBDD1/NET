@@ -382,7 +382,7 @@
         </div>
 
         <!-- Perfil (trigger) -->
-        <div class="sidebar-profile" id="sidebar-profile" data-action="toggle-profile-dropdown" title="Abrir perfil" style="cursor:pointer">
+        <div class="sidebar-profile" id="sidebar-profile" data-action="toggle-profile-dropdown" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-controls="profile-dropdown" title="Abrir perfil" style="cursor:pointer">
           <div class="sidebar-profile-top">
             <div class="sidebar-profile-avatar" id="sidebar-avatar">U</div>
             <div class="sidebar-profile-name nav-label" id="sidebar-username">Usuario</div>
@@ -435,7 +435,7 @@
             <div class="mh-networth" id="mh-networth">€0</div>
             <div class="mh-change" id="mh-change">—</div>
           </div>
-          <div class="mh-avatar" id="mh-avatar" data-action="toggle-profile-dropdown">U</div>
+          <div class="mh-avatar" id="mh-avatar" data-action="toggle-profile-dropdown" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-controls="profile-dropdown" aria-label="Abrir perfil">U</div>
         </div>
         <nav class="mh-tabs" id="mhTabs" aria-label="Navegación principal móvil">
           <button class="mh-tab active" data-section="dashboard">Inicio</button>
@@ -461,7 +461,7 @@
             </div>
           </div>
           <div class="mh-chart-wrap">
-            <canvas id="mh-sparkline-chart" aria-label="Gráfico de evolución patrimonial móvil"></canvas>
+            <canvas id="mh-sparkline-chart" role="img" aria-label="Gráfico de evolución patrimonial móvil"></canvas>
           </div>
         </div>
         <div class="mh-kpis">
@@ -516,42 +516,42 @@
 
         <div id="dash-block-kpis" class="dash-block dash-block-full">
           <div class="kpi-grid">
-            <div class="kpi-card kpi-hero" id="dash-kpi-networth" data-action="navigate" data-section="networth" style="cursor:pointer" title="Ver Patrimonio Neto">
+            <div class="kpi-card kpi-hero" id="dash-kpi-networth" data-action="navigate" data-section="networth" role="button" tabindex="0" style="cursor:pointer" title="Ver Patrimonio Neto">
               <div class="kpi-label">Patrimonio Neto Total</div>
               <div class="kpi-value" id="dash-networth" aria-label="Patrimonio neto total">€0</div>
               <div class="kpi-change" id="dash-networth-change">—</div>
               <div class="kpi-narrative" id="dash-networth-narrative"></div>
               <canvas class="kpi-sparkline" id="spark-networth" role="img" aria-label="Sparkline del patrimonio neto"></canvas>
             </div>
-            <div class="kpi-card" id="dash-kpi-balance" data-action="navigate" data-section="transactions" style="cursor:pointer" title="Ver Ingresos &amp; Gastos">
+            <div class="kpi-card" id="dash-kpi-balance" data-action="navigate" data-section="transactions" role="button" tabindex="0" style="cursor:pointer" title="Ver Ingresos &amp; Gastos">
               <div class="kpi-label">Balance del mes</div>
               <div class="kpi-value" id="dash-monthly-balance" aria-label="Balance del mes actual (ingresos menos gastos)">€0</div>
               <div class="kpi-change" id="dash-monthly-sub">Ingresos − Gastos</div>
               <div class="kpi-narrative" id="dash-balance-narrative"></div>
               <canvas class="kpi-sparkline" id="spark-balance" role="img" aria-label="Sparkline del balance mensual"></canvas>
             </div>
-            <div class="kpi-card" id="dash-kpi-portfolio" data-action="navigate" data-section="portfolio" style="cursor:pointer" title="Ver Cartera">
+            <div class="kpi-card" id="dash-kpi-portfolio" data-action="navigate" data-section="portfolio" role="button" tabindex="0" style="cursor:pointer" title="Ver Cartera">
               <div class="kpi-label">Cartera de inversión</div>
               <div class="kpi-value" id="dash-portfolio-value" aria-label="Valor total de la cartera de inversión">€0</div>
               <div class="kpi-change" id="dash-portfolio-change">—</div>
               <div class="kpi-narrative" id="dash-portfolio-narrative"></div>
               <canvas class="kpi-sparkline" id="spark-portfolio" role="img" aria-label="Sparkline de la cartera de inversión"></canvas>
             </div>
-            <div class="kpi-card" id="dash-kpi-cash" data-action="navigate" data-section="networth" style="cursor:pointer" title="Ver cuentas de efectivo">
+            <div class="kpi-card" id="dash-kpi-cash" data-action="navigate" data-section="networth" role="button" tabindex="0" style="cursor:pointer" title="Ver cuentas de efectivo">
               <div class="kpi-label">Efectivo disponible</div>
               <div class="kpi-value" id="dash-cash" aria-label="Efectivo disponible en cuentas">€0</div>
               <div class="kpi-change" id="dash-cash-sub">Saldo en cuenta</div>
               <div class="kpi-narrative" id="dash-cash-narrative"></div>
               <canvas class="kpi-sparkline" id="spark-cash" role="img" aria-label="Sparkline del efectivo disponible"></canvas>
             </div>
-            <div class="kpi-card" id="dash-kpi-savings" data-action="navigate" data-section="transactions" style="cursor:pointer" title="Ver Ingresos &amp; Gastos">
+            <div class="kpi-card" id="dash-kpi-savings" data-action="navigate" data-section="transactions" role="button" tabindex="0" style="cursor:pointer" title="Ver Ingresos &amp; Gastos">
               <div class="kpi-label">Tasa de ahorro</div>
               <div class="kpi-value" id="dash-savings-rate" aria-label="Tasa de ahorro mensual como porcentaje de los ingresos">—</div>
               <div class="kpi-change" id="dash-savings-sub">Del ingreso mensual</div>
               <div class="kpi-narrative" id="dash-savings-narrative"></div>
               <canvas class="kpi-sparkline" id="spark-savings" role="img" aria-label="Sparkline de la tasa de ahorro"></canvas>
             </div>
-            <div class="kpi-card" id="dash-kpi-dividends" data-action="navigate" data-section="dividends" style="cursor:pointer" title="Ver Dividendos">
+            <div class="kpi-card" id="dash-kpi-dividends" data-action="navigate" data-section="dividends" role="button" tabindex="0" style="cursor:pointer" title="Ver Dividendos">
               <div class="kpi-label">Dividendos anuales</div>
               <div class="kpi-value" id="dash-dividends" aria-label="Proyección de dividendos anuales">€0</div>
               <div class="kpi-change" id="dash-dividends-sub">Proyección anual</div>
@@ -1025,18 +1025,18 @@
             <caption class="sr-only">Cartera de inversión: activo, ticker, país, precio de compra, precio actual, cantidad, valor, rentabilidad y CAGR</caption>
             <thead>
               <tr id="portfolio-thead-row">
-                <th class="sortable" data-col="name" data-action="portfolio-sort">Activo<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable" data-col="ticker" data-action="portfolio-sort">Ticker<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable" data-col="country" data-action="portfolio-sort">País<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="buyPrice" data-action="portfolio-sort">P. Compra<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable" data-col="name" data-action="portfolio-sort" tabindex="0" aria-sort="none">Activo<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable" data-col="ticker" data-action="portfolio-sort" tabindex="0" aria-sort="none">Ticker<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable" data-col="country" data-action="portfolio-sort" tabindex="0" aria-sort="none">País<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="buyPrice" data-action="portfolio-sort" tabindex="0" aria-sort="none">P. Compra<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
                 <th class="text-right">P. Actual</th>
-                <th class="sortable text-right" data-col="quantity" data-action="portfolio-sort">Cantidad<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="cost" data-action="portfolio-sort">Coste<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="value" data-action="portfolio-sort">Valor actual<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="gain" data-action="portfolio-sort">G/P (€)<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="gainPct" data-action="portfolio-sort">G/P (%)<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="concPct" data-action="portfolio-sort">% Cartera<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="days" data-action="portfolio-sort">Tiempo<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="quantity" data-action="portfolio-sort" tabindex="0" aria-sort="none">Cantidad<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="cost" data-action="portfolio-sort" tabindex="0" aria-sort="none">Coste<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="value" data-action="portfolio-sort" tabindex="0" aria-sort="none">Valor actual<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="gain" data-action="portfolio-sort" tabindex="0" aria-sort="none">G/P (€)<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="gainPct" data-action="portfolio-sort" tabindex="0" aria-sort="none">G/P (%)<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="concPct" data-action="portfolio-sort" tabindex="0" aria-sort="none">% Cartera<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th class="sortable text-right" data-col="days" data-action="portfolio-sort" tabindex="0" aria-sort="none">Tiempo<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
                 <th class="text-right" title="Rentabilidad Anual Compuesta (CAGR)">CAGR</th>
                 <th>Acciones</th>
               </tr>

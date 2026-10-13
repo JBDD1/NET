@@ -690,6 +690,22 @@ async function init() {
   // 12. Global click dispatcher (replaces all inline onclick in HTML)
   document.addEventListener('click', _globalClickDispatch);
 
+  // 12b. Activación por teclado para [data-action] sin semántica nativa de
+  // botón (divs clicables como las tarjetas KPI del dashboard o el disparador
+  // del menú de perfil): sin esto, Tab nunca llega a ellos y Enter/Espacio no
+  // hacen nada, aunque el ratón funcione — WCAG 2.1.1 (Keyboard). Cubre
+  // cualquier [data-action][tabindex] presente o añadido en el futuro, en vez
+  // de cablear cada elemento suelto a mano.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const el = e.target.closest('[data-action][tabindex]');
+    if (!el) return;
+    const tag = el.tagName;
+    if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT' || tag === 'SELECT') return; // ya nativo
+    e.preventDefault();
+    el.click();
+  });
+
   // 13. Navegación inferior móvil
   document.querySelectorAll('.mobile-nav-btn[data-section]').forEach(btn => {
     btn.addEventListener('click', () => navigateTo(btn.dataset.section));
@@ -3293,23 +3309,47 @@ function toggleProfileDropdown() {
   dd.classList.contains('open') ? closeProfileDropdown() : openProfileDropdown();
 }
 
+// Dos disparadores posibles (sidebar en escritorio, avatar en la cabecera
+// móvil) — aria-expanded debe reflejar el estado real en cualquiera que esté
+// presente, para que un lector de pantalla sepa si el menú está abierto.
+function _setProfileTriggersExpanded(expanded) {
+  ['sidebar-profile', 'mh-avatar'].forEach(id => {
+    document.getElementById(id)?.setAttribute('aria-expanded', String(expanded));
+  });
+}
+
 function openProfileDropdown() {
   const dd = document.getElementById('profile-dropdown');
   if (!dd) return;
   dd.style.display = '';
   dd.classList.add('open');
+  _setProfileTriggersExpanded(true);
   updateProfileDropdown();
   const input = document.getElementById('profile-name-input');
   if (input) input.value = APP.userName || '';
   requestAnimationFrame(() => {
     document.addEventListener('click', _profileDropdownClickAway);
+    document.addEventListener('keydown', _profileDropdownEscClose);
   });
 }
 
 function closeProfileDropdown() {
   const dd = document.getElementById('profile-dropdown');
   if (dd) dd.classList.remove('open');
+  _setProfileTriggersExpanded(false);
   document.removeEventListener('click', _profileDropdownClickAway);
+  document.removeEventListener('keydown', _profileDropdownEscClose);
+}
+
+// Escape cierra el menú y devuelve el foco a quien lo abrió — mismo
+// comportamiento que el resto de overlays de la app (modal, búsqueda).
+function _profileDropdownEscClose(e) {
+  if (e.key !== 'Escape') return;
+  const trigger = document.getElementById('sidebar-profile')?.offsetParent
+    ? document.getElementById('sidebar-profile')
+    : document.getElementById('mh-avatar');
+  closeProfileDropdown();
+  trigger?.focus();
 }
 
 function _profileDropdownClickAway(e) {

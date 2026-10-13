@@ -72,10 +72,19 @@ function renderTransactions() {
   document.querySelectorAll('.sortable-th:not([data-sort-wired])').forEach(th => {
     th.dataset.sortWired = '1';
     th.style.cursor = 'pointer';
-    th.addEventListener('click', () => {
+    // tabindex + keydown: un <th> no es nativamente operable por teclado.
+    // Sin esto, ordenar la tabla de transacciones era imposible sin ratón.
+    th.tabIndex = 0;
+    const doSort = () => {
       if (_txSortCol === th.dataset.sort) { _txSortAsc = !_txSortAsc; }
       else { _txSortCol = th.dataset.sort; _txSortAsc = th.dataset.sort === 'amount' ? false : true; }
       renderTransactionTable();
+    };
+    th.addEventListener('click', doSort);
+    th.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      doSort();
     });
   });
   _delegate('section-transactions', {
@@ -568,10 +577,12 @@ function _txApplyFilters() {
   // Update sort arrow indicators
   document.querySelectorAll('.sortable-th').forEach(th => {
     const arrow = th.querySelector('.sort-arrow');
-    if (!arrow) return;
-    if (th.dataset.sort === col) arrow.textContent = _txSortAsc ? ' ▲' : ' ▼';
-    else arrow.textContent = '';
-    th.classList.toggle('sort-active', th.dataset.sort === col);
+    const active = th.dataset.sort === col;
+    if (arrow) arrow.textContent = active ? (_txSortAsc ? ' ▲' : ' ▼') : '';
+    th.classList.toggle('sort-active', active);
+    // aria-sort: mismo motivo que en la tabla de cartera — el indicador ▲/▼
+    // es visual, aria-sort lo hace audible para quien usa lector de pantalla.
+    th.setAttribute('aria-sort', active ? (_txSortAsc ? 'ascending' : 'descending') : 'none');
   });
   return txs;
 }

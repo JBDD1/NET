@@ -154,16 +154,26 @@ async function _loadUserDataFromServer(uid) {
 function _showLoginScreen() {
   const loading = document.getElementById('app-loading');
   const login   = document.getElementById('login-screen');
+  const main    = document.getElementById('mainContent');
   if (loading) loading.classList.add('hidden');
   if (login)   login.style.display = 'flex';
+  // login-screen (role="main") es un overlay fixed que cubre <main>, pero
+  // <main> sigue en el DOM sin aria-hidden ni display:none: con Tab, el
+  // foco de teclado podía colarse detrás del overlay hacia contenido
+  // invisible, y un lector de pantalla encontraba DOS landmarks "main"
+  // simultáneos. inert lo sacan del árbol de accesibilidad y del orden de
+  // tabulación a la vez (soportado en Safari 15.5+/Chrome 102+/Firefox 112+).
+  if (main) main.inert = true;
   _renderLoginForm(_loginMode);
 }
 
 function _hideLoginScreen() {
   const login   = document.getElementById('login-screen');
   const loading = document.getElementById('app-loading');
+  const main    = document.getElementById('mainContent');
   if (login)   login.style.display = 'none';
   if (loading) loading.classList.remove('hidden');
+  if (main)    main.inert = false;
 }
 
 // ─── Renderiza el formulario de login / registro ──────────────────

@@ -335,9 +335,13 @@ function renderPortfolioTable() {
     if (th.dataset.col === _portfolioSort.col) {
       arrow.textContent = _portfolioSort.dir === 1 ? '↑' : '↓';
       th.classList.add('sort-active');
+      // aria-sort informa a lectores de pantalla de qué columna y dirección
+      // está activa — el indicador visual (↑/↓) no llega a quien no ve la tabla.
+      th.setAttribute('aria-sort', _portfolioSort.dir === 1 ? 'ascending' : 'descending');
     } else {
       arrow.textContent = '⇅';
       th.classList.remove('sort-active');
+      th.setAttribute('aria-sort', 'none');
     }
   });
 
