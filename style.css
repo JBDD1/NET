@@ -3214,6 +3214,22 @@ body.dash-dragging-active .dash-block:not(.dash-dragging) { transition: transfor
   letter-spacing: .4px;
 }
 
+/* ── Widget resumen de Recurrentes arriba de Transacciones ──── */
+.tx-rec-widget { margin-bottom: var(--gap); padding: 14px 16px; }
+.tx-rec-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.tx-rec-title { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
+.tx-rec-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 0; border-top: 1px solid var(--border-subtle);
+}
+.tx-rec-row:first-of-type { border-top: none; }
+.tx-rec-row--due .tx-rec-when { color: var(--down); font-weight: 600; }
+.tx-rec-desc   { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-rec-when   { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; }
+.tx-rec-amount { font-size: 13px; font-weight: 600; white-space: nowrap; min-width: 70px; text-align: right; }
+.tx-rec-empty  { font-size: 12.5px; color: var(--text-muted); padding: 6px 0; }
+.tx-rec-more   { font-size: 11.5px; color: var(--text-muted); padding-top: 6px; }
+
 .btn-secondary.filter-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 
 .watchlist-price-age {
@@ -3436,7 +3452,7 @@ body.dash-dragging-active .dash-block:not(.dash-dragging) { transition: transfor
   border-radius: var(--r-sm);
   background: var(--bg-elevated);
 }
-.notif-dismissed-key  { flex: 1; min-width: 100px; font-family: monospace; font-size: 11px; word-break: break-all; }
+.notif-dismissed-key  { flex: 1; min-width: 100px; font-size: 12.5px; color: var(--text-secondary); word-break: break-word; }
 .notif-dismissed-time { white-space: nowrap; color: var(--text-muted); font-size: 11px; }
 .notif-config-row {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;

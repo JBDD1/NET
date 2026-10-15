@@ -49,7 +49,58 @@ function _txUpdateMonthLabel() {
   });
 }
 
+// Resumen compacto de recurrentes pendientes/próximas arriba de la tabla de
+// transacciones — la gestión completa (crear, editar, pausar, eliminar)
+// sigue viviendo en su propia sección (ver recurring.js → renderRecurring).
+// Oculto si no hay ninguna plantilla recurrente creada; si las hay pero
+// ninguna vence pronto, muestra un estado vacío en vez de desaparecer, para
+// que "arriba de transacciones" sea un sitio fiable donde mirar.
+function _renderTxRecurringWidget() {
+  const container = document.getElementById('tx-widget-recurring');
+  if (!container) return;
+  const all = APP.recurring || [];
+  if (!all.length) { container.innerHTML = ''; return; }
+
+  const today      = getTodayStr();
+  const horizon     = new Date();
+  horizon.setDate(horizon.getDate() + 14);
+  const horizonStr  = horizon.toISOString().slice(0, 10);
+
+  const relevant = all
+    .filter(r => r.active && r.nextDate && r.nextDate <= horizonStr)
+    .sort((a, b) => a.nextDate.localeCompare(b.nextDate));
+  const dueCount = relevant.filter(r => r.nextDate <= today).length;
+
+  const MAX_SHOWN = 4;
+  const shown = relevant.slice(0, MAX_SHOWN);
+  const extra = relevant.length - shown.length;
+
+  const rowsHtml = shown.length ? shown.map(r => {
+    const overdue = r.nextDate <= today;
+    const diff = Math.ceil((new Date(r.nextDate + 'T00:00:00') - new Date()) / 86400000);
+    const whenLabel = overdue ? (diff === 0 ? 'hoy' : `hace ${-diff}d`) : (diff === 1 ? 'mañana' : `en ${diff}d`);
+    return `
+      <div class="tx-rec-row${overdue ? ' tx-rec-row--due' : ''}">
+        <span class="tx-rec-desc">${escapeHtml(r.description)}</span>
+        <span class="tx-rec-when">${whenLabel}</span>
+        <span class="tx-rec-amount ${r.type === 'income' ? 'positive' : 'negative'}">${formatCurrency(r.amount)}</span>
+        <button type="button" class="btn-secondary btn-sm" onclick="applyRecurring('${r.id}')" title="Registrar como transacción hoy">Registrar</button>
+      </div>`;
+  }).join('') : `<div class="tx-rec-empty">Sin recurrentes pendientes en los próximos 14 días</div>`;
+
+  container.innerHTML = `
+    <div class="card tx-rec-widget">
+      <div class="tx-rec-head">
+        <span class="tx-rec-title">⟳ Recurrentes${dueCount ? ` <span class="rec-due-badge">${dueCount} pendiente${dueCount > 1 ? 's' : ''}</span>` : ''}</span>
+        <button type="button" class="btn-ghost-sm" onclick="navigateTo('recurring')">Ver todas →</button>
+      </div>
+      ${rowsHtml}
+      ${extra > 0 ? `<div class="tx-rec-more">+${extra} más en Recurrentes</div>` : ''}
+    </div>`;
+}
+
 function renderTransactions() {
+  _renderTxRecurringWidget();
   // Restore persisted month filter
   const monthEl = document.getElementById('tx-filter-month');
   if (monthEl && APP.txFilterMonth) {

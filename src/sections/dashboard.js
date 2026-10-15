@@ -2668,12 +2668,63 @@ function openNotificationsManager() {
   if (footer) footer.style.display = 'none';
 }
 
+// Traduce una clave interna de descarte (p.ej. "bizum-pending-mp5owov…")
+// a una frase legible, buscando la entidad referenciada por id en los
+// datos actuales. Si esa entidad ya no existe (se borró después de
+// descartar la alerta) cae a un texto genérico en vez de romperse.
+// Cubre cada prefijo que calcAlerts() genera (ver esa función) — añadir
+// un tipo de alerta nuevo ahí implica añadir su caso aquí.
+function _describeDismissedKey(key) {
+  const monthLabel = ym => {
+    const mm = /^(\d{4})-(\d{2})$/.exec(ym || '');
+    if (!mm) return ym || '';
+    return new Date(+mm[1], +mm[2] - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  };
+  const goalName = id => (APP.goals || []).find(g => g.id === id)?.name || 'objetivo eliminado';
+  const assetName = id => {
+    const a = (APP.portfolio || []).find(p => p.id === id);
+    return a ? `${a.name}${a.ticker ? ' (' + a.ticker + ')' : ''}` : 'activo eliminado';
+  };
+
+  let m;
+  if ((m = /^goal-stagnant-(.+)$/.exec(key)))  return `Objetivo sin avances — ${goalName(m[1])}`;
+  if ((m = /^goal-deadline-(.+)$/.exec(key)))  return `Plazo de objetivo próximo — ${goalName(m[1])}`;
+  if ((m = /^goal-overdue-(.+)$/.exec(key)))   return `Plazo de objetivo vencido — ${goalName(m[1])}`;
+  if ((m = /^neg-balance-(\d{4}-\d{2})$/.exec(key))) return `Balance negativo — ${monthLabel(m[1])}`;
+  if ((m = /^no-income-(\d{4}-\d{2})$/.exec(key)))   return `Sin ingresos registrados — ${monthLabel(m[1])}`;
+  if ((m = /^watch-alert-(.+)-(above|below)$/.exec(key))) {
+    const dir = m[2] === 'above' ? 'por encima del objetivo' : 'por debajo del objetivo';
+    return `Alerta de precio — ${assetName(m[1])} ${dir}`;
+  }
+  if ((m = /^rec-due-(\d{4}-\d{2})$/.exec(key)))     return `Recurrentes pendientes de registrar — ${monthLabel(m[1])}`;
+  if ((m = /^budget-over-(.+)-(\d{4}-\d{2})$/.exec(key))) return `Presupuesto superado — ${m[1]} (${monthLabel(m[2])})`;
+  if ((m = /^budget-near-(.+)-(\d{4}-\d{2})$/.exec(key))) return `Presupuesto casi agotado — ${m[1]} (${monthLabel(m[2])})`;
+  if ((m = /^savings-drop-(\d{4}-\d{2})$/.exec(key)))     return `Caída en la tasa de ahorro — ${monthLabel(m[1])}`;
+  if ((m = /^concentration-(.+)-(\d{4}-\d{2})$/.exec(key))) return `Concentración de cartera — ${assetName(m[1])}`;
+  if ((m = /^tax-hold-(.+)$/.exec(key)))  return `Regla de los 2 meses — ${assetName(m[1])}`;
+  if ((m = /^bizum-pending-(.+)$/.exec(key))) {
+    const b = (APP.bizums || []).find(b => b.id === m[1]);
+    return b ? `Bizum pendiente — ${b.person}, ${formatCurrency(b.amount)}` : 'Bizum pendiente — bizum eliminado';
+  }
+  if ((m = /^custom-(.+)-(\d{4}-\d{2})$/.exec(key))) {
+    const ca = (APP.customAlerts || []).find(c => c.id === m[1]);
+    return `Alerta personalizada — ${ca ? (ca.label || _alertTypeLabel(ca.type)) : 'eliminada'}`;
+  }
+  return key; // clave desconocida (p.ej. de una versión anterior) — se muestra tal cual
+}
+
 function _renderNotifManager() {
   const body = document.getElementById('modalBody');
   if (!body) return;
 
   const active    = calcAlerts();
-  const dismissed = Object.entries(APP.dismissedAlerts || {}).sort((a, b) => b[1] - a[1]);
+  // budget80-/budget90- no son descartes reales: son flags internos de
+  // "ya se avisó una vez este mes" (ver renderBudgets en transactions.js),
+  // no algo que el usuario haya descartado conscientemente — no tiene
+  // sentido mostrarlos aquí ni ofrecer "Restaurar" sobre ellos.
+  const dismissed = Object.entries(APP.dismissedAlerts || {})
+    .filter(([key]) => !/^budget(80|90)-/.test(key))
+    .sort((a, b) => b[1] - a[1]);
   const custom    = APP.customAlerts || [];
 
   const activeHtml = active.length
@@ -2708,7 +2759,7 @@ function _renderNotifManager() {
 
   const dismissedHtml = dismissed.length ? dismissed.map(([key, ts]) => `
     <div class="notif-dismissed-row">
-      <span class="notif-dismissed-key">${escapeHtml(key)}</span>
+      <span class="notif-dismissed-key" title="${escapeHtml(key)}">${escapeHtml(_describeDismissedKey(key))}</span>
       <span class="notif-dismissed-time">${_relativeTime(ts) || '—'}</span>
       <button class="btn-ghost-sm" onclick="_undismissAlert('${escapeHtml(key)}')">Restaurar</button>
     </div>`).join('') : '';
