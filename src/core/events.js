@@ -89,10 +89,27 @@
   });
 
   // ── Admin panel ────────────────────────────────────────────────
+  // adminRefreshUsers/adminHealthCheck viven en admin.js, que no se carga en
+  // el arranque (ver _LAZY_SCRIPTS.admin) — referenciarlas aquí tal cual
+  // (como valor, no dentro de un closure) las evalúa en el momento en que
+  // se ejecuta ESTA línea, con admin.js todavía sin cargar para cualquier
+  // usuario: ReferenceError inmediato que además abortaba el wireup de
+  // todos los _on() siguientes (notificaciones, restaurar backup, demo de
+  // ajustes, webhook, volver arriba, instalar PWA…). Mismo patrón que
+  // _withStaking más arriba: cargar admin.js bajo demanda antes de llamar.
+  function _withAdmin(fn) {
+    if (typeof adminRefreshUsers === 'function') { fn(); return; }
+    _lazyLoad(_LAZY_SCRIPTS.admin)
+      .then(fn)
+      .catch(function (e) {
+        console.error(e);
+        if (typeof showToast === 'function') showToast('No se pudo cargar el panel de administración', 'error');
+      });
+  }
   _on('btn-dev-refresh',        'click', _refreshDevCard);
-  _on('btn-admin-refresh-users','click', adminRefreshUsers);
+  _on('btn-admin-refresh-users','click', function () { _withAdmin(function () { adminRefreshUsers(); }); });
   _on('btn-admin-load-demo',    'click', _adminLoadDemoData);
-  _on('btn-admin-health-check', 'click', adminHealthCheck);
+  _on('btn-admin-health-check', 'click', function () { _withAdmin(function () { adminHealthCheck(); }); });
 
   // ── Settings ──────────────────────────────────────────────────
   _on('btn-notifications-manager', 'click', openNotificationsManager);
