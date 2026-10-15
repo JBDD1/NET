@@ -500,8 +500,9 @@ function deleteProperty(id) {
 
 function renderAlternatives() {
   _delegate('section-alternatives', {
-    'edit-alt':   id => editAlternative(id),
-    'delete-alt': id => deleteAlternative(id),
+    'edit-alt':        id => editAlternative(id),
+    'delete-alt':      id => deleteAlternative(id),
+    'view-alt-photo':  id => viewAlternativePhoto(id),
   });
   const totalCurrent = calcAlternativesTotal();
   const totalCost    = APP.alternatives.reduce((s, a) => s + (parseFloat(a.buyPrice) || 0), 0);
@@ -537,6 +538,7 @@ function renderAlternatives() {
           <button class="btn-edit btn-icon" data-action="edit-alt" aria-label="Editar ${escapeHtml(a.name)}">✎</button>
           <button class="btn-danger btn-icon" data-action="delete-alt" aria-label="Eliminar ${escapeHtml(a.name)}">✕</button>
         </div>
+        ${a.photoId ? `<img src="" data-alt-photo-id="${a.photoId}" alt="${escapeHtml(a.name)}" class="alt-photo-thumb" data-action="view-alt-photo" />` : ''}
         <div class="alt-category-badge">${escapeHtml(a.category)}</div>
         <div class="alt-name">${escapeHtml(a.name)}</div>
         <div class="alt-price-row">
@@ -556,6 +558,12 @@ function renderAlternatives() {
       </div>
     `;
   }).join('');
+
+  // Las miniaturas se cargan aparte: loadPhoto() es async (lee de IndexedDB),
+  // no se puede resolver dentro del template string de arriba.
+  grid.querySelectorAll('[data-alt-photo-id]').forEach(img => {
+    loadPhoto(img.dataset.altPhotoId).then(url => { if (url) img.src = url; });
+  });
 
   renderAltCharts();
 }
@@ -637,9 +645,18 @@ function renderAltCharts() {
   }
 }
 
+/* _altPhotoState machine — igual que _txPhotoState (transactions.js):
+ *   null                          — sin foto
+ *   { type:'existing', id }       — foto guardada en IDB, sin cambios
+ *   { type:'new', url, oldId }    — nueva foto local pendiente de guardar (oldId puede ser null)
+ *   { type:'removed', oldId }     — foto existente marcada para borrar
+ */
+let _altPhotoState = null;
+
 function openAddAlternative(prefill = null) {
   const isEdit = !!prefill;
   const a = prefill || {};
+  _altPhotoState = a.photoId ? { type: 'existing', id: a.photoId } : null;
 
   openModal(isEdit ? 'Editar activo alternativo' : 'Nuevo activo alternativo', `
     <div class="form-row">
@@ -680,7 +697,13 @@ function openAddAlternative(prefill = null) {
       <label class="form-label">Notas</label>
       <input type="text" id="f-alt-notes" class="text-input" placeholder="Referencias, condición..." value="${escapeHtml(a.notes || '')}" />
     </div>
-  `, () => {
+    <div class="form-group">
+      <label class="form-label">Foto (opcional)</label>
+      <label for="f-alt-photo" class="tx-photo-btn">📷 ${a.photoId ? 'Cambiar foto' : 'Añadir foto'}</label>
+      <input type="file" id="f-alt-photo" accept="image/*" style="display:none" onchange="onAltPhotoChange(this)" />
+      <div id="alt-photo-preview" class="tx-photo-preview"></div>
+    </div>
+  `, async () => {
     const name            = document.getElementById('f-alt-name').value.trim();
     const category        = document.getElementById('f-alt-category').value;
     const buyPrice        = parseFloat(document.getElementById('f-alt-buy').value) || 0;
@@ -695,6 +718,10 @@ function openAddAlternative(prefill = null) {
     if (depreciationPct > 0) entry.depreciationPct = depreciationPct;
     else delete entry.depreciationPct;
 
+    const photoId = await _commitAltPhotoState();
+    if (photoId) entry.photoId = photoId;
+    else delete entry.photoId;
+
     if (isEdit) {
       const idx = APP.alternatives.findIndex(x => x.id === prefill.id);
       if (idx >= 0) APP.alternatives[idx] = entry;
@@ -708,6 +735,13 @@ function openAddAlternative(prefill = null) {
     closeModal();
     renderAlternatives();
     if (APP.activeSection === SECTIONS.DASHBOARD) renderDashboard();
+  }, () => {
+    if (_altPhotoState?.type === 'existing') {
+      loadPhoto(_altPhotoState.id).then(url => {
+        const preview = document.getElementById('alt-photo-preview');
+        if (preview && url) preview.innerHTML = `<img src="${url}" alt="${escapeHtml(a.name || 'activo')}" /><button type="button" class="tx-photo-remove" onclick="onAltPhotoRemove()">✕</button>`;
+      });
+    }
   });
 }
 
@@ -726,7 +760,62 @@ function deleteAlternative(id) {
     APP.alternatives.push(alt);
     saveData();
     renderAlternatives();
+  }, () => {
+    // Confirmado (sin deshacer) — igual que deleteTransaction(), limpia la foto de IDB
+    if (alt.photoId) deletePhoto(alt.photoId);
   });
+}
+
+/* ─── Foto del activo alternativo (IDB, mismo motor que transacciones) ─── */
+function onAltPhotoChange(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _resizeImageForStorage(file, dataUrl => {
+    const oldId = _altPhotoState?.type === 'existing' ? _altPhotoState.id : null;
+    _altPhotoState = { type: 'new', url: dataUrl, oldId };
+    const preview = document.getElementById('alt-photo-preview');
+    if (preview) preview.innerHTML = `<img src="${dataUrl}" alt="foto activo" /><button type="button" class="tx-photo-remove" onclick="onAltPhotoRemove()">✕</button>`;
+  });
+}
+
+function onAltPhotoRemove() {
+  const oldId = _altPhotoState?.type === 'existing' ? _altPhotoState.id
+              : _altPhotoState?.type === 'new'      ? _altPhotoState.oldId
+              : null;
+  _altPhotoState = oldId ? { type: 'removed', oldId } : null;
+  const preview = document.getElementById('alt-photo-preview');
+  if (preview) preview.innerHTML = '';
+  const input = document.getElementById('f-alt-photo');
+  if (input) input.value = '';
+}
+
+async function _commitAltPhotoState() {
+  if (!_altPhotoState) return null;
+  if (_altPhotoState.type === 'existing') return _altPhotoState.id;
+  if (_altPhotoState.type === 'removed') {
+    await deletePhoto(_altPhotoState.oldId);
+    return null;
+  }
+  if (_altPhotoState.type === 'new') {
+    if (_altPhotoState.oldId) await deletePhoto(_altPhotoState.oldId);
+    const newId = generateId();
+    await savePhoto(newId, _altPhotoState.url);
+    return newId;
+  }
+  return null;
+}
+
+async function viewAlternativePhoto(id) {
+  const a = APP.alternatives.find(x => x.id === id);
+  if (!a?.photoId) return;
+  const dataUrl = await loadPhoto(a.photoId);
+  if (!dataUrl) return showToast('No se pudo cargar la foto', 'error');
+  openModal(`📷 ${escapeHtml(a.name)}`, `
+    <div style="text-align:center">
+      <img src="${dataUrl}" alt="${escapeHtml(a.name)}" style="max-width:100%;max-height:60vh;border-radius:var(--r-sm);object-fit:contain" />
+    </div>`, null);
+  const footer = document.getElementById('modal')?.querySelector('.modal-footer');
+  if (footer) footer.style.display = 'none';
 }
 
 /* ═══════════════════════════════════════════════════════════════

@@ -16,6 +16,19 @@ let _lpAuth = null;
 let _lpMode = 'signin';
 
 (function lpInit() {
+  // Firebase Auth solo acepta 'localhost', no 127.0.0.1 (misma IP, dominio
+  // distinto para Firebase). Ya existe un fix a nivel de servidor de Vite
+  // (vite.config.js → devHostRedirect) que redirige esto con un 301 antes de
+  // que el navegador llegue a cargar este script, pero solo surte efecto si
+  // se reinició `npm run dev` después de aplicarlo — un refresco de página no
+  // basta porque Vite no recarga su config en caliente. Este guard cliente
+  // (igual que el que ya tiene auth.js para index.html) cubre ese hueco sin
+  // depender de que el servidor se haya reiniciado.
+  if (location.hostname === '127.0.0.1') {
+    location.replace(`http://localhost:${location.port || 3000}${location.pathname}${location.search}`);
+    return;
+  }
+
   try {
     const lu   = localStorage.getItem('finova_last_uid');
     const bk   = lu ? ('finova_' + lu + '_data_v1') : 'finova_data_v1';
