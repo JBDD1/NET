@@ -3886,7 +3886,7 @@ const CATEGORY_KEYWORDS = {
     'Ocio':          ['cine', 'teatro', 'concierto', 'museo', 'parque', 'viaje', 'hotel', 'airbnb', 'booking', 'expedia', 'steam', 'playstation', 'xbox', 'nintendo', 'twitch', 'futbol', 'fútbol', 'padel', 'pádel', 'tenis', 'baloncesto', 'escape room'],
     'Suscripciones': ['netflix', 'spotify', 'hbo', 'disney', 'amazon prime', 'prime video', 'apple', 'icloud', 'dropbox', 'adobe', 'microsoft 365', 'google one', 'youtube premium', 'dazn', 'filmin'],
     'Ropa':          ['zara', 'h&m', 'mango', 'pull&bear', 'bershka', 'stradivarius', 'massimo dutti', 'primark', 'el corte ingles', 'decathlon', 'nike', 'adidas', 'zapateria'],
-    'Educación':     ['universidad', 'academia', 'udemy', 'coursera', 'master', 'matricula', 'formacion', 'libro', 'fnac', 'casa del libro'],
+    'Educación':     ['universidad', 'academia', 'udemy', 'coursera', 'master', 'matricula', 'formacion', 'libro', 'fnac', 'casa del libro', 'colegio', 'guarderia', 'escuela infantil', 'ampa'],
     'Seguros':       ['seguro', 'axa', 'mapfre', 'mutua madrilena', 'allianz', 'generali', 'zurich', 'helvetia'],
     'Fiesta':        ['discoteca', 'club ', 'botellon', 'copa ', 'copas', 'chupito', 'nightclub', 'fiesta', 'fiestas', 'cumpleaños', 'cumpleanos', 'cumple', 'boda', 'barra libre'],
   },
@@ -3955,7 +3955,14 @@ function _patWrite(key, cat) {
 }
 
 function matchLocalKeywords(description, type) {
-  const norm = _stripAccents(description);
+  // Con espacios de margen a cada lado: algunas keywords llevan un espacio de
+  // borde a propósito ('dia ', ' dia', 'bp ', 'agua ') para no disparar sobre
+  // palabras que solo CONTIENEN esas letras (p.ej. "agua" sin margen
+  // coincidiría dentro de "paraguas"). Pero sin este padding, una descripción
+  // de una sola palabra como "Agua" o "Dia" (sin nada detrás) nunca tenía el
+  // espacio literal que esas keywords exigen, así que no categorizaba nunca
+  // — justo el caso más natural de escribir una factura de agua a secas.
+  const norm = ' ' + _stripAccents(description) + ' ';
 
   const map       = CATEGORY_KEYWORDS[type] || {};
   const available = type === 'income' ? APP.categories.income : APP.categories.expense;

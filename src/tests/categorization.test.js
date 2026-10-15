@@ -93,6 +93,32 @@ describe('_classifyLocal — reglas locales (sin red)', () => {
     expect(r.category).toBe('Salario');
   });
 
+  test('7. Colegio → Educación (palabra clave)', () => {
+    const r = fns._classifyLocal('Colegio Lucas', 'expense');
+    expect(r.category).toBe('Educación');
+  });
+
+  // matchLocalKeywords(): algunas keywords llevan un espacio de margen a
+  // propósito ('dia ', ' dia', 'bp ', 'agua ') para no disparar dentro de
+  // palabras como "paraguas". Sin padding de la descripción, una sola
+  // palabra sin nada detrás ("Agua" a secas, la forma más natural de
+  // apuntar una factura de agua) nunca tenía ese espacio literal y no
+  // categorizaba nunca — bug real, no solo un caso de borde teórico.
+  test('8. "Agua" a secas (una sola palabra) → Vivienda, no se queda sin clasificar', () => {
+    const r = fns._classifyLocal('Agua', 'expense');
+    expect(r.category).toBe('Vivienda');
+  });
+
+  test('9. "Dia" a secas → Alimentación (mismo problema de margen que "Agua")', () => {
+    const r = fns._classifyLocal('Dia', 'expense');
+    expect(r.category).toBe('Alimentación');
+  });
+
+  test('el padding de margen no genera falsos positivos: "Paraguas Decathlon" no cae en Vivienda', () => {
+    const r = fns._classifyLocal('Paraguas Decathlon', 'expense');
+    expect(r.category).not.toBe('Vivienda');
+  });
+
   test('10. Comercio totalmente desconocido → Sin clasificar, no inventa', () => {
     const r = fns._classifyLocal('XZQVK Comercio Inexistente 999', 'expense');
     expect(r.category).toBe(fns.UNCLASSIFIED_CATEGORY);

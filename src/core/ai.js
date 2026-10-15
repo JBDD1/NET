@@ -351,6 +351,52 @@ function _buildFiscalContextLine() {
     const net = sales.reduce((s, v) => s + (v.sellPrice - v.buyPrice) * v.quantity, 0);
     parts.push(`${sales.length} venta(s) ${year}, resultado ${net >= 0 ? '+' : ''}${formatCurrency(net)}`);
   }
+
+  // Resultado final de la declaración (a pagar / a devolver), replicando
+  // renderResumenIRPF() (fiscal.js). Antes la IA solo recibía el salario
+  // bruto y las retenciones sueltas, y tenía que recalcular ella misma los
+  // tramos de IRPF, la reducción por rendimientos del trabajo y el mínimo
+  // personal para responder "¿cuánto me van a devolver?" — justo el tipo de
+  // cálculo donde un LLM puede inventarse un número con total confianza.
+  // Guardado tras typeof: fiscal.js se carga perezosamente y solo si el
+  // usuario ya visitó Fiscalidad estarán disponibles estas funciones: si no,
+  // se omite esta línea y el contexto queda igual que antes (solo inputs).
+  if (bruto > 0 &&
+      typeof calcReduccionTrabajo === 'function' && typeof calcIRPFGeneral === 'function' &&
+      typeof calcMinimosTotal === 'function'      && typeof calcIRPF === 'function') {
+    const dietas     = parseFloat(t.dietas) || 0;
+    const sindicatos = parseFloat(t.sindicatos) || 0;
+    const otros      = parseFloat(t.otrosGastos) || 0;
+    const ss         = parseFloat(t.seguridadSocial) || 0;
+    const retenTrab  = parseFloat(t.retencionEmpresa) || 0;
+
+    const rendNeto    = bruto - ss - dietas - sindicatos - otros;
+    const baseGeneral = Math.max(rendNeto - calcReduccionTrabajo(rendNeto), 0);
+    const minimoTotal = calcMinimosTotal(APP.minimos || {});
+    const cuotaGeneralNeta = Math.max(calcIRPFGeneral(baseGeneral) - calcIRPFGeneral(minimoTotal), 0);
+
+    const FREQ_MULT  = { annual: 1, semiannual: 2, quarterly: 4, monthly: 12 };
+    const annualDivs = (APP.dividends || []).reduce((s, d) =>
+      s + d.dividendPerShare * d.shares * (FREQ_MULT[d.frequency] || 1) * (typeof _divFxRate === 'function' ? _divFxRate(d) : 1), 0);
+    const retenDivs  = (APP.dividends || []).reduce((s, d) =>
+      s + d.dividendPerShare * d.shares * (FREQ_MULT[d.frequency] || 1) * (typeof _divFxRate === 'function' ? _divFxRate(d) : 1) * ((d.retentionRate ?? 19) / 100), 0);
+    const gainsAhorro  = sales.reduce((s, v) => { const r = (v.sellPrice - v.buyPrice) * v.quantity; return r > 0 ? s + r : s; }, 0);
+    const violatingIds = typeof _findTwoMonthsViolations === 'function'
+      ? new Set(_findTwoMonthsViolations(sales).map(v => v.id)) : new Set();
+    const lossesAhorro = sales.reduce((s, v) => {
+      const r = (v.sellPrice - v.buyPrice) * v.quantity;
+      if (r >= 0 || violatingIds.has(v.id)) return s;
+      return s + Math.abs(r);
+    }, 0);
+    const netCapGains = gainsAhorro - lossesAhorro;
+    const baseAhorro  = netCapGains >= 0
+      ? netCapGains + Math.max(annualDivs, 0)
+      : Math.max(Math.max(annualDivs, 0) - Math.min(Math.abs(netCapGains), 0.25 * Math.max(annualDivs, 0)), 0);
+
+    const resultado = (cuotaGeneralNeta + calcIRPF(Math.max(baseAhorro, 0))) - (retenTrab + retenDivs);
+    parts.push(`resultado estimado de la declaración: ${resultado > 0 ? formatCurrency(resultado) + ' a pagar' : formatCurrency(Math.abs(resultado)) + ' a devolver'}`);
+  }
+
   return parts.length ? `\nFiscal ${year}: ${parts.join(', ')}` : '';
 }
 

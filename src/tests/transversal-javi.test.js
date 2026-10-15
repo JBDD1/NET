@@ -205,6 +205,51 @@ describe('Flujo 1 — el contexto que recibe el Asesor IA', () => {
   });
 });
 
+/* ── Contexto del Asesor IA CON fiscal.js cargado (usuario que ya visitó
+   Fiscalidad) — _buildFiscalContextLine() antes solo mandaba el salario
+   bruto y las retenciones sueltas: para responder "¿cuánto me van a
+   devolver?" la IA tenía que recalcular ella misma los tramos de IRPF, la
+   reducción por rendimientos del trabajo y el mínimo personal — justo el
+   tipo de cálculo que un LLM puede acertar o inventarse con la misma
+   confianza. fiscal.js se carga perezosamente y solo si el usuario ya
+   visitó esa sección sus funciones están disponibles (ver el guard con
+   typeof en _buildFiscalContextLine) — este describe simula ese caso. */
+describe('Flujo 1b — contexto fiscal con fiscal.js ya cargado', () => {
+  const FISCAL = fs.readFileSync(path.join(process.cwd(), 'src/sections/fiscal.js'), 'utf8');
+
+  function loadWithFiscal() {
+    const ctx = load(); // reutiliza el setup normal (ya corrido por beforeEach)
+    vm.runInContext(FISCAL, ctx, { filename: 'fiscal.js' });
+    fns = vm.runInContext(`({
+      searchAll, MILESTONES, BACKUP_ARRAYS, BACKUP_ALLOWED_KEYS, validateBackup,
+      buildFinancialContext, buildFinancialSnapshot, _buildFiscalContextLine,
+      calcNetWorth, _calcGoalProgress, _invalidateCalcCache,
+      calcReduccionTrabajo, calcIRPFGeneral, calcMinimosTotal, calcIRPF, _findTwoMonthsViolations,
+    })`, ctx);
+    APP = vm.runInContext('APP', ctx);
+    return ctx;
+  }
+
+  test('con fiscal.js cargado, el contexto incluye el resultado final calculado (no solo los inputs sueltos)', () => {
+    loadWithFiscal();
+    // Mismo escenario de Javi (32.000 € bruto, SS 2.032 €, sin hijos, sin
+    // ventas ni dividendos este fixture) — resultado ya verificado en
+    // goals-fiscal-javi.test.js: 1.301,40 € a pagar vía calcIRPFGeneral +
+    // calcIRPF + calcMinimosTotal reales, no un número inventado aquí.
+    const ctx = fns.buildFinancialContext();
+    expect(ctx).toContain('resultado estimado de la declaración');
+    expect(ctx).toMatch(/resultado estimado de la declaración: [\d.,]+ a (pagar|devolver)/);
+    expect(ctx).toContain('1301.4 a pagar'); // verificado con precisión en goals-fiscal-javi.test.js
+  });
+
+  test('sin fiscal.js cargado (el caso normal, visto arriba), esa línea no aparece — degrada sin romperse', () => {
+    load(); // el loader normal del archivo, SIN fiscal.js
+    const ctx = fns.buildFinancialContext();
+    expect(ctx).not.toContain('resultado estimado de la declaración');
+    expect(ctx).toContain('salario bruto 32000'); // el resto del contexto sigue intacto
+  });
+});
+
 /* ── Flujo 8: búsqueda global ─────────────────────────────────── */
 describe('Flujo 8 — búsqueda global (Ctrl+K)', () => {
   const titles = q => fns.searchAll(q).map(r => r.title);

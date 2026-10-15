@@ -99,7 +99,13 @@ function renderGoals() {
 
   grid.innerHTML = sortedGoals.map(g => {
     const effectiveAmount = _calcGoalProgress(g, txByCategory);
-    const pct       = g.targetAmount > 0 ? Math.min((effectiveAmount / g.targetAmount) * 100, 100) : 0;
+    // Un objetivo vinculado al patrimonio neto total (FIRE) con patrimonio
+    // negativo (deuda > activos, normal al principio de una hipoteca) daba un
+    // "% completado" negativo sin acotar — y al pintar la barra con
+    // width:-20% el navegador la deja en 0%, así que el texto decía "-20,2%"
+    // junto a una barra que parecía estar al 0%, una combinación confusa sin
+    // ser técnicamente un NaN ni un crash.
+    const pct       = g.targetAmount > 0 ? Math.max(0, Math.min((effectiveAmount / g.targetAmount) * 100, 100)) : 0;
     const remaining = g.targetAmount - effectiveAmount;
     // Un objetivo con la fecha límite ya pasada y sin completar solo mostraba
     // "Fecha límite: <fecha pasada>", sin ninguna señal de que había vencido.

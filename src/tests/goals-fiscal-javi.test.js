@@ -320,6 +320,33 @@ describe('Flujos 5-6 — IRPF base general (trabajo) 2024', () => {
   });
 });
 
+/* ── Objetivo FIRE con patrimonio negativo (hipoteca recién abierta) ──── */
+describe('Objetivo vinculado al patrimonio neto, con patrimonio negativo', () => {
+  test('_calcGoalProgress() devuelve el patrimonio neto real (negativo) sin acotar — es el valor correcto para los €', () => {
+    APP.liabilities.push({ id: 'hip', name: 'Hipoteca', originalAmount: 187000, remainingAmount: 187000, monthlyPayment: 780, interestRate: 2.8 });
+    const nw = fns.calcNetWorth();
+    expect(nw).toBeLessThan(0); // la deuda nueva supera los activos — normal al abrir una hipoteca
+    const progress = fns._calcGoalProgress({ linkedAccount: fns.GOAL_LINK_NETWORTH });
+    expect(progress).toBe(nw); // el importe en € mostrado SÍ debe ser el real, negativo incluido
+  });
+
+  // renderGoals() (goals.js) calcula el "% completado" con
+  // Math.max(0, Math.min((effectiveAmount/targetAmount)*100, 100)) — antes
+  // solo tenía el Math.min (tope en 100%) sin acotar por abajo, así que un
+  // patrimonio negativo daba un "% completado" negativo (p.ej. -20,2%) sin
+  // ser NaN ni romper nada, pero sin sentido para el usuario: un objetivo no
+  // puede estar "completado al -20%". Se replica aquí la fórmula exacta
+  // (no está extraída en una función propia) para no perder la cobertura.
+  test('el "% completado" mostrado se acota en 0%, no en el valor negativo real', () => {
+    APP.liabilities.push({ id: 'hip', name: 'Hipoteca', originalAmount: 187000, remainingAmount: 187000, monthlyPayment: 780, interestRate: 2.8 });
+    const effectiveAmount = fns.calcNetWorth();
+    const targetAmount    = 800000;
+    expect(effectiveAmount).toBeLessThan(0);
+    const pct = targetAmount > 0 ? Math.max(0, Math.min((effectiveAmount / targetAmount) * 100, 100)) : 0;
+    expect(pct).toBe(0);
+  });
+});
+
 /* ── Regla de los 2 meses: excluida de la base, no solo avisada ── */
 describe('Regla de los 2 meses (art. 33.5.f/g LIRPF)', () => {
   const ventaConPerdida = (overrides = {}) => ({
