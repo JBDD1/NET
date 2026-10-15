@@ -409,15 +409,10 @@
         <span class="topbar-search-label">Buscar</span>
         <kbd class="topbar-kbd">Ctrl K</kbd>
       </button>
-      <button type="button" class="topbar-bell-btn" id="btnNotifBell" data-action="open-notifications" title="Notificaciones y alertas" aria-haspopup="dialog">
-        <svg class="icon icon-sm" aria-hidden="true"><use href="#icon-bell"/></svg>
-        <span class="topbar-bell-badge" id="topbarBellBadge" style="display:none">0</span>
-      </button>
       <button type="button" class="topbar-privacy-btn" id="btnPrivacy" data-action="toggle-privacy" aria-keyshortcuts="p" title="Ocultar valores (P)">
         <span id="privacyIcon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-eye"/></svg></span>
         <span class="topbar-search-label" id="privacyLabel">Privacidad</span>
       </button>
-      <button type="button" class="topbar-kbd-hint" data-action="show-keyboard-help" title="Atajos de teclado (?)">?</button>
       <button type="button" class="topbar-devmode-btn" id="btnDevMode" style="display:none"
         title="Dev mode">DEV</button>
       <span class="current-date" id="currentDate"></span>
@@ -1865,9 +1860,16 @@
 
       <!-- Asesor IA -->
       <div class="card">
-        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-sparkles"/></svg> Asesor IA — API Keys</h3>
+        <details class="settings-collapsible">
+          <summary class="settings-collapsible-summary">
+            <div>
+              <div class="settings-section-label" style="margin:0"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-sparkles"/></svg> Asesor IA — API Keys</div>
+              <p style="font-size:12px;color:var(--text-muted);margin:4px 0 0">Las claves se guardan solo en tu dispositivo. Configura los proveedores que quieras usar.</p>
+            </div>
+            <svg class="icon icon-sm settings-collapsible-chevron" aria-hidden="true"><use href="#icon-chevron-right"/></svg>
+          </summary>
+          <div style="margin-top:12px">
         <div id="settings-server-ai-banner" style="display:none;font-size:12px;border-radius:var(--r-sm);padding:8px 12px;margin-bottom:16px"></div>
-        <p style="font-size:12px;color:var(--text-muted);margin-bottom:20px">Las claves se guardan solo en tu dispositivo. Configura los proveedores que quieras usar.</p>
 
         <div class="settings-ai-key-row">
           <div class="settings-ai-key-label">
@@ -1916,6 +1918,8 @@
             <button class="btn-primary" id="btnSaveGroqKey" style="white-space:nowrap">Guardar</button>
           </div>
         </div>
+          </div>
+        </details>
       </div>
 
       <!-- Backup -->
@@ -1998,28 +2002,32 @@
 
       <!-- Atajos de teclado -->
       <div class="card">
-        <h3 class="card-title">⌨️ Atajos de teclado</h3>
-        <div class="kbd-help-grid" style="margin-top:8px">
-          <div>
-            <div class="kbd-help-section-title">Navegación</div>
-            <div class="kbd-help-row"><kbd>⌘K</kbd><span>Búsqueda global</span></div>
-            <div class="kbd-help-row"><kbd>G</kbd><span>Ir al dashboard</span></div>
-            <div class="kbd-help-row"><kbd>Esc</kbd><span>Cerrar / cancelar</span></div>
-            <div class="kbd-help-row"><kbd>⌘↵</kbd><span>Confirmar formulario</span></div>
+        <details class="settings-collapsible">
+          <summary class="settings-collapsible-summary">
+            <div class="settings-section-label" style="margin:0">⌨️ Atajos de teclado</div>
+            <svg class="icon icon-sm settings-collapsible-chevron" aria-hidden="true"><use href="#icon-chevron-right"/></svg>
+          </summary>
+          <div class="kbd-help-grid" style="margin-top:12px">
+            <div>
+              <div class="kbd-help-section-title">Navegación</div>
+              <div class="kbd-help-row"><kbd>⌘K</kbd><span>Búsqueda global</span></div>
+              <div class="kbd-help-row"><kbd>G</kbd><span>Ir al dashboard</span></div>
+              <div class="kbd-help-row"><kbd>Esc</kbd><span>Cerrar / cancelar</span></div>
+              <div class="kbd-help-row"><kbd>⌘↵</kbd><span>Confirmar formulario</span></div>
+            </div>
+            <div>
+              <div class="kbd-help-section-title">Crear</div>
+              <div class="kbd-help-row"><kbd>N</kbd><span>Nueva transacción</span></div>
+              <div class="kbd-help-row"><kbd>I</kbd><span>Nueva inversión</span></div>
+            </div>
+            <div>
+              <div class="kbd-help-section-title">Vista</div>
+              <div class="kbd-help-row"><kbd>T</kbd><span>Cambiar tema claro/oscuro</span></div>
+              <div class="kbd-help-row"><kbd>P</kbd><span>Activar / desactivar privacidad</span></div>
+              <div class="kbd-help-row"><kbd>/</kbd><span>Buscar transacciones</span></div>
+            </div>
           </div>
-          <div>
-            <div class="kbd-help-section-title">Crear</div>
-            <div class="kbd-help-row"><kbd>N</kbd><span>Nueva transacción</span></div>
-            <div class="kbd-help-row"><kbd>I</kbd><span>Nueva inversión</span></div>
-          </div>
-          <div>
-            <div class="kbd-help-section-title">Vista</div>
-            <div class="kbd-help-row"><kbd>T</kbd><span>Cambiar tema claro/oscuro</span></div>
-            <div class="kbd-help-row"><kbd>P</kbd><span>Activar / desactivar privacidad</span></div>
-            <div class="kbd-help-row"><kbd>/</kbd><span>Buscar transacciones</span></div>
-            <div class="kbd-help-row"><kbd>?</kbd><span>Mostrar atajos de teclado</span></div>
-          </div>
-        </div>
+        </details>
       </div>
 
       <!-- Panel de administrador (solo visible para admins) -->
@@ -2256,7 +2264,7 @@
         <span><kbd>↵</kbd> abrir</span>
         <span><kbd>Esc</kbd> cerrar</span>
         <span class="search-footer-sep">·</span>
-        <span><kbd>N</kbd> transacción &nbsp;<kbd>I</kbd> inversión &nbsp;<kbd>G</kbd> dashboard &nbsp;<kbd>P</kbd> privacidad &nbsp;<kbd>?</kbd> atajos</span>
+        <span><kbd>N</kbd> transacción &nbsp;<kbd>I</kbd> inversión &nbsp;<kbd>G</kbd> dashboard &nbsp;<kbd>P</kbd> privacidad</span>
       </div>
     </div>
   </div>

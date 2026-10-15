@@ -278,35 +278,6 @@ function _scheduleToastDismiss(toast, type, customDuration) {
   };
 }
 
-function showKeyboardHelp() {
-  openModal('Atajos de teclado', `
-    <div class="kbd-help-grid">
-      <div>
-        <div class="kbd-help-section-title">Navegación</div>
-        <div class="kbd-help-row"><kbd>⌘K</kbd><span>Búsqueda global</span></div>
-        <div class="kbd-help-row"><kbd>G</kbd><span>Ir al dashboard</span></div>
-        <div class="kbd-help-row"><kbd>Esc</kbd><span>Cerrar / cancelar</span></div>
-        <div class="kbd-help-row"><kbd>⌘↵</kbd><span>Confirmar formulario</span></div>
-      </div>
-      <div>
-        <div class="kbd-help-section-title">Crear</div>
-        <div class="kbd-help-row"><kbd>N</kbd><span>Nueva transacción</span></div>
-        <div class="kbd-help-row"><kbd>I</kbd><span>Nueva inversión</span></div>
-      </div>
-      <div>
-        <div class="kbd-help-section-title">Vista</div>
-        <div class="kbd-help-row"><kbd>T</kbd><span>Cambiar tema claro/oscuro</span></div>
-        <div class="kbd-help-row"><kbd>P</kbd><span>Activar / desactivar privacidad</span></div>
-        <div class="kbd-help-row"><kbd>/</kbd><span>Buscar transacciones</span></div>
-        <div class="kbd-help-row"><kbd>?</kbd><span>Mostrar atajos de teclado</span></div>
-      </div>
-    </div>
-  `, null, () => {
-    const footer = document.getElementById('modal')?.querySelector('.modal-footer');
-    if (footer) footer.style.display = 'none';
-  });
-}
-
 /* ═══════════════════════════════════════════════════════════════
    17. TEMA
 ═══════════════════════════════════════════════════════════════ */
@@ -840,9 +811,8 @@ async function init() {
     // Ctrl/Cmd+K → búsqueda global
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); openSearch(); return; }
 
-    // Atajos de letra (sin modificadores — excepto ? que requiere Shift)
+    // Atajos de letra (sin modificadores)
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key === '?') { e.preventDefault(); showKeyboardHelp(); return; }
     if (e.key === '/') {
       const searchEl = document.getElementById('tx-filter-search');
       if (searchEl && APP.activeSection === SECTIONS.TRANSACTIONS) {
@@ -1126,7 +1096,6 @@ function _globalClickDispatch(e) {
     case 'toggle-theme-btn':           e.stopPropagation(); toggleTheme(); break;
     case 'download-backup-btn':        e.stopPropagation(); downloadBackup(); break;
     case 'open-search':                openSearch(); break;
-    case 'open-notifications':         openNotificationsManager(); break;
     case 'toggle-privacy':             togglePrivacy(); break;
     // Dashboard
     case 'export-monthly-pdf':         _withPdf('exportMonthlyPDF', el); break;
@@ -1198,7 +1167,6 @@ function _globalClickDispatch(e) {
     case 'webhook-export-full':        exportViaWebhook('full'); break;
     case 'webhook-export-month':       exportViaWebhook('month'); break;
     case 'show-onboarding':            _ensureScript('./src/utils/onboarding.js').then(() => showOnboarding()).catch(err => console.warn('[Finova] No se pudo cargar onboarding.js:', err.message)); break;
-    case 'show-keyboard-help':         showKeyboardHelp(); break;
     case 'start-tour':                 _ensureScript('./src/utils/onboarding.js').then(() => obStartTour()).catch(err => console.warn('[Finova] No se pudo cargar onboarding.js:', err.message)); break;
     case 'run-tests':                  _ensureScript('./src/utils/tests.js').then(() => runTests()).catch(err => console.warn('[Finova] No se pudo cargar tests.js:', err.message)); break;
     case 'clear-photo-backups':        clearPhotoBackups(); break;

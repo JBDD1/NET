@@ -2235,23 +2235,8 @@ function openRule5030Settings() {
   );
 }
 
-// Badge de la campana en la topbar — independiente de #dash-alerts-container
-// (que vive en la sección Dashboard) para que el contador sea correcto
-// aunque el usuario esté en cualquier otra sección. #dash-alerts-container
-// es marcado estático en index.html (nunca se destruye al navegar), así
-// que calcAlerts() ya se recalculaba igual estando o no en el Dashboard;
-// esto solo añade el reflejo visual en la campana.
-function updateNotifBellBadge(alerts) {
-  const badge = document.getElementById('topbarBellBadge');
-  if (!badge) return;
-  const n = (alerts || calcAlerts()).length;
-  badge.textContent = n > 99 ? '99+' : String(n);
-  badge.style.display = n > 0 ? '' : 'none';
-}
-
 function renderDashboardAlerts() {
   const alerts = calcAlerts();
-  updateNotifBellBadge(alerts);
   const el = document.getElementById('dash-alerts-container');
   if (!el) return;
   if (!alerts.length) { el.innerHTML = ''; return; }

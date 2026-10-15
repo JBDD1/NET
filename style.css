@@ -5587,50 +5587,7 @@ input[type="date"], input[type="month"] { color-scheme: light; }
 }
 .topbar-privacy-btn:hover { border-color: var(--border-strong); color: var(--text-primary); }
 
-/* Campana de notificaciones — mismo lenguaje visual que .topbar-privacy-btn
-   pero cuadrado (solo icono) para poder anclarle el badge en la esquina. */
-.topbar-bell-btn {
-  position: relative;
-  display: flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--r-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition);
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-.topbar-bell-btn:hover { border-color: var(--border-strong); color: var(--text-primary); }
-.topbar-bell-badge {
-  position: absolute; top: -5px; right: -5px;
-  min-width: 16px; height: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
-  background: var(--down);
-  border: 2px solid var(--bg-surface);
-  color: #fff;
-  font-size: 9px; font-weight: 700;
-  line-height: 12px;
-  text-align: center;
-}
 @media (max-width: 768px) { .topbar-privacy-btn .topbar-search-label { display: none; } }
-.topbar-kbd-hint {
-  width: 26px; height: 26px;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-default);
-  border-radius: var(--r-sm);
-  font-size: 13px; font-weight: 600;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all var(--transition);
-  margin-right: 8px;
-  flex-shrink: 0;
-}
-.topbar-kbd-hint:hover { border-color: var(--accent); color: var(--accent); }
-@media (max-width: 768px) { .topbar-kbd-hint { display: none; } }
 
 /* ═══════════════════════════════════════════════════════════════
    ONBOARDING — flujo de bienvenida premium
