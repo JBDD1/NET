@@ -2494,6 +2494,7 @@ ul  { list-style: none; }
 .dash-blocks-container {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-flow: dense; /* rellena huecos: p.ej. S+L o M+M caben en la misma fila aunque no sumen 4 en ese orden exacto */
   gap: var(--gap);
 }
 .dash-block { min-width: 0; position: relative; }
