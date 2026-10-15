@@ -72,7 +72,7 @@ function load() {
   fns = vm.runInContext(`({
     _calcGoalProgress, GOAL_LINK_NETWORTH, calcNetWorth, calcCashTotal,
     calcIRPF, calcIRPFGeneral, calcReduccionTrabajo, IRPF_TRAMOS, IRPF_GENERAL,
-    _invalidateCalcCache,
+    _invalidateCalcCache, _findTwoMonthsViolations, calcMinimosTotal,
   })`, ctx);
   APP = vm.runInContext('APP', ctx);
   return ctx;
@@ -237,11 +237,24 @@ describe('Flujos 5-6 — IRPF base general (trabajo) 2024', () => {
     expect(fns.calcReduccionTrabajo(14852)).toBe(7302);
   });
 
-  test('reducción decreciente entre 14.852 € y 19.747,50 €', () => {
+  test('reducción decreciente entre 14.852 € y 17.673,52 € (pendiente 1,75)', () => {
     expect(fns.calcReduccionTrabajo(16000)).toBeCloseTo(7302 - 1.75 * (16000 - 14852), 6);
-    // se agota en 14.852 + 7.302/1,75 = 19.024,57 €, no al llegar a 19.747,50
-    expect(fns.calcReduccionTrabajo(19000)).toBeCloseTo(43, 0);
-    expect(fns.calcReduccionTrabajo(19500)).toBe(0);   // pasado el punto de corte
+    // en el propio punto de corte, el primer tramo (1,75) debe dar 2.364,34 €,
+    // el mismo valor donde arranca el segundo tramo (1,14) — sin salto
+    expect(fns.calcReduccionTrabajo(17673.52)).toBeCloseTo(2364.34, 2);
+  });
+
+  test('reducción decreciente entre 17.673,52 € y 19.747,50 € (pendiente 1,14 — AEAT manual práctico IRPF 2024)', () => {
+    // RDL 4/2024: tercer tramo con pendiente distinta (1,14, no 1,75) —
+    // antes de este fix se aplicaba 1,75 en todo el rango, dando 43 € en vez
+    // de los 852,15 € reales para una renta de 19.000 €.
+    expect(fns.calcReduccionTrabajo(19000)).toBeCloseTo(852.15, 2);
+    expect(fns.calcReduccionTrabajo(19747.5)).toBeCloseTo(0, 2);
+    expect(fns.calcReduccionTrabajo(19500)).toBeCloseTo(2364.34 - 1.14 * (19500 - 17673.52), 6);
+  });
+
+  test('por encima de 19.747,50 € la reducción es 0', () => {
+    expect(fns.calcReduccionTrabajo(19748)).toBe(0);
     expect(fns.calcReduccionTrabajo(25000)).toBe(0);
   });
 
@@ -268,6 +281,90 @@ describe('Flujos 5-6 — IRPF base general (trabajo) 2024', () => {
     // Es distinto (y menor) que restar el mínimo de la base directamente
     expect(cuotaNeta).not.toBeCloseTo(fns.calcIRPFGeneral(baseGeneral - minimo), 2);
     expect(cuotaNeta).toBeGreaterThan(0);
+  });
+
+  // Resultado final de Javi replicando exactamente renderResumenIRPF() —
+  // 1.301,40 € a pagar, NO 3.170,60 €. La diferencia no es un bug: viene de
+  // aplicar el método oficial del art. 63.1.2º LIRPF (escala sobre la base
+  // completa 29.968 €, escala sobre el mínimo 5.550 €, y restar — verificado
+  // contra INEAF/Agencia Tributaria), en vez de restar el mínimo de la base
+  // ANTES de aplicar tramos (24.416 €, el método "a mano" más intuitivo pero
+  // incorrecto: grava el mínimo como si cayera en el tramo marginal más alto
+  // en vez de en los tramos más bajos). Separado de eso, Finova usa una única
+  // escala general nacional (19/24/30/37/45/47 %) en vez de partir estatal +
+  // autonómica por comunidad — no hay selector de CCAA en el modelo de datos,
+  // así que un resultado específico de Madrid (que si separa ambas escalas)
+  // no es replicable sin esa función, que no existe todavía.
+  test('resultado completo de Javi (32.000 € bruto, Madrid) = 1.301,40 € a pagar — no 3.170,60 €', () => {
+    const rendNeto    = 32000 - 2032; // 29.968
+    const reduccion   = fns.calcReduccionTrabajo(rendNeto);
+    const baseGeneral = Math.max(rendNeto - reduccion, 0);
+    const minimoTotal = fns.calcMinimosTotal({});
+    expect(minimoTotal).toBe(5550);
+
+    const cuotaGeneralNeta = Math.max(
+      fns.calcIRPFGeneral(baseGeneral) - fns.calcIRPFGeneral(minimoTotal), 0
+    );
+    expect(cuotaGeneralNeta).toBeCloseTo(6101.40, 2);
+
+    const annualDivs  = 0.36 * 50 * 4; // dividendo KO del fixture — 72 €
+    const cuotaAhorro = fns.calcIRPF(annualDivs);
+    expect(cuotaAhorro).toBeCloseTo(13.68, 2);
+
+    const cuotaTotal        = cuotaGeneralNeta + cuotaAhorro;
+    const totalRetenciones  = 4800 + annualDivs * 0.19; // retención empresa + retención dividendo
+    const resultado         = cuotaTotal - totalRetenciones;
+
+    expect(resultado).toBeCloseTo(1301.40, 2);
+    expect(resultado).not.toBeCloseTo(3170.60, 2);
+  });
+});
+
+/* ── Regla de los 2 meses: excluida de la base, no solo avisada ── */
+describe('Regla de los 2 meses (art. 33.5.f/g LIRPF)', () => {
+  const ventaConPerdida = (overrides = {}) => ({
+    id: 'v1', ticker: 'VWRL', buyPrice: 90, sellPrice: 80, quantity: 10,
+    sellDate: '2024-06-15', ...overrides,
+  });
+
+  test('venta con pérdida + mismo ticker recomprado a los 30 días → violación detectada', () => {
+    APP.portfolio.push({ id: 'vwrl2', ticker: 'VWRL', buyDate: '2024-07-15', quantity: 5, buyPrice: 85, currentPrice: 85 });
+    const v = ventaConPerdida();
+    expect(fns._findTwoMonthsViolations([v]).map(x => x.id)).toEqual(['v1']);
+  });
+
+  test('venta con pérdida + recompra a los 90 días (fuera de ventana) → sin violación', () => {
+    APP.portfolio.push({ id: 'vwrl2', ticker: 'VWRL', buyDate: '2024-09-13', quantity: 5, buyPrice: 85, currentPrice: 85 });
+    const v = ventaConPerdida();
+    expect(fns._findTwoMonthsViolations([v])).toEqual([]);
+  });
+
+  test('venta con pérdida pero ticker ya no está en cartera → sin violación', () => {
+    const v = ventaConPerdida(); // APP.portfolio (fixture) no tiene VWRL con esa buyDate
+    expect(fns._findTwoMonthsViolations([v]).length).toBe(0);
+  });
+
+  test('venta con GANANCIA nunca cuenta como violación, aunque se recompre al día siguiente', () => {
+    APP.portfolio.push({ id: 'vwrl2', ticker: 'VWRL', buyDate: '2024-06-16', quantity: 5, buyPrice: 85, currentPrice: 85 });
+    const v = ventaConPerdida({ sellPrice: 120 }); // ganancia, no pérdida
+    expect(fns._findTwoMonthsViolations([v])).toEqual([]);
+  });
+
+  test('la pérdida excluida no debe restar de la base del ahorro (misma cuenta que haría renderFiscalidad)', () => {
+    APP.portfolio.push({ id: 'vwrl2', ticker: 'VWRL', buyDate: '2024-07-01', quantity: 5, buyPrice: 85, currentPrice: 85 });
+    const sales = [
+      ventaConPerdida(),                                    // −100 €, violación → NO deducible
+      { id: 'v2', ticker: 'ITX', buyPrice: 30, sellPrice: 50, quantity: 10, sellDate: '2024-03-01' }, // +200 €, ganancia normal
+    ];
+    const violatingIds = new Set(fns._findTwoMonthsViolations(sales).map(v => v.id));
+    const gains  = sales.reduce((s, v) => { const r = (v.sellPrice - v.buyPrice) * v.quantity; return r > 0 ? s + r : s; }, 0);
+    const losses = sales.reduce((s, v) => {
+      const r = (v.sellPrice - v.buyPrice) * v.quantity;
+      if (r >= 0 || violatingIds.has(v.id)) return s;
+      return s + Math.abs(r);
+    }, 0);
+    expect(gains).toBe(200);
+    expect(losses).toBe(0); // la única pérdida está excluida por la regla de los 2 meses
   });
 });
 

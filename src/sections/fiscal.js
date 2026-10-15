@@ -56,9 +56,16 @@ function renderFiscalidad() {
     const res = (v.sellPrice - v.buyPrice) * v.quantity;
     return res > 0 ? s + res : s;
   }, 0);
+  // Pérdidas DEDUCIBLES: excluye las afectadas por la regla de los 2 meses
+  // (art. 33.5.f/g LIRPF — ver _findTwoMonthsViolations). El total bruto de
+  // pérdidas sigue mostrándose tal cual en la tabla de ventas (es un registro
+  // de lo ocurrido, no de lo deducible); solo la base imponible, la cuota y
+  // el resultado final deben excluir estas pérdidas no deducibles este año.
+  const twoMonthsViolationIds = new Set(_findTwoMonthsViolations(sales).map(v => v.id));
   const losses = sales.reduce((s, v) => {
     const res = (v.sellPrice - v.buyPrice) * v.quantity;
-    return res < 0 ? s + Math.abs(res) : s;
+    if (res >= 0 || twoMonthsViolationIds.has(v.id)) return s;
+    return s + Math.abs(res);
   }, 0);
 
   // Dividendos del año (retención variable por activo)
@@ -368,6 +375,25 @@ function renderFiscalDividends(annual, retention) {
   `;
 }
 
+// Ventas con pérdida afectadas por la regla de los 2 meses (art. 33.5.f/g
+// LIRPF): el mismo ticker recomprado en los ±60 días de la venta y seguido en
+// cartera a día de hoy. Extraída de renderTwoMonthsRule() para que
+// renderFiscalidad() pueda EXCLUIR esa pérdida del cálculo real (antes solo
+// se avisaba aquí, pero el importe seguía restando de la base del ahorro:
+// el resultado "a pagar"/"a devolver" quedaba mejor de lo que Hacienda
+// realmente permitiría, el peor tipo de error en una app financiera).
+function _findTwoMonthsViolations(sales) {
+  const lossySales = sales.filter(v => (v.sellPrice - v.buyPrice) * v.quantity < 0);
+  return lossySales.filter(v => {
+    const sellTs = new Date(v.sellDate + 'T00:00:00').getTime();
+    return APP.portfolio.some(a => {
+      if (a.ticker.toUpperCase() !== v.ticker.toUpperCase() || !a.buyDate) return false;
+      const buyTs = new Date(a.buyDate + 'T00:00:00').getTime();
+      return Math.abs(buyTs - sellTs) / 86400000 <= 60;
+    });
+  });
+}
+
 /** Regla de los 2 meses */
 function renderTwoMonthsRule(sales) {
   const el = document.getElementById('fisc-two-months');
@@ -380,19 +406,7 @@ function renderTwoMonthsRule(sales) {
     return;
   }
 
-  // Comprobar si algún activo vendido con pérdida se recompró dentro de la
-  // ventana real de ±2 meses (60 días) de la venta — antes avisaba con solo
-  // tenerlo en cartera actualmente, sin mirar la fecha de recompra, así que
-  // una recompra legítima años después seguía disparando el aviso para
-  // siempre.
-  const warnings = lossySales.filter(v => {
-    const sellTs = new Date(v.sellDate + 'T00:00:00').getTime();
-    return APP.portfolio.some(a => {
-      if (a.ticker.toUpperCase() !== v.ticker.toUpperCase() || !a.buyDate) return false;
-      const buyTs = new Date(a.buyDate + 'T00:00:00').getTime();
-      return Math.abs(buyTs - sellTs) / 86400000 <= 60;
-    });
-  });
+  const warnings = _findTwoMonthsViolations(sales);
 
   if (warnings.length === 0) {
     el.innerHTML = `
@@ -405,9 +419,10 @@ function renderTwoMonthsRule(sales) {
   } else {
     el.innerHTML = warnings.map(v => `
       <div class="fisc-alert fisc-alert-warning">
-        <strong>⚠ Atención con ${escapeHtml(v.ticker)}:</strong> 
-        Vendiste con pérdida el ${formatDate(v.sellDate)} y actualmente tienes este activo en cartera. 
-        Hacienda puede no permitirte deducir la pérdida de ${formatCurrency(Math.abs((v.sellPrice - v.buyPrice) * v.quantity))}.
+        <strong>⚠ Atención con ${escapeHtml(v.ticker)}:</strong>
+        Vendiste con pérdida el ${formatDate(v.sellDate)} y actualmente tienes este activo en cartera.
+        Hacienda no te permite deducir esta pérdida de ${formatCurrency(Math.abs((v.sellPrice - v.buyPrice) * v.quantity))} este año —
+        ya se ha excluido del cálculo de tu base imponible y tu resultado final.
       </div>
     `).join('');
   }
@@ -794,23 +809,26 @@ function calcIRPFGeneral(base) {
   return tax;
 }
 
-// Reducción por obtención de rendimientos del trabajo (art. 20 LIRPF), con las
-// cifras VIGENTES EN 2024 (redacción del RDL 8/2023):
-//   · rendimiento neto ≤ 14.852 €                → 7.302 €
-//   · entre 14.852 € y 19.747,50 €               → 7.302 − 1,75 × (RN − 14.852)
-//   · ≥ 19.747,50 €                              → 0
-// Antes estaba con los importes DEROGADOS de antes de 2023 (5.565 € con cortes
-// en 13.115/16.825 y coeficiente 1,5), y además duplicados en renderTrabajo() y
-// en renderResumenIRPF(), con el riesgo de que divergieran. Eso no afectaba a
-// sueldos altos (la reducción es 0 en ambas versiones), pero a un sueldo
-// medio-bajo le recortaba la reducción y le inflaba la base imponible: con un
-// rendimiento neto de 14.000 €, 5.565 € en vez de 7.302 €, es decir 1.737 € más
-// de base tributando al 19-24 %.
+// Reducción por obtención de rendimientos del trabajo (art. 20 LIRPF), cifras
+// VIGENTES EN 2024 tras el RDL 4/2024, de 26 de junio (verificado contra la
+// Agencia Tributaria — sede.agenciatributaria.gob.es, manual práctico IRPF
+// 2024, apartado 7.1.6):
+//   · rendimiento neto ≤ 14.852 €                  → 7.302 €
+//   · 14.852,01 € – 17.673,52 €                    → 7.302 − 1,75 × (RN − 14.852)
+//   · 17.673,52 € – 19.747,50 €                    → 2.364,34 − 1,14 × (RN − 17.673,52)
+//   · ≥ 19.747,50 €                                → 0
+// Antes faltaba el tercer tramo (17.673,52–19.747,50 €, pendiente 1,14 en vez
+// de 1,75): la versión anterior aplicaba la pendiente de 1,75 en todo el rango
+// 14.852–19.747,50 de un tirón, lo que para una renta de 19.000 € daba una
+// reducción de solo 43 € en vez de los 852,15 € reales — 809 € de más de base
+// imponible tributando al 24-30 %. Para RN ≤ 17.673,52 € o ≥ 19.747,50 € el
+// resultado no cambia (ambos tramos ya eran correctos ahí).
 // (La ley exige además no tener otras rentas > 6.500 €; Finova no modela esa
-// condición, igual que antes de este cambio.)
+// condición.)
 function calcReduccionTrabajo(rendNeto) {
-  if (rendNeto <= 14852) return 7302;
-  if (rendNeto < 19747.5) return Math.max(0, 7302 - 1.75 * (rendNeto - 14852));
+  if (rendNeto <= 14852)   return 7302;
+  if (rendNeto <= 17673.52) return Math.max(0, 7302 - 1.75 * (rendNeto - 14852));
+  if (rendNeto < 19747.5)  return Math.max(0, 2364.34 - 1.14 * (rendNeto - 17673.52));
   return 0;
 }
 
