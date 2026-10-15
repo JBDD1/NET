@@ -26,6 +26,14 @@ const FIREBASE_CONFIG = {
 // Esta lista solo controla el badge de admin en el cliente.
 const ADMIN_EMAILS = ['MyFinova1@gmail.com'];
 
+// ─── Correos con el panel de monitorización de desarrollo ─────────
+// Solo en local (ver DEV_HOSTNAME_RE más abajo) y solo para estos correos —
+// nunca se carga en producción ni para el resto de usuarios. Lista aparte de
+// ADMIN_EMAILS a propósito: no todo admin tiene por qué querer este panel, y
+// mañana puede haber más de una persona depurando sin que eso implique rol admin.
+const DEV_MONITOR_EMAILS = ['myfinova1@gmail.com'];
+const DEV_HOSTNAME_RE = /^(localhost|127\.0\.0\.1)$/;
+
 // ─── Estado interno ───────────────────────────────────────────────
 let _fbAuth          = null;
 let _appInitialized  = false;
@@ -75,7 +83,9 @@ async function initAuth() {
       APP.userEmail = user.email || '';
       APP.userName  = APP.userName || user.displayName || '';
       APP.userPhoto = user.photoURL || '';
-      APP.isAdmin   = ADMIN_EMAILS.includes((user.email || '').toLowerCase());
+      APP.isAdmin   = ADMIN_EMAILS.some(e => e.toLowerCase() === (user.email || '').toLowerCase());
+
+      _maybeStartDevMonitor(user.email);
 
       // Persistir último UID para que el boot-script lea el tema correcto
       try { localStorage.setItem('finova_last_uid', user.uid); } catch (_) {}
@@ -100,6 +110,20 @@ async function initAuth() {
     console.error('[Finova Auth] Error al inicializar Firebase:', err);
     init(); // fallback sin auth
   }
+}
+
+// ─── Panel de monitorización de desarrollo (errores + métricas reales) ───
+// Carga perezosa (nunca entra en el bundle de nadie más) y solo si se cumplen
+// AMBAS condiciones: estamos en local Y el usuario logueado es uno de
+// DEV_MONITOR_EMAILS. _LAZY_SCRIPTS/_lazyLoad vienen de utils.js, cargado
+// antes que este archivo (ver orden de <script> en index.html).
+function _maybeStartDevMonitor(email) {
+  if (!DEV_HOSTNAME_RE.test(location.hostname)) return;
+  if (!DEV_MONITOR_EMAILS.includes((email || '').toLowerCase())) return;
+  if (typeof _lazyLoad !== 'function' || !_LAZY_SCRIPTS?.devMonitor) return;
+  _lazyLoad(_LAZY_SCRIPTS.devMonitor)
+    .then(() => { if (typeof initDevMonitor === 'function') initDevMonitor(); })
+    .catch(err => console.warn('[Finova DevMonitor] No se pudo cargar:', err));
 }
 
 // ─── Helper global: header de autorización Firebase ──────────

@@ -73,6 +73,7 @@ const _LAZY_SCRIPTS = {
   ai:         'src/core/ai.js',
   admin:      'src/sections/admin.js',
   pdf:        'src/utils/pdf.js',
+  devMonitor: 'src/core/devMonitor.js',
 };
 
 /* ── _ensureScript (cache-aware dynamic loader) ── */

@@ -144,6 +144,28 @@ function devClassicScripts(mode) {
   };
 }
 
+// Redirige 127.0.0.1 → localhost en el servidor de desarrollo de Vite. Firebase
+// Auth solo acepta 'localhost' como dominio autorizado (no 127.0.0.1, aunque sea
+// la misma máquina) — mismo fix que ya existe para `npm start` en server.cjs.
+// Arreglarlo aquí, a nivel de servidor, cubre TODAS las páginas (index.html y
+// landing.html, y cualquiera futura) de una vez, en vez de parchear cada script
+// de auth por separado.
+function devHostRedirect() {
+  return {
+    name: 'finova-dev-host-redirect',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const host = req.headers.host || '';
+        if (!host.startsWith('127.0.0.1')) return next();
+        const port = host.split(':')[1];
+        res.writeHead(301, { Location: `http://localhost${port ? ':' + port : ''}${req.url}` });
+        res.end();
+      });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const isProd = mode === 'production';
 
@@ -198,7 +220,7 @@ export default defineConfig(({ mode }) => {
       reportCompressedSize:  true,
     },
 
-    plugins: [copyStaticAssets('dist', mode), devClassicScripts(mode)],
+    plugins: [copyStaticAssets('dist', mode), devHostRedirect(), devClassicScripts(mode)],
 
     // Solo exponer al frontend variables con prefijo VITE_
     envPrefix: 'VITE_',
