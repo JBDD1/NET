@@ -24,7 +24,16 @@ async function _apiRequest(path, opts, withAuth) {
 
   const res = await fetch(_SERVER_URL + path, Object.assign({}, opts, { headers }));
 
-  if (res.status === 429) {
+  if (res.status === 401) {
+    // Antes un 401 pasaba en silencio: el servidor rechazaba el token (caducado
+    // o revocado) y la llamada devolvía res sin que nadie avisara, así que el
+    // usuario veía "no se guardó nada" sin explicación. No se fuerza una
+    // redirección: un reload en mitad de un guardado puede perder lo que el
+    // usuario estaba escribiendo — se avisa y él decide.
+    if (typeof showToast === 'function') {
+      showToast('Tu sesión ha caducado. Vuelve a iniciar sesión para seguir sincronizando.', 'error');
+    }
+  } else if (res.status === 429) {
     const retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
     var msg = 'Demasiadas peticiones. Espera ' +
       (retryAfter < 120 ? retryAfter + 's' : Math.ceil(retryAfter / 60) + ' min') + '.';

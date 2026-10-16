@@ -74,9 +74,9 @@ function renderRecurring() {
 
   el.innerHTML = `
     <div class="rec-summary-bar">
-      <div class="rec-summary-item"><span class="rec-summary-label">Ingresos/mes</span><span class="rec-summary-val positive">${formatCurrency(monthlyIncome)}</span></div>
-      <div class="rec-summary-item"><span class="rec-summary-label">Gastos/mes</span><span class="rec-summary-val negative">${formatCurrency(monthlyExpense)}</span></div>
-      <div class="rec-summary-item"><span class="rec-summary-label">Balance/mes</span><span class="rec-summary-val ${monthlyBalance >= 0 ? 'positive' : 'negative'}">${formatCurrency(monthlyBalance)}</span></div>
+      <div class="rec-summary-item"><span class="rec-summary-label">Ingresos/mes</span><span class="rec-summary-val positive pvt">${formatCurrency(monthlyIncome)}</span></div>
+      <div class="rec-summary-item"><span class="rec-summary-label">Gastos/mes</span><span class="rec-summary-val negative pvt">${formatCurrency(monthlyExpense)}</span></div>
+      <div class="rec-summary-item"><span class="rec-summary-label">Balance/mes</span><span class="rec-summary-val pvt ${monthlyBalance >= 0 ? 'positive' : 'negative'}">${formatCurrency(monthlyBalance)}</span></div>
     </div>
     <div class="card">
       <table class="data-table">
@@ -100,7 +100,7 @@ function renderRecurring() {
               <td><strong>${escapeHtml(r.description)}</strong>${overdue ? ' <span class="rec-due-badge">pendiente</span>' : ''}</td>
               <td><span class="cat-chip">${escapeHtml(r.category)}</span></td>
               <td><span class="badge badge-${r.type}">${r.type === 'income' ? 'Ingreso' : 'Gasto'}</span></td>
-              <td class="text-right ${r.type === 'income' ? 'positive' : 'negative'}">${formatCurrency(r.amount)}</td>
+              <td class="text-right pvt ${r.type === 'income' ? 'positive' : 'negative'}">${formatCurrency(r.amount)}</td>
               <td>${RECURRING_FREQ_LABELS[r.frequency] || r.frequency}${r.frequency === 'monthly' && r.renewalDay ? `<br><span style="font-size:11px;color:var(--text-muted)">día ${r.renewalDay}</span>` : ''}</td>
               <td${overdue ? ' style="color:var(--down);font-weight:600"' : ''}>${(() => {
                 if (!r.nextDate) return '—';

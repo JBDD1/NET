@@ -370,8 +370,16 @@ function renderPortfolioTable() {
     const daysLabel  = daysHeld !== null ? formatDaysHeld(daysHeld) : '—';
 
     const divEntry   = dividendsByTicker.get(a.ticker);
+    // El "|| 1" estaba FUERA del paréntesis del multiplicador, así que aplicaba
+    // al PRODUCTO entero en vez de al multiplicador: con una frecuencia
+    // desconocida o ausente, dividendPerShare * undefined daba NaN y "NaN || 1"
+    // caía en 1, mostrando un yield inventado (1/precio×100) en vez del real.
+    // Un dividendPerShare de 0 también se convertía en 1 por el mismo motivo.
+    // Ahora el fallback va donde debe, igual que en el resto del archivo
+    // (p.ej. `const mult = FREQ_MULT[d.frequency] || 1`).
+    const divMult    = divEntry ? (_DIV_FREQ_MULT[divEntry.frequency] || 1) : 1;
     const divYield   = divEntry && a.currentPrice > 0
-      ? ((divEntry.dividendPerShare * { annual: 1, semiannual: 2, quarterly: 4, monthly: 12 }[divEntry.frequency] || 1) / a.currentPrice * 100).toFixed(2)
+      ? ((_num(divEntry.dividendPerShare) * divMult) / a.currentPrice * 100).toFixed(2)
       : null;
     return `
       <tr data-id="${a.id}"${_isPriceStale(a) ? ' class="portfolio-row-stale"' : ''} tabindex="0">

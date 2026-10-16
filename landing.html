@@ -2716,8 +2716,12 @@ async function lpJoinWaitlist(e) {
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<!-- defer en los tres: los scripts diferidos se ejecutan en orden de documento,
+     así que landing.js sigue encontrando `firebase` ya definido, pero los dos
+     SDK dejan de bloquear el parser al final del documento (index.html ya los
+     cargaba así; aquí se habían quedado sin defer). -->
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script defer src="landing.js"></script>
 <!-- Hard fallback: reveal everything after 2 s regardless of what happened above -->
 <script>setTimeout(function(){document.querySelectorAll('.lp-ani,.lp-ani-left,.lp-ani-right').forEach(function(e){e.classList.add('in')})},2000)</script>

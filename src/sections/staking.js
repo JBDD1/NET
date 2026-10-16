@@ -72,12 +72,12 @@ function _stkRenderKPIs() {
   grid.innerHTML = `
     <div class="kpi-card">
       <div class="kpi-label">Total en staking</div>
-      <div class="kpi-value positive">${formatCurrency(totalStaked)}</div>
+      <div class="kpi-value positive pvt">${formatCurrency(totalStaked)}</div>
       <div class="kpi-change">${posLabel}</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Recompensas acumuladas</div>
-      <div class="kpi-value positive">${formatCurrency(totalRewards)}</div>
+      <div class="kpi-value positive pvt">${formatCurrency(totalRewards)}</div>
       <div class="kpi-change">Historial total cobrado</div>
     </div>
     <div class="kpi-card">
@@ -87,12 +87,12 @@ function _stkRenderKPIs() {
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Estimación mensual</div>
-      <div class="kpi-value positive">${formatCurrency(monthlyEst)}</div>
+      <div class="kpi-value positive pvt">${formatCurrency(monthlyEst)}</div>
       <div class="kpi-change">Ingresos pasivos / mes</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Estimación anual</div>
-      <div class="kpi-value positive">${formatCurrency(annualEst)}</div>
+      <div class="kpi-value positive pvt">${formatCurrency(annualEst)}</div>
       <div class="kpi-change">Proyección 12 meses</div>
     </div>
   `;
@@ -139,7 +139,7 @@ function _stkRenderAssets() {
           ${myTotal > 0 ? `
           <div class="stk-meta-row">
             <span class="stk-meta-lbl">Mi staking</span>
-            <span class="positive" style="font-size:12px;font-weight:600">${formatCurrency(myTotal)}</span>
+            <span class="positive pvt" style="font-size:12px;font-weight:600">${formatCurrency(myTotal)}</span>
           </div>` : ''}
         </div>
         <p class="stk-asset-desc">${escapeHtml(asset.desc)}</p>
@@ -200,9 +200,9 @@ function _stkRenderPositions() {
                     </div>
                   </div>
                 </td>
-                <td class="text-right"><strong>${formatCurrency(p.amountEur)}</strong></td>
+                <td class="text-right pvt"><strong>${formatCurrency(p.amountEur)}</strong></td>
                 <td class="text-right positive">${p.apy.toFixed(2)}%</td>
-                <td class="text-right positive">${formatCurrency(p.rewardsEur || 0)}</td>
+                <td class="text-right positive pvt">${formatCurrency(p.rewardsEur || 0)}</td>
                 <td style="font-size:12px">${escapeHtml(p.startDate)}</td>
                 <td>
                   ${isLocked
@@ -353,8 +353,8 @@ function _stkRenderHistory() {
                    <td style="font-size:12px">${escapeHtml(h.date)}</td>
                    <td><span class="ticker-chip">${escapeHtml(h.coin)}</span></td>
                    <td><span class="${TYPE_CLS[h.type] || ''}">${TYPE_LABEL[h.type] || h.type}</span></td>
-                   <td class="text-right ${TYPE_CLS[h.type] || ''}">${formatCurrency(h.amountEur)}</td>
-                   <td class="text-right positive">${h.rewards > 0 ? formatCurrency(h.rewards) : '—'}</td>
+                   <td class="text-right pvt ${TYPE_CLS[h.type] || ''}">${formatCurrency(h.amountEur)}</td>
+                   <td class="text-right positive pvt">${h.rewards > 0 ? formatCurrency(h.rewards) : '—'}</td>
                    <td><span class="stk-status-badge ${STATUS_CLS[h.status] || ''}">${STATUS_LABEL[h.status] || h.status}</span></td>
                  </tr>
                `).join('')}

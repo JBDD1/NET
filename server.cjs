@@ -1123,6 +1123,11 @@ async function _gcCall(method, apiPath, body) {
 }
 
 async function handleBankInstitutions(req, res) {
+  // Los 4 endpoints de /api/bank/* llaman a GoCardless, una API de pago con
+  // cuota por llamada: sin límite, un usuario autenticado puede agotarla (o
+  // hacer que throttleen la IP del servidor) con un bucle. El bucket 'bank' ya
+  // estaba definido en _LIMITS pero no se aplicaba en ningún handler.
+  if (!_checkRateLimit(req, res, 'bank')) return;
   if ((await _requireAuth(req, res)) === null) return;
   if (!GC_SECRET_ID || !GC_SECRET_KEY) {
     res.writeHead(503, _apiHeaders(req));
@@ -1146,6 +1151,7 @@ async function handleBankInstitutions(req, res) {
 }
 
 async function handleBankCreateRequisition(req, res) {
+  if (!_checkRateLimit(req, res, 'bank')) return;
   const uid = await _requireAuth(req, res);
   if (uid === null) return;
   if (!GC_SECRET_ID || !GC_SECRET_KEY) {
@@ -1187,6 +1193,7 @@ async function handleBankCreateRequisition(req, res) {
 }
 
 async function handleBankGetRequisition(req, res) {
+  if (!_checkRateLimit(req, res, 'bank')) return;
   const uid = await _requireAuth(req, res);
   if (uid === null) return;
   if (!GC_SECRET_ID || !GC_SECRET_KEY) {
@@ -1210,6 +1217,7 @@ async function handleBankGetRequisition(req, res) {
 }
 
 async function handleBankImport(req, res) {
+  if (!_checkRateLimit(req, res, 'bank')) return;
   const uid = await _requireAuth(req, res);
   if (uid === null) return;
   if (!GC_SECRET_ID || !GC_SECRET_KEY) {
@@ -1780,6 +1788,11 @@ async function handleUserMeta(req, res) {
 // Verifica token Y rol admin. Devuelve uid verificado o null (401/403 ya enviado).
 // adminUid del body/query ya no se usa — el uid viene del token Firebase.
 async function _adminGuard(req, res) {
+  // El bucket 'admin' estaba definido en _LIMITS pero no se aplicaba en ningún
+  // sitio: los 8 endpoints de administración (listar usuarios, bloquear,
+  // cambiar rol, estadísticas…) no tenían ningún límite. Se aplica aquí, en el
+  // único punto por el que pasan todos, en vez de repetirlo handler a handler.
+  if (!_checkRateLimit(req, res, 'admin')) return null;
   const uid = await _requireAuth(req, res);
   if (uid === null) return null;
   if (!_isAdminUid(uid)) {

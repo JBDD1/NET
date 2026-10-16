@@ -83,7 +83,7 @@ function _renderTxRecurringWidget() {
       <div class="tx-rec-row${overdue ? ' tx-rec-row--due' : ''}">
         <span class="tx-rec-desc">${escapeHtml(r.description)}</span>
         <span class="tx-rec-when">${whenLabel}</span>
-        <span class="tx-rec-amount ${r.type === 'income' ? 'positive' : 'negative'}">${formatCurrency(r.amount)}</span>
+        <span class="tx-rec-amount pvt ${r.type === 'income' ? 'positive' : 'negative'}">${formatCurrency(r.amount)}</span>
         <button type="button" class="btn-secondary btn-sm" onclick="applyRecurring('${r.id}')" title="Registrar como transacción hoy">Registrar</button>
       </div>`;
   }).join('') : `<div class="tx-rec-empty">Sin recurrentes pendientes en los próximos 14 días</div>`;

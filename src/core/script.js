@@ -232,6 +232,11 @@ function showToast(message, type = 'success', opts = {}) {
   toast.className = `toast ${type}`;
   toast.dataset.msg  = message;
   toast.dataset.type = type;
+  // El contenedor ya es una live region "polite" (role="status"), correcto para
+  // confirmaciones. Pero un ERROR anunciado en cola educada puede llegarle al
+  // usuario de lector de pantalla mucho después —o nunca, si el toast ya se ha
+  // cerrado—. role="alert" lo marca como asertivo para que interrumpa.
+  toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
 
   const actionHtml = opts.action
     ? `<button class="toast-action btn-primary" data-action="${escapeHtml(opts.action.action)}">${escapeHtml(opts.action.label)}</button>`
