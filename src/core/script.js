@@ -2115,9 +2115,14 @@ function _computeImportRowStatus(r) {
 }
 
 let _pendingCertainDupCount = 0;
+// Saldo de cierre del extracto importado (si traía columna de saldo), para
+// ofrecer cuadrar la cuenta vinculada al terminar — ver _offerBalanceSync().
+let _pendingClosingBalance = null, _pendingClosingBalanceDate = '';
 
 function _showOFXPreview(allRows, source = 'OFX/QFX') {
   _pendingImportSource = source;
+  _pendingClosingBalance     = allRows._closingBalance ?? null;
+  _pendingClosingBalanceDate = allRows._closingBalanceDate || '';
   // FITID (OFX) es un identificador único real del banco: coincidencia =
   // duplicado seguro, se excluye directamente sin preguntar. Sin FITID
   // (CSV/Excel) solo hay la firma de contenido (fecha+importe+tipo+inicio de
@@ -2390,12 +2395,88 @@ function _confirmOFXImport() {
   } else {
     showToast(`${importedCount} transacciones importadas desde ${_pendingImportSource} ✓`, 'success');
   }
+
+  if (importedCount > 0) _offerBalanceSync();
+}
+
+// Si el extracto traía columna de saldo y hay una cuenta de efectivo vinculada
+// a las transacciones, ofrece cuadrarla con el saldo de cierre REAL del banco.
+// Importar movimientos ya mueve el saldo de la cuenta vinculada (ver
+// _applyTxCashImpact), pero ese acumulado arrastra cualquier desfase previo:
+// el saldo que da el propio banco es el dato autoritativo.
+// Siempre se PREGUNTA, nunca se sobrescribe solo — es el dinero del usuario.
+function _offerBalanceSync() {
+  const bal = _pendingClosingBalance;
+  _pendingClosingBalance = null;             // de un solo uso
+  if (bal === null || !Number.isFinite(bal)) return;
+
+  const acc = (APP.cashAccounts || []).find(a => a.id === APP.transactionCashAccountId);
+  if (!acc) return;                           // sin cuenta vinculada no hay nada que cuadrar
+
+  const current = parseFloat(acc.amount) || 0;
+  if (Math.abs(current - bal) < 0.01) return; // ya cuadra: no molestar
+
+  const diff  = bal - current;
+  const fecha = _pendingClosingBalanceDate ? ` (${formatDate(_pendingClosingBalanceDate)})` : '';
+  openModal('Cuadrar saldo con el extracto', `
+    <p style="font-size:13.5px;line-height:1.6;margin:0 0 14px">
+      El extracto indica un saldo de cierre${fecha} distinto del que tiene
+      <strong>${escapeHtml(acc.name)}</strong> en Finova.
+    </p>
+    <div class="renta-table" style="margin-bottom:14px">
+      <div class="renta-row"><div class="renta-label">Saldo en Finova</div><div class="renta-value">${formatCurrency(current)}</div></div>
+      <div class="renta-row"><div class="renta-label">Saldo según el banco</div><div class="renta-value">${formatCurrency(bal)}</div></div>
+      <div class="renta-row renta-total"><div class="renta-label">Diferencia</div><div class="renta-value ${diff >= 0 ? 'positive' : 'negative'}">${formatCurrency(diff, true)}</div></div>
+    </div>
+    <p style="font-size:12px;color:var(--text-muted);margin:0">
+      Si actualizas, el saldo de la cuenta pasa a ser el del banco. Las transacciones importadas no se tocan.
+    </p>
+  `, () => {
+    const idx = APP.cashAccounts.findIndex(a => a.id === acc.id);
+    if (idx >= 0) APP.cashAccounts[idx].amount = bal;
+    updateNetworthHistory();
+    saveData();
+    closeModal();
+    if (typeof renderNetworth === 'function') renderNetworth();
+    renderDashboard();
+    showToast(`Saldo de ${acc.name} actualizado a ${formatCurrency(bal)} ✓`, 'success');
+  });
+  const btn = document.getElementById('modalConfirm');
+  if (btn) btn.textContent = 'Actualizar saldo';
 }
 
 /* ─── Importación CSV / Excel bancario (Santander, BBVA, CaixaBank…) ── */
 
 function importTransactionsCSV() {
   document.getElementById('csv-import-input')?.click();
+}
+
+// Detecta la codificación de un extracto CSV a partir de sus bytes. Los
+// bancos españoles tradicionales (Santander, CaixaBank, Sabadell, Unicaja,
+// Bankinter) exportan en Windows-1252, no en UTF-8: leerlos como UTF-8
+// convertía "NÓMINA" en "N<?>MINA" — y eso no solo se ve mal, además rompe la
+// categorización automática, porque el carácter de reemplazo impide que
+// 'nomina' coincida (ni siquiera quitando tildes, ya que el byte original se
+// pierde). Los neobancos (Revolut, N26, Wise) sí exportan UTF-8.
+//
+// Heurística, en este orden:
+//  1. BOM UTF-8 / UTF-16 → mandan, son inequívocos.
+//  2. Si los bytes son UTF-8 válido → UTF-8 (un archivo Windows-1252 con
+//     acentos casi nunca forma secuencias UTF-8 válidas por casualidad).
+//  3. Si no, Windows-1252 (superset de latin1 que cubre € y las comillas
+//     tipográficas que mete Excel).
+function _detectCsvEncoding(buffer) {
+  const b = new Uint8Array(buffer);
+  if (b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) return 'utf-8';
+  if (b[0] === 0xFF && b[1] === 0xFE) return 'utf-16le';
+  if (b[0] === 0xFE && b[1] === 0xFF) return 'utf-16be';
+  try {
+    // fatal:true lanza en cuanto encuentra una secuencia inválida.
+    new TextDecoder('utf-8', { fatal: true }).decode(b);
+    return 'utf-8';
+  } catch {
+    return 'windows-1252';
+  }
 }
 
 function handleCSVImportFile(input) {
@@ -2411,7 +2492,12 @@ function handleCSVImportFile(input) {
   const reader = new FileReader();
   reader.onload = async e => {
     try {
-      const txs = _parseCSVBank(e.target.result);
+      const encoding = _detectCsvEncoding(e.target.result);
+      const text     = new TextDecoder(encoding).decode(e.target.result);
+      if (encoding !== 'utf-8') {
+        console.info('[Finova] Extracto leído como', encoding, '(no era UTF-8 válido)');
+      }
+      const txs = _parseCSVBank(text);
       if (!txs.length) {
         console.warn('[Finova] Import CSV sin resultados:', txs._diag);
         return showToast(txs._diag || 'No se encontraron transacciones en el archivo. Verifica que es un extracto bancario válido.', 'error');
@@ -2424,7 +2510,9 @@ function handleCSVImportFile(input) {
     }
   };
   reader.onerror = () => showToast('Error al leer el archivo.', 'error');
-  reader.readAsText(file, 'UTF-8');
+  // ArrayBuffer en vez de readAsText(file,'UTF-8'): hace falta ver los bytes
+  // en crudo para poder detectar la codificación (ver _detectCsvEncoding).
+  reader.readAsArrayBuffer(file);
 }
 
 const _XLSX_CDN = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
@@ -2652,9 +2740,16 @@ function _detectBankCols(rawHdrs) {
   // CARD_PAYMENT no altera nada y los extractos con signo siguen igual.
   const typeCol = col(/^tipo$|^type$|^movimiento$|^operacion$|^d\/c$|debe.*haber/);
 
+  // Columna de saldo: el extracto trae el saldo DESPUÉS de cada movimiento.
+  // No se usa para importar la transacción en sí (el importe ya manda), sino
+  // para ofrecer cuadrar la cuenta vinculada con el saldo de cierre real del
+  // banco al terminar — ver _offerBalanceSync(). "Saldo disponible" (Unicaja)
+  // y "Disponible" (BBVA) cuentan; "Saldo medio" u otros promedios, no.
+  const balanceCol = col(/^saldo$|^saldo disponible$|^disponible$|^balance$|saldo posterior|running balance/);
+
   return amtCol >= 0
-    ? { dateCol, descCol, amtCol, typeCol }
-    : { dateCol, descCol, debitCol, creditCol, typeCol };
+    ? { dateCol, descCol, amtCol, typeCol, balanceCol }
+    : { dateCol, descCol, debitCol, creditCol, typeCol, balanceCol };
 }
 
 // Devuelve 'income' | 'expense' | null a partir del valor de una columna de
@@ -2690,7 +2785,11 @@ function _rowsToBankTransactions(allRows) {
     txs._diag = `No se reconocieron las columnas de fecha/importe. Cabeceras encontradas: ${cleanHdrs.join(', ') || '(sin cabecera detectada)'}`;
     return txs;
   }
-  const { dateCol, descCol, amtCol, debitCol, creditCol, typeCol } = cols;
+  const { dateCol, descCol, amtCol, debitCol, creditCol, typeCol, balanceCol } = cols;
+  // Saldo de cierre: el del movimiento con la fecha MÁS RECIENTE, no el de la
+  // última fila del archivo — hay bancos que exportan en orden ascendente y
+  // otros descendente, así que la posición en el archivo no dice nada.
+  let closingBalance = null, closingBalanceDate = '';
   const neededCols = [dateCol, descCol, amtCol, debitCol, creditCol].filter(c => typeof c === 'number' && c >= 0);
   const maxCol = Math.max(...neededCols);
 
@@ -2713,6 +2812,15 @@ function _rowsToBankTransactions(allRows) {
         return;
       }
       if (amount === 0) { zeroAmtCount++; return; }
+      if (typeof balanceCol === 'number' && balanceCol >= 0 && date >= closingBalanceDate) {
+        const rawBal = String(row[balanceCol] ?? '').trim();
+        // Solo si la celda trae un número de verdad: una celda vacía daría 0 y
+        // acabaría proponiendo poner la cuenta a cero.
+        if (rawBal && /\d/.test(rawBal)) {
+          closingBalance     = _parseCSVAmt(rawBal);
+          closingBalanceDate = date;
+        }
+      }
       // Un importe NEGATIVO ya es inequívoco (manda el signo, como siempre).
       // Si viene sin signo y hay columna de tipo reconocible, manda esa.
       const typeHint = (typeof typeCol === 'number' && typeCol >= 0) ? _csvTypeHint(row[typeCol]) : null;
@@ -2734,6 +2842,11 @@ function _rowsToBankTransactions(allRows) {
       skippedRows.push(headerIdx + i + 2); // 1-based, contando la fila de cabecera real
     }
   });
+
+  if (closingBalance !== null) {
+    txs._closingBalance     = closingBalance;
+    txs._closingBalanceDate = closingBalanceDate;
+  }
 
   if (skippedRows.length > 0) {
     const rowList = skippedRows.slice(0, 5).join(', ') + (skippedRows.length > 5 ? '…' : '');
@@ -3880,10 +3993,10 @@ const NAV_SECTIONS = [
 
 const CATEGORY_KEYWORDS = {
   expense: {
-    'Alimentación':  ['mercadona', 'carrefour', 'lidl', 'aldi', 'dia ', ' dia', 'alcampo', 'eroski', 'consum', 'spar', 'supermercado', 'hipercor', 'ahorra mas', 'froiz', 'supercor', 'covirán', 'masymas', 'bonarea', 'panaderia', 'fruteria', 'pescaderia', 'carniceria', 'verduleria', 'colmado', 'barbacoa'],
-    'Restaurantes':  ['restaurante', 'cafeteria', 'mcdonalds', 'burger king', 'kfc', 'telepizza', 'dominos', 'pizzeria', 'sushi', 'kebab', 'taberna', 'mesón', 'glovo', 'just eat', 'deliveroo', 'uber eats', 'bar ', 'tapas', 'hamburgueseria'],
-    'Transporte':    ['gasolinera', 'gasolina', 'repsol', 'cepsa', 'bp ', 'shell', 'renfe', 'metro', 'cabify', 'uber', 'bolt', 'blablacar', 'autopista', 'peaje', 'parking', 'aparcamiento', 'itv', 'taller', 'autobus', 'avion', 'vueling', 'iberia', 'ryanair', 'easyjet', 'taxi', 'bus', 'furgoneta', 'cercanias'],
-    'Vivienda':      ['alquiler', 'hipoteca', 'comunidad', 'endesa', 'iberdrola', 'naturgy', 'agua ', 'gas nat', 'vodafone', 'movistar', 'orange ', 'jazztel', 'masmovil', 'internet', 'adsl', 'fibra', 'seguro hogar', 'ikea', 'leroy merlin', 'bricomart'],
+    'Alimentación':  ['mercadona', 'carrefour', 'lidl', 'aldi', 'dia ', ' dia', 'alcampo', 'eroski', 'consum', 'spar', 'supermercado', 'hipercor', 'ahorra mas', 'ahorramas', 'froiz', 'supercor', 'covirán', 'masymas', 'bonarea', 'panaderia', 'fruteria', 'pescaderia', 'carniceria', 'verduleria', 'colmado', 'barbacoa'],
+    'Restaurantes':  ['restaurante', 'cafeteria', 'cafe ', 'mcdonalds', 'burger king', 'kfc', 'telepizza', 'dominos', 'pizzeria', 'sushi', 'kebab', 'taberna', 'mesón', 'glovo', 'just eat', 'deliveroo', 'uber eats', 'bar ', 'tapas', 'hamburgueseria'],
+    'Transporte':    ['gasolinera', 'gasolina', 'combustible', 'repsol', 'cepsa', 'bp ', 'shell', 'galp', 'campsa', 'dgt', 'multa', 'renfe', 'metro', 'cabify', 'uber', 'bolt', 'blablacar', 'autopista', 'peaje', 'parking', 'aparcamiento', 'itv', 'taller', 'autobus', 'avion', 'vueling', 'iberia', 'ryanair', 'easyjet', 'taxi', 'bus', 'furgoneta', 'cercanias'],
+    'Vivienda':      ['alquiler', 'hipoteca', 'comunidad', ' ibi ', 'luz ', 'electricidad', 'endesa', 'iberdrola', 'naturgy', 'agua ', 'gas nat', 'vodafone', 'movistar', 'orange ', 'jazztel', 'masmovil', 'internet', 'adsl', 'fibra', 'seguro hogar', 'ikea', 'leroy merlin', 'bricomart'],
     'Salud':         ['farmacia', 'medico', 'dentista', 'clinica', 'hospital', 'sanitas', 'adeslas', 'asisa', 'mapfre salud', 'fisioterapia', 'optica', 'gym', 'gimnasio', 'sport', 'wellness'],
     // 'tenis' se mantiene como deporte (uso peninsular) — en español
     // latinoamericano también significa "zapatillas", pero Finova está
@@ -3896,7 +4009,7 @@ const CATEGORY_KEYWORDS = {
     'Fiesta':        ['discoteca', 'club ', 'botellon', 'copa ', 'copas', 'chupito', 'nightclub', 'fiesta', 'fiestas', 'cumpleaños', 'cumpleanos', 'cumple', 'boda', 'barra libre'],
   },
   income: {
-    'Salario':    ['nomina', 'salario', 'sueldo', 'empresa', 'trabajo', 'mensual'],
+    'Salario':    ['nomina', 'salario', 'sueldo', 'haberes', 'empresa', 'trabajo', 'mensual'],
     'Freelance':  ['freelance', 'factura', 'cliente', 'proyecto', 'honorarios', 'consulting'],
     'Dividendos': ['dividendo', 'cupon', 'renta fija', 'interes'],
     'Alquiler':   ['alquiler', 'arrendamiento', 'inquilino', 'renta'],

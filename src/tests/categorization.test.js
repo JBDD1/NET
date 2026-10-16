@@ -119,6 +119,34 @@ describe('_classifyLocal — reglas locales (sin red)', () => {
     expect(r.category).not.toBe('Vivienda');
   });
 
+  // Palabras clave añadidas tras revisar extractos reales de bancos españoles.
+  // Las categorías propuestas en el encargo (Supermercados, Suministros,
+  // Compras online, Transferencias, Deporte) NO existen en APP.categories, así
+  // que se mapean a las reales: Alimentación, Vivienda, Transporte…
+  test('IBI → Vivienda, pero "RECIBIDA" NO (el margen evita el falso positivo)', () => {
+    expect(fns._classifyLocal('IBI 2026 Ayuntamiento', 'expense').category).toBe('Vivienda');
+    expect(fns._classifyLocal('Transferencia recibida', 'expense').category).not.toBe('Vivienda');
+  });
+
+  test('"Recibo Luz octubre" → Vivienda, pero "Compra Andaluza" NO', () => {
+    expect(fns._classifyLocal('Recibo Luz octubre', 'expense').category).toBe('Vivienda');
+    expect(fns._classifyLocal('Compra Andaluza', 'expense').category).not.toBe('Vivienda');
+  });
+
+  test('Galp / Campsa / multa DGT → Transporte', () => {
+    expect(fns._classifyLocal('E.S. GALP MADRID', 'expense').category).toBe('Transporte');
+    expect(fns._classifyLocal('CAMPSA ESTACION', 'expense').category).toBe('Transporte');
+    expect(fns._classifyLocal('Multa DGT', 'expense').category).toBe('Transporte');
+  });
+
+  test('AhorraMas (junto, como lo escribe el banco) → Alimentación', () => {
+    expect(fns._classifyLocal('COMPRA AHORRAMAS', 'expense').category).toBe('Alimentación');
+  });
+
+  test('"Haberes" → Salario (así lo etiquetan varios bancos)', () => {
+    expect(fns._classifyLocal('ABONO HABERES OCTUBRE', 'income').category).toBe('Salario');
+  });
+
   test('10. Comercio totalmente desconocido → Sin clasificar, no inventa', () => {
     const r = fns._classifyLocal('XZQVK Comercio Inexistente 999', 'expense');
     expect(r.category).toBe(fns.UNCLASSIFIED_CATEGORY);
