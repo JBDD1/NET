@@ -4,31 +4,63 @@
    jsPDF + AutoTable
 ═══════════════════════════════════════════════════════════════ */
 
-/* ── Paleta Finova Obsidian Brass ───────────────────────────── */
+/* ── Paleta Finova Obsidian Brass — tema OSCURO ──────────────────
+   Todo el diseño del PDF sale de este objeto: cambiar estos valores
+   cambia los tres informes a la vez, sin tocar la lógica de contenido.
+   _PDF.pageBg se pinta en TODAS las páginas (incluidas las que crea
+   AutoTable solo, ver willDrawPage en TABLE_OPT).
+
+   NOTA PRÁCTICA: un A4 a fondo negro gasta mucho tóner y muchas
+   impresoras lo sacan gris con bandas. Si el informe se va a imprimir
+   para la gestoría, la variante clara anterior está en el historial de
+   git (commit previo a este) y se recupera sustituyendo solo este
+   bloque — el resto del archivo no depende de si el tema es claro u
+   oscuro, solo de los nombres de estas claves. */
 const _PDF = {
+  pageBg:    [14, 12, 9],     // fondo de página (antes: blanco por defecto)
   dark:      [15, 13, 9],
   dark2:     [30, 26, 16],
   dark3:     [22, 19, 12],
   darkCover: [18, 15, 9],
   gold:      [200, 169, 110],
-  goldDim:   [140, 116, 72],
+  goldDim:   [150, 126, 80],
   goldLight: [228, 200, 148],
   cream:     [245, 237, 214],
-  muted:     [168, 144, 96],
-  sectionBg: [246, 241, 226],
-  kpiBg:     [252, 249, 243],
-  kpiFg:     [130, 112, 74],
-  kpiVal:    [28, 24, 14],
-  rowEven:   [252, 249, 243],
-  rowOdd:    [241, 235, 218],
-  gridLine:  [220, 210, 186],
-  barTrack:  [220, 210, 186],
-  gain:      [44, 118, 78],
-  gainSoft:  [195, 230, 210],
-  loss:      [136, 50, 50],
-  lossSoft:  [240, 208, 208],
-  totalBg:   [30, 26, 16],
+  muted:     [150, 138, 118],
+  // Superficies: antes crema sobre blanco, ahora grises cálidos sobre negro
+  sectionBg: [26, 22, 16],
+  kpiBg:     [23, 20, 15],
+  kpiFg:     [150, 138, 118],
+  kpiVal:    [240, 232, 214],  // color de texto por defecto (lo restauran los helpers)
+  rowEven:   [23, 20, 15],
+  rowOdd:    [28, 24, 18],
+  gridLine:  [48, 42, 32],
+  barTrack:  [40, 35, 26],
+  // Semánticos: aclarados para que contrasten sobre fondo oscuro
+  gain:      [90, 170, 120],
+  gainSoft:  [26, 46, 34],
+  loss:      [208, 112, 96],
+  lossSoft:  [56, 28, 24],
+  amber:     [224, 144, 64],
+  totalBg:   [38, 33, 20],
+  // Texto que va ENCIMA de una superficie (tarjeta KPI, banda de sección,
+  // fila de tabla, caja de insights). Antes estos sitios usaban dark2 —
+  // correcto sobre crema, invisible sobre negro. Tenerlo como clave propia
+  // evita que el siguiente cambio de tema vuelva a dejar texto del color
+  // del fondo.
+  onSurface: [240, 232, 214],
 };
+
+/* ── Fondo de página ─────────────────────────────────────────────
+   jsPDF crea las páginas en blanco: sin esto, el tema oscuro dejaría
+   franjas blancas en los márgenes y debajo del contenido. */
+function _pdfPageBg(doc) {
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  doc.setFillColor(..._PDF.pageBg);
+  doc.rect(0, 0, W, H, 'F');
+  doc.setTextColor(..._PDF.kpiVal);
+}
 
 let _jspdfPromise = null;
 function _loadJsPDF() {
@@ -53,7 +85,19 @@ function _pdfGetDoc() {
     showToast('La librería PDF no está disponible — comprueba tu conexión', 'error');
     return null;
   }
-  return new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  _pdfPageBg(doc);                       // página 1
+  // Los informes llaman a doc.addPage() en 14 sitios distintos. En vez de
+  // añadir _pdfPageBg() en cada uno (y arriesgarse a olvidar alguno al
+  // añadir una sección nueva), se envuelve addPage una sola vez aquí: toda
+  // página nueva nace ya con el fondo pintado.
+  const _addPage = doc.addPage.bind(doc);
+  doc.addPage = function (...args) {
+    const r = _addPage(...args);
+    _pdfPageBg(doc);
+    return r;
+  };
+  return doc;
 }
 
 /* ── Marca Finova (círculo vectorial, nunca texto — evita glifos
@@ -105,7 +149,7 @@ function _pdfInsightBox(doc, items, y) {
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.setTextColor(..._PDF.dark2);
+  doc.setTextColor(..._PDF.onSurface);
   let curY = y + 10.5;
   wrapped.forEach((lines, i) => {
     lines.forEach((line, j) => {
@@ -160,7 +204,7 @@ function _pdfHeader(doc, title, subtitle) {
   doc.text(dateStr, W - 11, 20, { align: 'right' });
 
   doc.setFontSize(6.5);
-  doc.setTextColor(80, 70, 48);
+  doc.setTextColor(..._PDF.muted);
   doc.text('Informe personal  ·  datos orientativos', W - 11, 28, { align: 'right' });
 
   doc.setTextColor(..._PDF.kpiVal);
@@ -188,7 +232,7 @@ function _pdfFooter(doc, reportId, startPage) {
     );
     if (reportId) {
       doc.setFontSize(6);
-      doc.setTextColor(70, 60, 40);
+      doc.setTextColor(..._PDF.goldDim);
       doc.text('Ref: ' + reportId, 11, H - 1.5);
     }
     doc.setFont('helvetica', 'bold');
@@ -207,7 +251,7 @@ function _pdfSection(doc, text, y, rightLabel) {
   doc.rect(12, y, 3.5, 9, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.setTextColor(..._PDF.dark2);
+  doc.setTextColor(..._PDF.onSurface);
   doc.text(text.toUpperCase(), 19.5, y + 6);
   if (rightLabel) {
     doc.setFont('helvetica', 'normal');
@@ -282,6 +326,12 @@ const TABLE_OPT = {
   headStyles:         HEAD_STYLE,
   alternateRowStyles: ROW_ALT,
   margin:             { left: 12, right: 12 },
+  // Una tabla larga crea páginas nuevas por su cuenta, y jsPDF las crea en
+  // blanco. willDrawPage se dispara ANTES de dibujar el contenido de cada
+  // página (didDrawPage sería demasiado tarde: pintaría el fondo ENCIMA de
+  // la tabla), así que es el único punto donde se puede pintar el fondo sin
+  // tapar nada.
+  willDrawPage: data => _pdfPageBg(data.doc),
 };
 
 /* ── Resumen mensual ─────────────────────────────────────────── */
@@ -685,7 +735,7 @@ async function exportFiscalPDF() {
   doc.rect(12, y, 3.5, 22, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
-  doc.setTextColor(..._PDF.dark2);
+  doc.setTextColor(..._PDF.onSurface);
   doc.text('AVISO LEGAL', 19.5, y + 6);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
@@ -998,7 +1048,7 @@ async function exportMonthlyBriefingPDF() {
     // Label
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
-    doc.setTextColor(..._PDF.dark2);
+    doc.setTextColor(..._PDF.onSurface);
     doc.text(
       `${firePct.toFixed(1)}%  ·  ${formatCurrency(nw)} de ${formatCurrency(fireNumber)}`,
       14, barY + 5.5
@@ -1056,7 +1106,7 @@ async function exportMonthlyBriefingPDF() {
       doc.text('RECOMENDACIONES PERSONALIZADAS', 19.5, y + 5.5);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
-      doc.setTextColor(..._PDF.dark2);
+      doc.setTextColor(..._PDF.onSurface);
       ws.advice.forEach((a, i) => {
         doc.text('- ' + a, 19.5, y + 11 + i * 6.5);
       });
