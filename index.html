@@ -967,6 +967,8 @@
       <div class="section-header">
         <h1>Cartera</h1>
         <div class="btn-row">
+          <button type="button" class="btn-secondary" data-action="import-portfolio" title="Importar cartera desde tu bróker (CSV, Excel o JSON)"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Importar</button>
+          <input type="file" id="portfolio-import-input" accept=".csv,.tsv,.txt,.xls,.xlsx,.xlsm,.ods,.json" style="display:none" />
           <button type="button" class="btn-secondary" data-action="export-excel" title="Exportar a Excel (4 hojas: Resumen, Cartera, Dividendos, Watchlist)"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-download"/></svg> Excel</button>
           <button type="button" class="btn-secondary btn-refresh-prices" data-action="refresh-prices">⟳ Precios</button>
           <button type="button" class="btn-secondary" data-action="refresh-fx" title="Actualizar tipos de cambio desde el BCE"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-refresh"/></svg> Divisas</button>

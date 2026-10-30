@@ -74,6 +74,9 @@ const _LAZY_SCRIPTS = {
   admin:      'src/sections/admin.js',
   pdf:        'src/utils/pdf.js',
   devMonitor: 'src/core/devMonitor.js',
+  // Importador de carteras de bróker: solo se usa al pulsar "Importar" en
+  // Cartera, no tiene sentido descargarlo en cada visita.
+  pfImport:   'src/utils/portfolio-import.js',
 };
 
 /* ── _ensureScript (cache-aware dynamic loader) ── */

@@ -1,0 +1,5 @@
+[
+  { "ticker": "VWRL", "asset_name": "Vanguard FTSE All-World", "quantity": 30, "buy_price": 82.33, "currentPrice": 102.0, "currency": "EUR", "asset_class": "ETF" },
+  { "symbol": "SAN", "name": "Banco Santander", "quantity": 500, "buyPrice": 3.2, "currentPrice": 4.45, "currency": "EUR" },
+  { "ticker": "ETH", "asset_name": "Ethereum", "quantity": 1.5, "buy_price": 1850.0, "currentPrice": 2940.0, "currency": "EUR" }
+]

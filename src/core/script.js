@@ -1062,6 +1062,33 @@ function requireAccountFor(actionLabel) {
 // vez y le da al usuario la misma señal visual que pedía el encargo, pero
 // reutilizable por los 4 botones que ya llaman a _withPdf en vez de
 // duplicar la lógica de spinner en cada uno.
+// Carga perezosa del importador de carteras (mismo patrón que _withPdf): el
+// módulo solo hace falta al pulsar "Importar" en Cartera. El diálogo de
+// archivo se abre DESPUÉS de cargarlo, para que el input ya esté cableado.
+async function _withPortfolioImport(btn) {
+  const original = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.textContent = 'Preparando…'; }
+  try {
+    if (typeof importPortfolioFile !== 'function') {
+      await _lazyLoad(_LAZY_SCRIPTS.pfImport);
+      // El <input type=file> es marcado estático: se cablea al vuelo porque
+      // events.js ya se ejecutó cuando este módulo aún no existía.
+      const inp = document.getElementById('portfolio-import-input');
+      if (inp && !inp._pfWired) {
+        inp._pfWired = true;
+        inp.addEventListener('change', function () { handlePortfolioImportFile(this); });
+      }
+    }
+    if (typeof importPortfolioFile === 'function') importPortfolioFile();
+    else showToast('No se pudo cargar el importador de carteras', 'error');
+  } catch (err) {
+    console.error(err);
+    showToast('No se pudo cargar el importador de carteras', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = original; }
+  }
+}
+
 async function _withPdf(fnName, btn) {
   if (!requireAccountFor('exportar a PDF')) return;
   const original = btn ? btn.innerHTML : null;
@@ -1130,6 +1157,7 @@ function _globalClickDispatch(e) {
     case 'add-bizum':                  openAddBizum(); break;
     // Portfolio
     case 'export-excel':               exportPortfolioExcel(); break;
+    case 'import-portfolio':           _withPortfolioImport(el); break;
     case 'refresh-prices':             refreshAllPrices(); break;
     case 'refresh-fx':                 refreshExchangeRates(); break;
     case 'add-asset':                  openAddAsset(); break;
