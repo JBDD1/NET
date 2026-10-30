@@ -1065,7 +1065,7 @@ function requireAccountFor(actionLabel) {
 // Carga perezosa del importador de carteras (mismo patrón que _withPdf): el
 // módulo solo hace falta al pulsar "Importar" en Cartera. El diálogo de
 // archivo se abre DESPUÉS de cargarlo, para que el input ya esté cableado.
-async function _withPortfolioImport(btn) {
+async function _withPortfolioImport(btn, mode) {
   const original = btn ? btn.innerHTML : null;
   if (btn) { btn.disabled = true; btn.textContent = 'Preparando…'; }
   try {
@@ -1079,7 +1079,8 @@ async function _withPortfolioImport(btn) {
         inp.addEventListener('change', function () { handlePortfolioImportFile(this); });
       }
     }
-    if (typeof importPortfolioFile === 'function') importPortfolioFile();
+    if (mode === 'paste' && typeof importPortfolioPaste === 'function') importPortfolioPaste();
+    else if (mode !== 'paste' && typeof importPortfolioFile === 'function') importPortfolioFile();
     else showToast('No se pudo cargar el importador de carteras', 'error');
   } catch (err) {
     console.error(err);
@@ -1158,6 +1159,7 @@ function _globalClickDispatch(e) {
     // Portfolio
     case 'export-excel':               exportPortfolioExcel(); break;
     case 'import-portfolio':           _withPortfolioImport(el); break;
+    case 'paste-portfolio':            _withPortfolioImport(el, 'paste'); break;
     case 'refresh-prices':             refreshAllPrices(); break;
     case 'refresh-fx':                 refreshExchangeRates(); break;
     case 'add-asset':                  openAddAsset(); break;

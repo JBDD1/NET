@@ -62,11 +62,22 @@ function _pfDetectCols(headers) {
     }
   };
 
+  // 1ª pasada: coincidencia exacta.
   for (const [field, aliases] of Object.entries(_PF_ALIASES)) {
     claim(field, h => aliases.includes(h));
   }
+  // 2ª: sin separadores. Las etiquetas de XML y las claves de JSON no llevan
+  // espacios ("precioMedio", "precio_medio", "avg-price"), así que comparar
+  // contra "precio medio" fallaba y la columna se perdía entera.
+  const squash = s => s.replace(/[^a-z0-9]/g, '');
   for (const [field, aliases] of Object.entries(_PF_ALIASES)) {
-    claim(field, h => aliases.some(a => h.includes(a)));
+    const sq = aliases.map(squash);
+    claim(field, h => sq.includes(squash(h)));
+  }
+  // 3ª: por inclusión, también sin separadores.
+  for (const [field, aliases] of Object.entries(_PF_ALIASES)) {
+    const sq = aliases.map(squash);
+    claim(field, h => sq.some(a => squash(h).includes(a)));
   }
   return out;
 }
@@ -182,6 +193,83 @@ function _pfRowsToAssets(rows) {
   return { assets, errors, cols, headers };
 }
 
+/**
+ * Detecta el formato por CONTENIDO, no por extensión. Los brokers mienten con
+ * la extensión constantemente: lo más habitual es un archivo llamado .xls que
+ * en realidad es una tabla HTML (Degiro, ING y varios bancos lo hacen), o un
+ * .csv separado por tabuladores. Fiarse del nombre es lo que hace que un
+ * import "no funcione" sin explicación.
+ * Devuelve: 'html' | 'xml' | 'json' | 'delimited'
+ */
+function _pfSniffFormat(text) {
+  const head = text.slice(0, 4000).trim();
+  const low = head.toLowerCase();
+  if (/^<!doctype html|^<html|<table[\s>]/i.test(low)) return 'html';
+  if (/^<\?xml|^<[a-z][\w:-]*[\s>][\s\S]*<\/[a-z]/i.test(head) && !/<table[\s>]/i.test(low)) return 'xml';
+  if (/^[\[{]/.test(head)) return 'json';
+  return 'delimited';
+}
+
+/**
+ * Tablas HTML. Se usa el DOMParser del navegador (nativo, sin dependencias).
+ * Se recorren todas las <table> y se queda con la primera que produzca
+ * posiciones: la tabla de cartera no siempre es la primera (suele haber antes
+ * tablas de cabecera, totales o maquetación).
+ */
+function _pfParseHTML(text) {
+  let doc;
+  try { doc = new DOMParser().parseFromString(text, 'text/html'); }
+  catch { return { assets: [], errors: [], diag: 'No se pudo leer el HTML.' }; }
+
+  const tables = [...doc.querySelectorAll('table')];
+  if (!tables.length) return { assets: [], errors: [], diag: 'El HTML no contiene ninguna tabla.' };
+
+  let best = null;
+  for (const table of tables) {
+    const rows = [...table.querySelectorAll('tr')].map(tr =>
+      [...tr.querySelectorAll('th,td')].map(td => td.textContent.replace(/\s+/g, ' ').trim())
+    ).filter(r => r.length);
+    if (rows.length < 2) continue;
+    const attempt = _pfRowsToAssets(rows);
+    if (attempt.assets.length) return attempt;
+    if (!best) best = attempt;
+  }
+  return best || { assets: [], errors: [], diag: 'Ninguna tabla del HTML tenía posiciones reconocibles.' };
+}
+
+/**
+ * XML genérico: se busca el elemento que más se repite (las posiciones) y
+ * cada uno se aplana a un objeto {etiqueta/atributo: valor}, que ya se puede
+ * tratar igual que una fila. Cubre exports tipo <position><ticker>…
+ * sin tener que conocer el esquema de cada bróker.
+ */
+function _pfParseXML(text) {
+  let doc;
+  try { doc = new DOMParser().parseFromString(text, 'application/xml'); }
+  catch { return { assets: [], errors: [], diag: 'No se pudo leer el XML.' }; }
+  if (doc.querySelector('parsererror')) return { assets: [], errors: [], diag: 'El XML no es válido.' };
+
+  const counts = new Map();
+  doc.querySelectorAll('*').forEach(el => {
+    if (!el.children.length && !el.attributes.length) return;
+    counts.set(el.tagName, (counts.get(el.tagName) || 0) + 1);
+  });
+  const repeated = [...counts.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1])[0];
+  if (!repeated) return { assets: [], errors: [], diag: 'El XML no tiene elementos repetidos que parezcan posiciones.' };
+
+  const items = [...doc.querySelectorAll(repeated[0])];
+  const flat = items.map(el => {
+    const o = {};
+    [...el.attributes].forEach(a => { o[a.name] = a.value; });
+    [...el.children].forEach(c => { if (!c.children.length) o[c.tagName] = c.textContent.trim(); });
+    return o;
+  });
+  // Se reutiliza la ruta de filas: cabecera = unión de claves.
+  const keys = [...new Set(flat.flatMap(Object.keys))];
+  const rows = [keys, ...flat.map(o => keys.map(k => o[k] ?? ''))];
+  return _pfRowsToAssets(rows);
+}
+
 /** JSON: array de activos (o {assets:[...]} / {portfolio:[...]}). */
 function _pfParseJSON(text) {
   let data;
@@ -277,19 +365,75 @@ function handlePortfolioImportFile(input) {
   input.value = '';
   const ext = (file.name.split('.').pop() || '').toLowerCase();
 
-  if (['xls', 'xlsx', 'xlsm', 'ods'].includes(ext)) return _pfReadExcel(file);
-  if (ext === 'json') return _pfReadText(file, 'json');
-  return _pfReadText(file, 'csv');
+  // Solo los binarios de verdad van por SheetJS. El resto se lee como texto y
+  // se decide por contenido (_pfSniffFormat), porque la extensión miente a
+  // menudo: un .xls que en realidad es una tabla HTML es de lo más común.
+  if (['xlsx', 'xlsm', 'ods'].includes(ext)) return _pfReadExcel(file);
+  if (ext === 'xls') return _pfReadMaybeExcel(file);
+  return _pfReadText(file);
 }
 
-function _pfReadText(file, kind) {
+/**
+ * .xls ambiguo: puede ser un binario de Excel de verdad o una tabla HTML con
+ * el nombre cambiado. Se miran los primeros bytes: los .xls binarios
+ * empiezan por la firma OLE2 (D0 CF 11 E0) y los .xlsx por "PK" (ZIP).
+ * Cualquier otra cosa se trata como texto.
+ */
+function _pfReadMaybeExcel(file) {
+  const head = new FileReader();
+  head.onload = e => {
+    const b = new Uint8Array(e.target.result);
+    const isOle = b[0] === 0xD0 && b[1] === 0xCF && b[2] === 0x11 && b[3] === 0xE0;
+    const isZip = b[0] === 0x50 && b[1] === 0x4B;
+    if (isOle || isZip) _pfReadExcel(file);
+    else _pfReadText(file);
+  };
+  head.onerror = () => showToast('Error al leer el archivo.', 'error');
+  head.readAsArrayBuffer(file.slice(0, 8));
+}
+
+/** Importar pegando el texto copiado del bróker, sin archivo de por medio. */
+function importPortfolioPaste() {
+  if (typeof requireAccountFor === 'function' && !requireAccountFor('importar una cartera')) return;
+  openModal('Pegar cartera', `
+    <p style="font-size:13px;color:var(--text-secondary);margin:0 0 10px">
+      Copia la tabla de posiciones desde la web de tu bróker (incluida la fila
+      de cabeceras) y pégala aquí. Vale cualquier formato: tabla copiada,
+      CSV, TSV, JSON o XML.
+    </p>
+    <textarea id="pf-paste-area" class="text-input" rows="10" spellcheck="false"
+      style="width:100%;font-family:monospace;font-size:12px"
+      placeholder="Ticker&#9;Cantidad&#9;Precio medio&#10;VWRL&#9;30&#9;82,33"></textarea>
+  `, () => {
+    const text = document.getElementById('pf-paste-area')?.value.trim();
+    if (!text) return showToast('No has pegado nada', 'error');
+    const { res, label } = _pfParseAny(text);
+    closeModal();
+    _pfHandleResult(res, label === 'CSV' ? 'texto pegado' : label);
+  });
+  const btn = document.getElementById('modalConfirm');
+  if (btn) btn.textContent = 'Analizar';
+}
+
+/** Enruta por contenido y parsea. Usado por archivos y por texto pegado. */
+function _pfParseAny(text) {
+  const fmt = _pfSniffFormat(text);
+  if (fmt === 'html') return { res: _pfParseHTML(text), label: 'HTML' };
+  if (fmt === 'xml') return { res: _pfParseXML(text), label: 'XML' };
+  if (fmt === 'json') return { res: _pfParseJSON(text), label: 'JSON' };
+  return { res: _pfParseCSV(text), label: 'CSV' };
+}
+
+function _pfReadText(file) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
       const enc = typeof _detectCsvEncoding === 'function' ? _detectCsvEncoding(e.target.result) : 'utf-8';
       const text = new TextDecoder(enc).decode(e.target.result);
-      const res = kind === 'json' ? _pfParseJSON(text) : _pfParseCSV(text);
-      _pfHandleResult(res, kind === 'json' ? 'JSON' : 'CSV');
+      // La extensión NO decide: un .xls puede ser HTML y un .csv venir con
+      // tabuladores. Manda lo que haya dentro.
+      const { res, label } = _pfParseAny(text);
+      _pfHandleResult(res, label);
     } catch (err) {
       console.error('[Finova] Import cartera:', err);
       showToast('No se pudo leer el archivo. Comprueba que es un export de cartera válido.', 'error');

@@ -967,8 +967,9 @@
       <div class="section-header">
         <h1>Cartera</h1>
         <div class="btn-row">
-          <button type="button" class="btn-secondary" data-action="import-portfolio" title="Importar cartera desde tu bróker (CSV, Excel o JSON)"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Importar</button>
-          <input type="file" id="portfolio-import-input" accept=".csv,.tsv,.txt,.xls,.xlsx,.xlsm,.ods,.json" style="display:none" />
+          <button type="button" class="btn-secondary" data-action="import-portfolio" title="Importar cartera desde tu bróker (CSV, TSV, Excel, JSON, XML o tabla HTML)"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Importar</button>
+          <button type="button" class="btn-secondary" data-action="paste-portfolio" title="Pegar la tabla copiada de la web de tu bróker">Pegar</button>
+          <input type="file" id="portfolio-import-input" accept=".csv,.tsv,.txt,.xls,.xlsx,.xlsm,.ods,.json,.xml,.html,.htm" style="display:none" />
           <button type="button" class="btn-secondary" data-action="export-excel" title="Exportar a Excel (4 hojas: Resumen, Cartera, Dividendos, Watchlist)"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-download"/></svg> Excel</button>
           <button type="button" class="btn-secondary btn-refresh-prices" data-action="refresh-prices">⟳ Precios</button>
           <button type="button" class="btn-secondary" data-action="refresh-fx" title="Actualizar tipos de cambio desde el BCE"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-refresh"/></svg> Divisas</button>
@@ -1944,6 +1945,16 @@
             <svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Importar
             <input type="file" id="fileRestore" accept=".json" style="display:none" aria-label="Importar backup desde archivo JSON" />
           </label>
+        </div>
+        <div class="settings-row" style="margin-top:12px">
+          <div class="settings-info">
+            <div class="settings-name">Importar cartera desde tu bróker</div>
+            <div class="settings-desc">CSV, TSV, Excel, JSON, XML o la tabla copiada de la web. Fusiona por ticker con precio medio ponderado.</div>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn-secondary" data-action="paste-portfolio">Pegar</button>
+            <button type="button" class="btn-primary" data-action="import-portfolio"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Importar archivo</button>
+          </div>
         </div>
         <div class="settings-row" style="margin-top:12px">
           <div class="settings-info">

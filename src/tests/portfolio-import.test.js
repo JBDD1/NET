@@ -42,7 +42,7 @@ beforeEach(() => {
     liabilities: [], transactions: [], networthHistory: [], portfolioSnapshots: [],
   };
   const ctx = vm.createContext({
-    APP, console, TextDecoder, TextEncoder,
+    APP, console, TextDecoder, TextEncoder, DOMParser,
     document: { getElementById: () => null },
     showToast: () => {}, saveData: () => {}, closeModal: () => {}, openModal: () => {},
     escapeHtml: s => String(s ?? ''), formatCurrency: v => `${v}`,
@@ -59,7 +59,7 @@ beforeEach(() => {
   );
   vm.runInContext(PF, ctx, { filename: 'portfolio-import.js' });
   fns = vm.runInContext(`({ _pfDetectCols, _pfRowsToAssets, _pfParseJSON, _pfParseCSV,
-                            _pfPlanMerge, _pfCurrency, _pfAssetClass, _pfCommit, _pfNorm, _pfShowPreview })`, ctx);
+                            _pfPlanMerge, _pfCurrency, _pfAssetClass, _pfCommit, _pfNorm, _pfShowPreview, _pfSniffFormat, _pfParseAny, _pfParseHTML, _pfParseXML })`, ctx);
   APP = vm.runInContext('APP', ctx);
 });
 
@@ -168,6 +168,55 @@ describe('Importación JSON', () => {
     const r = fns._pfParseJSON('{esto no es json');
     expect(r.assets).toHaveLength(0);
     expect(r.diag).toMatch(/JSON/);
+  });
+});
+
+describe('Detección de formato por contenido (la extensión miente)', () => {
+  test('reconoce HTML, XML, JSON y delimitado sin mirar el nombre del archivo', () => {
+    expect(fns._pfSniffFormat('<html><body><table><tr><td>1</td></tr></table>')).toBe('html');
+    expect(fns._pfSniffFormat('<table><tr><td>1</td></tr></table>')).toBe('html');
+    expect(fns._pfSniffFormat('<?xml version="1.0"?><p><x>1</x></p>')).toBe('xml');
+    expect(fns._pfSniffFormat('[{"ticker":"X"}]')).toBe('json');
+    expect(fns._pfSniffFormat('Ticker;Cantidad\nX;1')).toBe('delimited');
+  });
+
+  test('tabla HTML con nombre .xls — el caso real de varios brokers', () => {
+    const html = `<html><body>
+      <table><tr><td>Informe de cartera</td></tr></table>
+      <table>
+        <tr><th>Producto</th><th>Ticker</th><th>Cantidad</th><th>Precio medio</th></tr>
+        <tr><td>Vanguard FTSE All-World</td><td>VWRL</td><td>30</td><td>82,33</td></tr>
+        <tr><td>Banco Santander</td><td>SAN</td><td>500</td><td>3,20</td></tr>
+      </table></body></html>`;
+    const { res, label } = fns._pfParseAny(html);
+    expect(label).toBe('HTML');
+    expect(res.assets).toHaveLength(2);           // salta la tabla de portada
+    expect(res.assets[0].ticker).toBe('VWRL');
+    expect(res.assets[1].buyPrice).toBeCloseTo(3.2, 2);
+  });
+
+  test('XML con elementos repetidos, sin conocer el esquema del bróker', () => {
+    const xml = `<?xml version="1.0"?><cartera>
+      <position><ticker>VWRL</ticker><cantidad>30</cantidad><preciomedio>82.33</preciomedio></position>
+      <position><ticker>SAN</ticker><cantidad>500</cantidad><preciomedio>3.20</preciomedio></position>
+    </cartera>`;
+    const { res, label } = fns._pfParseAny(xml);
+    expect(label).toBe('XML');
+    expect(res.assets).toHaveLength(2);
+    expect(res.assets[0].ticker).toBe('VWRL');
+  });
+
+  test('texto pegado con tabuladores (copiar/pegar desde la web del bróker)', () => {
+    const pasted = 'Ticker\tCantidad\tPrecio medio\nVWRL\t30\t82,33\nSAN\t500\t3,20';
+    const { res, label } = fns._pfParseAny(pasted);
+    expect(label).toBe('CSV');
+    expect(res.assets).toHaveLength(2);
+  });
+
+  test('HTML sin ninguna tabla da un diagnóstico claro', () => {
+    const { res } = fns._pfParseAny('<html><body><p>Sin tablas</p></body></html>');
+    expect(res.assets).toHaveLength(0);
+    expect(res.diag).toMatch(/tabla/i);
   });
 });
 
