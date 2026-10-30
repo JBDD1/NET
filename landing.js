@@ -175,9 +175,15 @@ function lpSubmit() {
 
 function lpSignInGoogle() {
   if (!_lpAuth) return _showError('Firebase no disponible.');
+  _setLoading(true); _clearError();
   _lpAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
     .then(() => { location.href = 'index.html'; })
-    .catch(err => { if (err.code !== 'auth/popup-closed-by-user') _showError(_lpErrMsg(err.code)); });
+    .catch(err => {
+      // Cerrar el popup a mano no es un error que haya que enseñar, pero el
+      // botón tiene que volver a su sitio igualmente.
+      _setLoading(false);
+      if (err.code !== 'auth/popup-closed-by-user') _showError(_lpErrMsg(err.code));
+    });
 }
 
 function lpSendReset() {

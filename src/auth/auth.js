@@ -99,8 +99,23 @@ async function initAuth() {
       if (!_appInitialized) {
         _appInitialized = true;
         _hideLoginScreen();
-        await init();
-        _injectAuthUI();
+        // init() oculta #app-loading en su ÚLTIMA línea. Si revienta antes
+        // (datos corruptos en localStorage, una sección que falla al pintar),
+        // el spinner se queda fijo a z-index 9999 tapando la app entera y el
+        // usuario ve un "cargando" eterno tras iniciar sesión. Este listener
+        // es async y nada recoge su rechazo: el try de abajo solo envuelve el
+        // REGISTRO del listener, no su ejecución. Así que se captura aquí.
+        try {
+          await init();
+          _injectAuthUI();
+        } catch (err) {
+          console.error('[Finova Auth] Fallo al arrancar la app:', err);
+          const loading = document.getElementById('app-loading');
+          if (loading) loading.classList.add('hidden');
+          if (typeof showToast === 'function') {
+            showToast('No se pudo cargar la app. Recarga la página.', 'error');
+          }
+        }
       } else {
         // Re-login con usuario diferente en la misma pestaña → recarga limpia
         location.reload();
@@ -222,7 +237,8 @@ function _renderLoginForm(mode) {
       <div class="login-field">
         <label class="login-label">Correo electrónico</label>
         <input type="email" id="login-email" class="login-input"
-          placeholder="tu@correo.com" autocomplete="email" />
+          placeholder="tu@correo.com" autocomplete="email"
+          onkeydown="if(event.key==='Enter')_submitLogin()" />
       </div>
       <div class="login-field">
         <label class="login-label">Contraseña</label>
@@ -230,7 +246,7 @@ function _renderLoginForm(mode) {
           placeholder="••••••••" autocomplete="current-password"
           onkeydown="if(event.key==='Enter')_submitLogin()" />
       </div>
-      <div id="login-error" class="login-msg" style="display:none"></div>
+      <div id="login-error" class="login-msg" role="alert" style="display:none"></div>
       <button type="button" class="login-btn-primary" id="login-submit-btn"
         onclick="_submitLogin()">Iniciar sesión</button>
       <button type="button" class="login-forgot"
@@ -242,12 +258,14 @@ function _renderLoginForm(mode) {
       <div class="login-field">
         <label class="login-label">Tu nombre</label>
         <input type="text" id="login-name" class="login-input"
-          placeholder="Nombre (opcional)" autocomplete="name" />
+          placeholder="Nombre (opcional)" autocomplete="name"
+          onkeydown="if(event.key==='Enter')_submitLogin()" />
       </div>
       <div class="login-field">
         <label class="login-label">Correo electrónico</label>
         <input type="email" id="login-email" class="login-input"
-          placeholder="tu@correo.com" autocomplete="email" />
+          placeholder="tu@correo.com" autocomplete="email"
+          onkeydown="if(event.key==='Enter')_submitLogin()" />
       </div>
       <div class="login-field">
         <label class="login-label">Contraseña</label>
@@ -255,7 +273,7 @@ function _renderLoginForm(mode) {
           placeholder="Mínimo 6 caracteres" autocomplete="new-password"
           onkeydown="if(event.key==='Enter')_submitLogin()" />
       </div>
-      <div id="login-error" class="login-msg" style="display:none"></div>
+      <div id="login-error" class="login-msg" role="alert" style="display:none"></div>
       <button type="button" class="login-btn-primary" id="login-submit-btn"
         onclick="_submitLogin()">Crear cuenta</button>`;
   }
@@ -307,9 +325,27 @@ async function signUpEmail(email, password, name) {
   if (password.length < 6) return _showLoginMsg('La contraseña debe tener al menos 6 caracteres.', 'error');
   _setLoginLoading(true);
   try {
+    // createUserWithEmailAndPassword dispara onAuthStateChanged DE INMEDIATO,
+    // y en ese momento user.displayName todavía es null porque updateProfile
+    // no ha corrido: APP.userName se quedaba vacío y la app mostraba el
+    // trozo del correo en vez del nombre recién escrito. Se fija aquí, antes
+    // de llamar a updateProfile, para que el listener ya lo encuentre puesto
+    // (usa `APP.userName || …`, así que respeta este valor).
+    // El registro desde la landing no tenía el fallo porque encadena
+    // updateProfile ANTES de navegar a index.html.
+    if (name) APP.userName = name;
     const cred = await _fbAuth.createUserWithEmailAndPassword(email, password);
-    if (name) await cred.user.updateProfile({ displayName: name });
+    if (name) {
+      await cred.user.updateProfile({ displayName: name });
+      // Si la UI ya se pintó con el listener, se refresca con el nombre bueno.
+      if (typeof _injectAuthUI === 'function' && _appInitialized) _injectAuthUI();
+    }
   } catch (err) {
+    // Si la creación falla (correo ya en uso, red, contraseña débil…) hay que
+    // DESHACER el nombre puesto arriba: si no, queda pegado en APP y, al
+    // iniciar sesión después con otra cuenta, se mostraría ese nombre ajeno
+    // (onAuthStateChanged hace `APP.userName || …`, así que lo respetaría).
+    if (name && APP.userName === name) APP.userName = '';
     console.error('[Finova Auth] signUpEmail error:', err.code, err.message);
     _setLoginLoading(false);
     _showLoginMsg(_authErrMsg(err.code));

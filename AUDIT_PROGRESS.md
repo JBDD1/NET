@@ -3,7 +3,7 @@
 > Archivo de retoma. Si se interrumpe la auditoría, leer esto y continuar
 > desde la primera fase marcada como PENDIENTE.
 
-**Última actualización:** 30 de octubre de 2026
+**Última actualización:** 30 de octubre de 2026 (login y registro)
 **Rama:** `rediseno-ui`
 
 ---
@@ -171,6 +171,99 @@ ni la recarga a mitad de formulario.
 
 ---
 
+## FASE 5b — Login y registro · ✅ COMPLETA
+
+Auditados **los dos** sistemas de autenticación que conviven en el proyecto:
+el de dentro de la app (`src/auth/auth.js`) y el de la landing
+(`landing.js` + `landing.html`). Son implementaciones independientes, y la
+divergencia entre ellas es justo donde estaban los fallos.
+
+### Bug 1 — el registro perdía el nombre escrito (solo dentro de la app)
+
+`createUserWithEmailAndPassword()` dispara `onAuthStateChanged` **de
+inmediato**, y en ese instante `user.displayName` todavía es `null` porque
+`updateProfile()` aún no ha corrido. Como el listener hace
+`APP.userName = APP.userName || user.displayName || ''`, el nombre recién
+escrito se perdía y la app mostraba **el trozo del correo** en su lugar.
+
+La landing **no** tenía el fallo: encadena `updateProfile` *antes* de navegar
+a `index.html`.
+
+*Corregido* fijando `APP.userName` antes de crear la cuenta y refrescando la
+UI tras `updateProfile`. Y en el `catch`: si la creación falla (correo ya en
+uso, red…) el nombre se **deshace**, porque si no quedaba pegado en `APP` y
+al iniciar sesión después con otra cuenta se mostraba ese nombre ajeno.
+
+### Bug 2 — el spinner podía quedarse colgado para siempre
+
+`_hideLoginScreen()` vuelve a **mostrar** `#app-loading`, y es `init()`
+quien lo oculta **en su última línea**. El listener de `onAuthStateChanged`
+es `async` y **nada recogía su rechazo** (el `try` del fichero envuelve el
+*registro* del listener, no su ejecución). Si `init()` reventaba a mitad
+—datos corruptos en localStorage, una sección que falla al pintar— el spinner
+se quedaba fijo a `z-index: 9999` tapando la app entera: inicio de sesión
+correcto y un «cargando» eterno, sin ningún aviso.
+
+*Corregido* con un `try/catch` alrededor de `init()` que oculta el spinner y
+avisa con un toast. `_loadUserDataFromServer()` ya se comía sus propios
+errores, así que no podía romper la cadena.
+
+### Bug 3 — Enter no enviaba el formulario (en ambos sistemas)
+
+**No hay ningún `<form>`** envolviendo los campos de login, ni en
+`index.html` ni en el modal de `landing.html`: el `onkeydown` de Enter
+estaba solo en el campo de contraseña. Pulsar Enter en el correo (o en el
+nombre) no hacía absolutamente nada. Añadido a los 3 campos de los 2 sistemas
+(5 sustituciones).
+
+### Bug 4 — el mensaje de error no se anunciaba
+
+`#login-error` y `#lpFormError` se rellenan dinámicamente pero no tenían
+`role`, así que un lector de pantalla no anunciaba «Contraseña incorrecta».
+Añadido `role="alert"` a ambos. Coherente con el arreglo de los toasts de la
+Fase 7.
+
+### Bug 5 — el botón de Google no daba señal de carga (landing)
+
+`lpSignInGoogle()` no llamaba a `_setLoading()`: se podía pulsar repetidas
+veces y abrir varios popups. Añadido, con `_setLoading(false)` también al
+cerrar el popup a mano (`auth/popup-closed-by-user`), que no es un error que
+mostrar pero sí tiene que devolver el botón a su sitio.
+
+### Verificado, sin cambios
+
+| Comprobación | Resultado |
+|---|---|
+| `Cross-Origin-Opener-Policy: same-origin-allow-popups` en `server.cjs` | ✅ curl real |
+| Misma COOP en `vercel.json` (es la ruta de producción) | ✅ |
+| CSP `frame-src https://*.firebaseapp.com https://accounts.google.com` | ✅ ambos |
+| CSP `script-src` con `apis.google.com` + `www.gstatic.com` | ✅ ambos |
+| CSP `connect-src` con `identitytoolkit` + `securetoken` | ✅ ambos |
+| `_authErrMsg` / `_lpErrMsg` | 18 y 12 códigos, con fallback ✅ |
+| `_submitLogin` rechaza correo o contraseña vacíos | ✅ (hace segura la lectura de `password.length`) |
+| Contraseña < 6 se rechaza **antes** de tocar la red | ✅ en ambos |
+| `?signup=1` abre registro y se consume una sola vez | ✅ `history.replaceState` |
+| `main.inert` mientras el overlay está arriba | ✅ sin doble landmark `main` |
+| `authLogout` recarga a `location.pathname` | ✅ limpia el query string |
+| Los `onkeydown` sobreviven a Terser (`_submitLogin` es global) | ✅ comprobado en `dist/` |
+
+**Tests nuevos:** `src/tests/auth-signup.test.js`, 9 casos. Cada uno se
+validó **retirando el arreglo** y comprobando que el test se pone rojo de
+verdad: el del nombre falla sin la asignación previa, los dos de contaminación
+fallan sin el `catch` que lo deshace, y los tres de arranque fallan sin el
+`try/catch` de `init()`. Se descartó además un test estructural que seguía
+en verde con el bug presente —`indexOf('try {')` enganchaba otro `try`
+cualquiera del archivo—; ahora la extracción exige encontrar `await init()`
+dentro del bloque.
+
+**Suite: 537 en verde, 23 suites. Build correcto.**
+
+**Pendiente de navegador:** el popup real de Google contra el dominio de
+producción. Lo que se ha podido verificar sin navegador son las cabeceras que
+lo hacían fallar, y están todas correctas.
+
+---
+
 ## FASE 6 — PWA, offline y responsive · ⚠️ PARCIAL
 
 **Verificado:** `manifest.json` válido (standalone, theme_color, iconos 192 y
@@ -228,3 +321,14 @@ Ver la salida real en el informe del commit.
 4. **Iconos**: `icon-64.png` usa un diseño distinto al de `icon-16/32/128.png`
    (una "F" sólida frente a una de contorno). Están así por decisión pendiente
    de confirmar — el sidebar y el favicon se verán distintos entre sí.
+5. **Popup de Google en producción** (Fase 5b): las cabeceras que lo rompían
+   (COOP y CSP) están verificadas con curl, pero el popup real contra el
+   dominio desplegado no se puede probar sin navegador. Al probarlo, mirar
+   también que el dominio esté en Firebase Console → Authentication →
+   Authorized domains: si falta, el error que sale es
+   `auth/unauthorized-domain` y la app ya lo explica con el hostname dentro
+   del mensaje.
+6. **Eyebrow de la landing**: el `<title>` ya no dice "para la comunidad
+   FIRE", pero el texto sobre el titular del hero todavía pone "Para la
+   comunidad FIRE española". Solo se pidió cambiar el título, así que se ha
+   dejado — decir si también sale.

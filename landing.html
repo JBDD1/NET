@@ -2681,11 +2681,11 @@ async function lpJoinWaitlist(e) {
     <div class="modal-body">
       <div class="lp-field" id="lpNameField" style="display:none">
         <label class="lp-label">Tu nombre</label>
-        <input type="text" id="lpNameInput" class="lp-input" placeholder="Nombre (opcional)" autocomplete="name" />
+        <input type="text" id="lpNameInput" class="lp-input" placeholder="Nombre (opcional)" autocomplete="name" onkeydown="if(event.key==='Enter')lpSubmit()" />
       </div>
       <div class="lp-field">
         <label class="lp-label">Correo electrónico</label>
-        <input type="email" id="lpEmailInput" class="lp-input" placeholder="tu@correo.com" autocomplete="email" />
+        <input type="email" id="lpEmailInput" class="lp-input" placeholder="tu@correo.com" autocomplete="email" onkeydown="if(event.key==='Enter')lpSubmit()" />
       </div>
       <div class="lp-field">
         <label class="lp-label">Contraseña</label>
@@ -2698,7 +2698,7 @@ async function lpJoinWaitlist(e) {
           </button>
         </div>
       </div>
-      <div class="lp-form-error" id="lpFormError"></div>
+      <div class="lp-form-error" id="lpFormError" role="alert"></div>
       <button class="lp-submit" id="lpSubmitBtn" onclick="lpSubmit()">Iniciar sesión</button>
       <div class="lp-forgot-row" id="lpForgotWrap">
         <button class="lp-forgot-btn" onclick="lpSendReset()">¿Olvidaste tu contraseña?</button>
