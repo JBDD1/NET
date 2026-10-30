@@ -187,7 +187,8 @@ describe('Upsert por ticker con precio medio ponderado', () => {
     // _pfShowPreview deja el plan pendiente; _pfCommit lo aplica. Se recorre
     // esa ruta en vez de replicar la fusión en el test.
     fns._pfShowPreview({ assets: [
-      { ticker: 'VWRL', name: 'Vanguard', quantity: 10, buyPrice: 91, currentPrice: 105, currency: 'EUR', exchangeRate: 1 },
+      // hasCurrentPrice: el archivo trae cotización propia, así que manda
+      { ticker: 'VWRL', name: 'Vanguard', quantity: 10, buyPrice: 91, currentPrice: 105, hasCurrentPrice: true, currency: 'EUR', exchangeRate: 1 },
     ], errors: [] }, 'CSV');
     fns._pfCommit();
     expect(APP.portfolio).toHaveLength(1);
@@ -208,6 +209,30 @@ describe('Upsert por ticker con precio medio ponderado', () => {
     expect(a.ticker).toBe('SAN');
     expect(a.buyPrice).toBe(3.2);
     expect(a.exchangeRate).toBe(1);
+  });
+
+  test('fusionar con un archivo SIN precio actual no machaca el precio vivo', () => {
+    // Caso real: la cartera tiene VWRL a 102 € (precio refrescado). El export
+    // del bróker solo trae coste medio, sin cotización. Antes, el parser
+    // rellenaba currentPrice con buyPrice y la fusión lo daba por bueno: el
+    // precio actual pasaba a 82,33 € y la ganancia mostrada se evaporaba.
+    APP.portfolio.push({ id: 'a1', ticker: 'VWRL', name: 'Vanguard', quantity: 20, buyPrice: 78, currentPrice: 102, currency: 'EUR', exchangeRate: 1 });
+    const { assets } = fns._pfParseCSV('Ticker;Cantidad;Precio medio\nVWRL;10;91,00');
+    expect(assets[0].hasCurrentPrice).toBe(false);
+    fns._pfShowPreview({ assets, errors: [] }, 'CSV');
+    fns._pfCommit();
+    expect(APP.portfolio).toHaveLength(1);
+    expect(APP.portfolio[0].currentPrice).toBe(102);          // intacto
+    expect(APP.portfolio[0].buyPrice).toBeCloseTo(82.3333, 3); // el medio sí se recalcula
+  });
+
+  test('si el archivo SÍ trae precio actual, ese manda (es más reciente)', () => {
+    APP.portfolio.push({ id: 'a1', ticker: 'VWRL', quantity: 20, buyPrice: 78, currentPrice: 102, currency: 'EUR', exchangeRate: 1 });
+    const { assets } = fns._pfParseCSV('Ticker;Cantidad;Precio medio;Precio actual\nVWRL;10;91,00;105,00');
+    expect(assets[0].hasCurrentPrice).toBe(true);
+    fns._pfShowPreview({ assets, errors: [] }, 'CSV');
+    fns._pfCommit();
+    expect(APP.portfolio[0].currentPrice).toBe(105);
   });
 
   test('una posición en conflicto de divisa NO se importa', () => {

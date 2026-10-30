@@ -148,8 +148,13 @@ function _pfRowsToAssets(rows) {
 
     // Sin precio actual en el archivo se usa el de compra: la posición entra
     // con 0 % de rentabilidad en vez de inventarse una cotización.
+    // hasCurrentPrice distingue "el archivo traía cotización" de "se rellenó
+    // con el precio de compra". Sin esa marca, al FUSIONAR no había forma de
+    // saberlo (currentPrice nunca es 0) y se machacaba el precio vivo ya
+    // guardado con el de compra, evaporando la ganancia mostrada.
     const currentRaw = _parseCSVAmt(cell(row, cols.currentPrice));
-    const currentPrice = currentRaw > 0 ? currentRaw : buyPrice;
+    const hasCurrentPrice = currentRaw > 0;
+    const currentPrice = hasCurrentPrice ? currentRaw : buyPrice;
 
     const currency = _pfCurrency(cell(row, cols.currency));
     const buyDate = cols.buyDate != null && typeof _parseCSVDate === 'function'
@@ -161,6 +166,7 @@ function _pfRowsToAssets(rows) {
       quantity,
       buyPrice,
       currentPrice,
+      hasCurrentPrice,
       currency,
       // exchangeRate = euros por 1 unidad de la divisa. No se inventa: si no
       // es EUR se deja a 1 y se avisa, porque un tipo de cambio inventado
@@ -199,13 +205,15 @@ function _pfParseJSON(text) {
     if (!ticker && !name) { errors.push({ line: i + 1, reason: 'Sin ticker ni nombre' }); return; }
     if (!(quantity > 0)) { errors.push({ line: i + 1, reason: 'Cantidad no válida', name: name || ticker }); return; }
     if (!(buyPrice > 0)) { errors.push({ line: i + 1, reason: 'Falta el precio de compra', name: name || ticker }); return; }
-    const currentPrice = _num(o.currentPrice ?? o.current_price ?? o.price) || buyPrice;
+    const currentRaw = _num(o.currentPrice ?? o.current_price ?? o.price);
+    const hasCurrentPrice = currentRaw > 0;
     assets.push({
       ticker: ticker || name.slice(0, 12).toUpperCase(),
       name,
       quantity,
       buyPrice,
-      currentPrice,
+      currentPrice: hasCurrentPrice ? currentRaw : buyPrice,
+      hasCurrentPrice,
       currency: _pfCurrency(o.currency),
       exchangeRate: _num(o.exchangeRate) > 0 ? _num(o.exchangeRate) : 1,
       buyDate: String(o.buyDate ?? o.buy_date ?? '').slice(0, 10),
@@ -441,8 +449,12 @@ function _pfCommit() {
           ...APP.portfolio[idx],
           quantity: p.mergedQuantity,
           buyPrice: p.mergedBuyPrice,
-          // El precio actual del archivo es más reciente que el guardado.
-          currentPrice: inc.currentPrice > 0 ? inc.currentPrice : _num(APP.portfolio[idx].currentPrice),
+          // Solo se pisa el precio actual si el archivo traía cotización DE
+          // VERDAD. Si no la traía, el parser lo rellenó con el de compra, y
+          // darlo por bueno aquí machacaría el precio vivo ya guardado.
+          currentPrice: inc.hasCurrentPrice
+            ? inc.currentPrice
+            : _num(APP.portfolio[idx].currentPrice) || inc.currentPrice,
         };
         merged++;
       }
