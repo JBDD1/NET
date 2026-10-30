@@ -1027,21 +1027,44 @@ async function handleAIProxy(req, res) {
 // Uses Admin SDK (with revocation check) when available; custom RS256 otherwise.
 async function _requireAuth(req, res) {
   if (!_AUTH_ENABLED) { req.uid = 'dev-uid'; return 'dev-uid'; }
+
+  // Antifuerza-bruta: _recordFailedAttempt/_isIPBlocked existían desde hacía
+  // tiempo pero NO se invocaban desde ningún sitio. Como la autenticación
+  // corre ANTES del rate limit en todos los handlers, una IP podía martillear
+  // cualquier endpoint protegido con tokens basura de forma indefinida: nunca
+  // gastaba cubo (no había 429) ni se bloqueaba, y cada intento seguía
+  // costando un parseo de JWT y, con Firebase Admin activo, una verificación
+  // criptográfica. Comprobado con 20 peticiones seguidas a /api/ai: las 20
+  // devolvían 401, ninguna 429.
+  const ip = _clientIp(req);
+  if (_isIPBlocked(ip)) {
+    res.writeHead(429, _apiHeaders(req, { 'Retry-After': '3600' }));
+    res.end(JSON.stringify({ error: 'Demasiados intentos fallidos. Inténtalo dentro de 1 hora.' }));
+    return null;
+  }
+
   const authHeader = req.headers['authorization'] || '';
   try {
     if (_adminReady) {
       if (!authHeader.startsWith('Bearer ')) throw Object.assign(new Error('Token ausente'), { code: 'auth/no-token' });
       const decoded = await _adminSDK.auth().verifyIdToken(authHeader.slice(7).trim(), true);
       req.uid = decoded.uid;
+      _clearFailedAttempts(ip);
       return decoded.uid;
     }
-    const uid = await _verifyFirebaseToken(authHeader);
+    const uid = await _verifyFirebaseToken(authHeader, req);
     req.uid = uid;
+    _clearFailedAttempts(ip);   // sesión legítima: se borra el historial de la IP
     return uid;
   } catch (e) {
     const code      = e.code || '';
     const isExpired = code === 'auth/id-token-expired' || e.message === 'Token expirado';
     const isRevoked = code === 'auth/id-token-revoked';
+    // Un token CADUCADO o REVOCADO es un usuario legítimo cuya sesión venció
+    // (el SDK de Firebase lo renueva solo): no cuenta como intento hostil.
+    // Solo se penaliza el token inválido o ausente, que es lo que manda quien
+    // está probando a ciegas.
+    if (!isExpired && !isRevoked) _recordFailedAttempt(ip);
     res.writeHead(401, _apiHeaders(req));
     res.end(JSON.stringify({
       error: isExpired ? 'Sesión expirada. Vuelve a iniciar sesión.' :
@@ -1333,7 +1356,33 @@ function _b64urlDecode(s) {
 
 // Verifies a Firebase ID Token (RS256 JWT) and returns the verified UID.
 // Throws on any validation failure — never returns an unverified UID.
-async function _verifyFirebaseToken(authHeader) {
+/**
+ * Verifica un ID token de Firebase.
+ *
+ * El parámetro `req` es opcional pero conviene pasarlo SIEMPRE: con él se
+ * lleva la cuenta antifuerza-bruta por IP. Había tres handlers
+ * (handleUserDataGet/Post, handleUserMeta) que llamaban aquí directamente en
+ * vez de pasar por _requireAuth, así que poner la contabilidad solo en
+ * _requireAuth dejaba fuera justo los endpoints de datos del usuario. Aquí
+ * dentro la cubre pase por donde pase la petición.
+ */
+async function _verifyFirebaseToken(authHeader, req) {
+  const ip = req ? _clientIp(req) : null;
+  if (ip && _isIPBlocked(ip)) throw Object.assign(new Error('IP bloqueada'), { code: 'auth/ip-blocked' });
+  try {
+    const uid = await _verifyFirebaseTokenInner(authHeader);
+    if (ip) _clearFailedAttempts(ip);
+    return uid;
+  } catch (e) {
+    // Un token caducado es un usuario legítimo cuya sesión venció (el SDK lo
+    // renueva solo): no se penaliza. Lo demás sí cuenta como intento a ciegas.
+    const expired = e.message === 'Token expirado' || e.code === 'auth/id-token-expired';
+    if (ip && !expired && e.code !== 'auth/ip-blocked') _recordFailedAttempt(ip);
+    throw e;
+  }
+}
+
+async function _verifyFirebaseTokenInner(authHeader) {
   if (!authHeader || !authHeader.startsWith('Bearer ')) throw new Error('Token ausente');
   const parts = authHeader.slice(7).trim().split('.');
   if (parts.length !== 3) throw new Error('Token malformado');
@@ -1440,7 +1489,7 @@ async function handleUserDataGet(req, res) {
   let uid;
   if (_AUTH_ENABLED) {
     try {
-      uid = await _verifyFirebaseToken(req.headers['authorization']);
+      uid = await _verifyFirebaseToken(req.headers['authorization'], req);
     } catch (e) {
       res.writeHead(401, _apiHeaders(req));
       return res.end(JSON.stringify({ error: 'Token inválido.' }));
@@ -1488,7 +1537,7 @@ async function handleUserDataPost(req, res) {
   let verifiedUid = null;
   if (_AUTH_ENABLED) {
     try {
-      verifiedUid = await _verifyFirebaseToken(req.headers['authorization']);
+      verifiedUid = await _verifyFirebaseToken(req.headers['authorization'], req);
       req.uid = verifiedUid;
     } catch (e) {
       res.writeHead(401, _apiHeaders(req));
@@ -1765,7 +1814,7 @@ async function handleUserMeta(req, res) {
   let verifiedUid = null;
   if (_AUTH_ENABLED) {
     try {
-      verifiedUid = await _verifyFirebaseToken(req.headers['authorization']);
+      verifiedUid = await _verifyFirebaseToken(req.headers['authorization'], req);
       req.uid = verifiedUid;
     } catch (e) {
       res.writeHead(401, _apiHeaders(req));
@@ -2192,6 +2241,19 @@ http.createServer((req, res) => {
       ..._SEC,
     });
     return res.end();
+  }
+
+  // Health check — para monitorización y despliegues (Railway reinicia el
+  // contenedor si deja de responder). Público a propósito: no expone nada
+  // sensible, solo que el proceso está vivo y desde cuándo. Sin versiones de
+  // dependencias ni rutas internas, que son información útil para un atacante.
+  if (req.method === 'GET' && req.url === '/api/health') {
+    res.writeHead(200, _apiHeaders(req));
+    return res.end(JSON.stringify({
+      ok: true,
+      uptime: Math.floor(process.uptime()),
+      ts: new Date().toISOString(),
+    }));
   }
 
   // AI status
