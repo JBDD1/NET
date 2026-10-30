@@ -765,6 +765,27 @@ function _txModalFill(tx) {
   return frag;
 }
 
+/**
+ * Alta de una transacción: ÚNICA ruta de creación de la app.
+ * La usan el formulario normal (_txSave) y el escáner de tickets, para que no
+ * haya dos caminos que puedan divergir en los efectos secundarios (impacto en
+ * la cuenta de efectivo vinculada y aviso de progreso de objetivos).
+ * No guarda ni renderiza: de eso se encarga quien llama, que sabe si está en
+ * mitad de un lote o de una sola alta.
+ */
+function _txCreate({ type, date, description, category, amount, note = '', favorite = false, photoId, tripId, receipt }) {
+  const entry = { id: generateId(), type, date, description, category, amount, note, favorite };
+  if (photoId) entry.photoId = photoId;
+  if (tripId)  entry.tripId  = tripId;
+  // Datos extraídos de un ticket escaneado (productos, IVA, nº de ticket…).
+  // Campo opcional: una transacción escrita a mano simplemente no lo lleva.
+  if (receipt) entry.receipt = receipt;
+  APP.transactions.push(entry);
+  _applyTxCashImpact(entry, 1);
+  if (typeof _notifyGoalProgress === 'function') _notifyGoalProgress(entry);
+  return entry;
+}
+
 async function _txSave(prefill, isEdit) {
   const type        = document.getElementById('f-tx-type').value;
   const date        = document.getElementById('f-tx-date').value;
@@ -800,12 +821,7 @@ async function _txSave(prefill, isEdit) {
       _applyTxCashImpact(updated, 1);
     }
   } else {
-    const entry = { id: generateId(), type, date, description, category, amount, note, favorite };
-    if (photoId) entry.photoId = photoId;
-    if (tripId)  entry.tripId  = tripId;
-    APP.transactions.push(entry);
-    _applyTxCashImpact(entry, 1);
-    if (typeof _notifyGoalProgress === 'function') _notifyGoalProgress(entry);
+    _txCreate({ type, date, description, category, amount, note, favorite, photoId, tripId });
   }
 
   _patWrite(txPatternKey(description), category);
@@ -862,6 +878,55 @@ async function _txSave(prefill, isEdit) {
   }
 }
 
+/**
+ * Muestra lo que el escáner leyó del ticket: productos, IVA y datos del
+ * documento. Es solo lectura — los campos editables (importe, fecha,
+ * categoría) son los del propio formulario, que ya existen: así no hay dos
+ * sitios donde cambiar lo mismo.
+ */
+function _txRenderReceiptDetail(r) {
+  const anchor = document.getElementById('tx-photo-preview');
+  if (!anchor || anchor.parentElement.querySelector('.tx-receipt-detail')) return;
+
+  const meta = [
+    r.receiptNumber ? `Nº ${escapeHtml(r.receiptNumber)}` : null,
+    r.time ? `${escapeHtml(r.time)}` : null,
+    r.paymentMethod ? `Pago: ${escapeHtml(r.paymentMethod)}` : null,
+    r.taxId ? `CIF ${escapeHtml(r.taxId)}` : null,
+  ].filter(Boolean).join(' · ');
+
+  const tax = [
+    r.taxBase != null ? `Base ${formatCurrency(r.taxBase)}` : null,
+    r.taxAmount != null ? `IVA${r.taxRate ? ` ${r.taxRate}%` : ''} ${formatCurrency(r.taxAmount)}` : null,
+    r.discount ? `Dto. ${formatCurrency(r.discount)}` : null,
+  ].filter(Boolean).join(' · ');
+
+  const items = Array.isArray(r.items) && r.items.length
+    ? `<table class="data-table" style="margin-top:8px">
+         <thead><tr><th>Producto</th><th class="text-right">Uds</th><th class="text-right">Importe</th></tr></thead>
+         <tbody>${r.items.map(it => `<tr>
+           <td style="font-size:11.5px">${escapeHtml(it.name)}</td>
+           <td class="text-right" style="font-size:11.5px">${it.qty ?? '—'}</td>
+           <td class="text-right" style="font-size:11.5px">${it.total != null ? formatCurrency(it.total) : '—'}</td>
+         </tr>`).join('')}</tbody>
+       </table>` : '<div style="font-size:12px;color:var(--text-muted);margin-top:6px">No se detectaron productos individuales.</div>';
+
+  const box = document.createElement('details');
+  box.className = 'settings-collapsible tx-receipt-detail';
+  box.style.marginTop = '10px';
+  box.innerHTML = `
+    <summary class="settings-collapsible-summary">
+      <div class="settings-section-label" style="margin:0">🧾 Datos del ticket escaneado</div>
+      <svg class="icon icon-sm settings-collapsible-chevron" aria-hidden="true"><use href="#icon-chevron-right"/></svg>
+    </summary>
+    <div style="margin-top:8px">
+      ${meta ? `<div style="font-size:12px;color:var(--text-muted)">${meta}</div>` : ''}
+      ${tax ? `<div style="font-size:12px;color:var(--text-muted);margin-top:4px">${tax}</div>` : ''}
+      ${items}
+    </div>`;
+  anchor.parentElement.appendChild(box);
+}
+
 function _txModalSetupListeners(tx) {
   if (!tx.id && APP.txPhotoDraftId) {
     loadPhoto(APP.txPhotoDraftId).then(dataUrl => {
@@ -896,6 +961,11 @@ function _txModalSetupListeners(tx) {
     if (desc.length >= 2) autoSuggestCategory(desc);
   });
   if (tx.description) setTimeout(() => autoSuggestCategory(tx.description), 80);
+
+  // Desglose del ticket escaneado (productos, IVA, nº de ticket). Solo
+  // aparece si la transacción vino del escáner; una escrita a mano no lo
+  // lleva. Se inyecta junto a la foto, que ya se carga más abajo.
+  if (tx.receipt) _txRenderReceiptDetail(tx.receipt);
 
   if (tx.photoId) {
     loadPhoto(tx.photoId).then(dataUrl => {

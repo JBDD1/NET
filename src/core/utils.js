@@ -77,6 +77,8 @@ const _LAZY_SCRIPTS = {
   // Importador de carteras de bróker: solo se usa al pulsar "Importar" en
   // Cartera, no tiene sentido descargarlo en cada visita.
   pfImport:   'src/utils/portfolio-import.js',
+  // Escáner de tickets: se trae al pulsar "Escanear ticket".
+  receiptScan: 'src/utils/receipt-scan.js',
 };
 
 /* ── _ensureScript (cache-aware dynamic loader) ── */

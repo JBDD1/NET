@@ -8661,3 +8661,15 @@ tr[tabindex="0"]:focus {
 @media (max-width: 480px) {
   .stk-assets-grid { grid-template-columns: 1fr; }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   ESCÁNER DE TICKETS — indicador de confianza del OCR
+───────────────────────────────────────────────────────────── */
+.rs-conf {
+  display: inline-block; margin-left: 6px; padding: 1px 6px;
+  border-radius: 99px; font-size: 9.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em; vertical-align: middle;
+}
+.rs-conf--high { background: var(--up-soft);   color: var(--up); }
+.rs-conf--mid  { background: var(--accent-soft); color: var(--accent); }
+.rs-conf--low  { background: var(--down-soft); color: var(--down); }

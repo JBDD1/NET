@@ -726,6 +726,10 @@
           </div>
           <input type="file" id="csv-import-input" accept=".csv,.txt,.xls,.xlsx,.xlsm,.ods" style="display:none" />
           <input type="file" id="ofx-import-input" accept=".ofx,.qfx,.ofc" style="display:none" />
+          <button type="button" class="btn-secondary" data-action="scan-receipt" title="Fotografía un ticket y se registra solo"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-camera"/></svg> Escanear ticket</button>
+          <!-- capture="environment" abre directamente la cámara trasera en
+               móvil; en ordenador el navegador ofrece el selector de archivos. -->
+          <input type="file" id="receipt-scan-input" accept="image/*" capture="environment" style="display:none" />
           <button type="button" class="btn-primary" id="btnAddTransaction" data-action="add-transaction" aria-keyshortcuts="n" title="Añadir transacción (N)">+ Añadir</button>
           <button type="button" class="btn-secondary" id="btnManageCategories" data-action="manage-categories">Categorías</button>
         </div>

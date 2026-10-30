@@ -1065,6 +1065,31 @@ function requireAccountFor(actionLabel) {
 // Carga perezosa del importador de carteras (mismo patrón que _withPdf): el
 // módulo solo hace falta al pulsar "Importar" en Cartera. El diálogo de
 // archivo se abre DESPUÉS de cargarlo, para que el input ya esté cableado.
+// Escáner de tickets, mismo patrón de carga diferida que el importador: el
+// módulo solo se descarga al pulsar el botón, y el <input type=file> se
+// cablea al vuelo porque events.js ya corrió cuando aún no existía.
+async function _withReceiptScanner(btn) {
+  const original = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.textContent = 'Preparando…'; }
+  try {
+    if (typeof openReceiptScanner !== 'function') {
+      await _lazyLoad(_LAZY_SCRIPTS.receiptScan);
+      const inp = document.getElementById('receipt-scan-input');
+      if (inp && !inp._rsWired) {
+        inp._rsWired = true;
+        inp.addEventListener('change', function () { handleReceiptFile(this); });
+      }
+    }
+    if (typeof openReceiptScanner === 'function') openReceiptScanner();
+    else showToast('No se pudo cargar el escáner de tickets', 'error');
+  } catch (err) {
+    console.error(err);
+    showToast('No se pudo cargar el escáner de tickets', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = original; }
+  }
+}
+
 async function _withPortfolioImport(btn, mode) {
   const original = btn ? btn.innerHTML : null;
   if (btn) { btn.disabled = true; btn.textContent = 'Preparando…'; }
@@ -1160,6 +1185,7 @@ function _globalClickDispatch(e) {
     case 'export-excel':               exportPortfolioExcel(); break;
     case 'import-portfolio':           _withPortfolioImport(el); break;
     case 'paste-portfolio':            _withPortfolioImport(el, 'paste'); break;
+    case 'scan-receipt':               _withReceiptScanner(el); break;
     case 'refresh-prices':             refreshAllPrices(); break;
     case 'refresh-fx':                 refreshExchangeRates(); break;
     case 'add-asset':                  openAddAsset(); break;

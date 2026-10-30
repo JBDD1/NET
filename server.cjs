@@ -977,9 +977,22 @@ async function handleAIProxy(req, res) {
 
   if (!_requireJson(req, res)) return;
   let body = '';
-  req.on('data', c => body += c);
+  // /api/ai no tenía NINGÚN límite de tamaño: se acumulaba el body entero en
+  // memoria, así que una petición grande (o muchas a la vez) podía tumbar el
+  // proceso. Importa aún más desde que el escáner de tickets manda imágenes
+  // en base64. Mismo patrón que handleUserDataPost: bandera + corte en seco.
+  let oversize = false;
+  req.on('data', c => {
+    if (oversize) return;
+    body += c;
+    if (body.length > _AI_MAX_BYTES) { oversize = true; body = ''; }
+  });
   req.on('end', async () => {
     try {
+      if (oversize) {
+        res.writeHead(413, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'Imagen o consulta demasiado grande (máx 6 MB).' }));
+      }
       const { provider, apiKey, messages, anonMode, snapshot } = JSON.parse(body);
       const systemPrompt = _buildServerSystemPrompt(!!anonMode, snapshot);
       const userKey      = (apiKey || '').trim();
@@ -1679,6 +1692,9 @@ function handleWaitlist(req, res) {
 /* ─── Sync backup ────────────────────────────────────────────── */
 const _SYNC_CODE_RE   = /^[a-f0-9]{8,16}$/;
 const _SYNC_MAX_BYTES = 8_000_000;
+// Tope del body de /api/ai. Holgado para una foto de ticket en base64
+// (~1,3× el tamaño del JPEG) pero acotado: antes no había ninguno.
+const _AI_MAX_BYTES   = 6_000_000;
 
 async function handleSyncUpload(req, res) {
   if (!_checkRateLimit(req, res, 'syncUpload')) return;
