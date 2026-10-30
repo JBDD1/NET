@@ -208,7 +208,16 @@ const _SEC = {
   'Referrer-Policy':              'strict-origin-when-cross-origin',
   'Permissions-Policy':           'camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=(), fullscreen=(self), picture-in-picture=(), interest-cohort=()',
   'Cross-Origin-Resource-Policy': 'same-origin',
-  'Cross-Origin-Opener-Policy':   'same-origin',
+  // 'same-origin' a secas ROMPE el login con Google: corta la relación
+  // window.opener con los popups, así que el handler de Firebase
+  // (finova-92100.firebaseapp.com/__/auth/handler) no puede devolver la
+  // credencial a la ventana que lo abrió — el popup se queda colgado en
+  // "Selecciona una cuenta" y la sesión nunca se inicia.
+  // 'same-origin-allow-popups' mantiene el aislamiento frente a ventanas que
+  // NOS abran a nosotros, pero deja que los popups que abrimos nos
+  // referencien. Es el valor que ya usaba vercel.json; aquí se había quedado
+  // el estricto, así que el fallo solo se daba en local.
+  'Cross-Origin-Opener-Policy':   'same-origin-allow-popups',
 };
 
 // Content Security Policy — aplicado a respuestas HTML
