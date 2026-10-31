@@ -773,6 +773,8 @@ function _assetSave(prefill, isEdit) {
     if (idx >= 0) APP.portfolio[idx] = { ...prefill, name, ticker, buyPrice, currentPrice, quantity, buyDate, country, sector, currency, exchangeRate };
     showToast('Activo actualizado ✓', 'success');
   } else {
+    // Hito del embudo: el primer activo. Se mide antes del push (longitud 0).
+    if (typeof track === 'function' && APP.portfolio.length === 0) track('primer_activo_cartera');
     APP.portfolio.push({ id: generateId(), name, ticker, buyPrice, currentPrice, quantity, buyDate, country, sector, currency, exchangeRate });
     showToast('Activo añadido ✓', 'success');
   }

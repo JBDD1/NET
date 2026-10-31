@@ -111,6 +111,76 @@
   _on('btn-admin-load-demo',    'click', _adminLoadDemoData);
   _on('btn-admin-health-check', 'click', function () { _withAdmin(function () { adminHealthCheck(); }); });
   _on('btn-admin-fb-refresh',   'click', function () { _withAdmin(function () { adminRefreshFeedback(); }); });
+  _on('btn-admin-test-error-front',  'click', function () { _withAdmin(function () { adminTestErrorFront(); }); });
+
+  // ── Privacidad: informes de errores y estadísticas ───────────
+  // Los dos interruptores reflejan el estado REAL, no el deseado: si falta el
+  // DSN o estás en localhost, Sentry no envía nada y el texto lo dice, en vez
+  // de mostrar un interruptor encendido que no hace nada.
+  (function () {
+    var errT = document.getElementById('settings-error-reports');
+    var anaT = document.getElementById('settings-analytics');
+    var note = document.getElementById('settings-privacy-note');
+
+    function refrescar() {
+      var mon = window.fvMonitor;
+      var monConfigurado = !!mon;
+      var anaConfigurada = typeof analyticsOptedOut === 'function';
+      if (errT) {
+        errT.checked  = monConfigurado ? !mon.optedOut : false;
+        errT.disabled = !monConfigurado;
+      }
+      if (anaT) {
+        anaT.checked  = anaConfigurada ? !analyticsOptedOut() : false;
+        anaT.disabled = !anaConfigurada;
+      }
+      if (!note) return;
+      var activo = monConfigurado && mon.enabled;
+      var anaAct = typeof analyticsActive === 'function' && analyticsActive();
+      if (!monConfigurado) {
+        note.textContent = 'La monitorización no está configurada en esta instalación: no se envía nada.';
+      } else if (!activo && !mon.optedOut) {
+        note.textContent = 'Ahora mismo no se envía nada: estás en local o falta la configuración del servicio.';
+      } else {
+        note.textContent = 'Estado actual — errores: ' + (activo ? 'enviando' : 'desactivado') +
+          ' · estadísticas: ' + (anaAct ? 'enviando' : 'desactivadas') + '.';
+      }
+    }
+
+    if (errT) errT.addEventListener('change', function () {
+      var mon = window.fvMonitor;
+      if (!mon) return;
+      if (this.checked) {
+        mon.optIn();
+        // Activar requiere recargar: el SDK solo se inicializa al arrancar, y
+        // no se puede "encender" a mitad de sesión sin dejarlo a medias.
+        if (typeof showToast === 'function') {
+          showToast('Los informes de errores se activarán al recargar la página.', 'info');
+        }
+      } else {
+        mon.optOut();
+        if (typeof showToast === 'function') showToast('Ya no se enviarán informes de errores.', 'success');
+      }
+      refrescar();
+    });
+
+    if (anaT) anaT.addEventListener('change', function () {
+      if (typeof analyticsOptIn !== 'function') return;
+      if (this.checked) {
+        analyticsOptIn();
+        if (typeof showToast === 'function') {
+          showToast('Las estadísticas se activarán al recargar la página.', 'info');
+        }
+      } else {
+        analyticsOptOut();
+        if (typeof showToast === 'function') showToast('Ya no se enviarán estadísticas.', 'success');
+      }
+      refrescar();
+    });
+
+    refrescar();
+  })();
+  _on('btn-admin-test-error-server', 'click', function () { _withAdmin(function () { adminTestErrorServer(); }); });
   // El filtro recarga directamente: no tiene sentido obligar a pulsar
   // "Actualizar" después de cambiar el desplegable.
   _on('admin-fb-filter',        'change', function () { _withAdmin(function () { adminRefreshFeedback(); }); });

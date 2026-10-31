@@ -701,6 +701,174 @@ Ver `FEEDBACK_SETUP.md` para la configuración manual.
 
 ---
 
+## FASE 12 — Monitorización para el lanzamiento · ✅ COMPLETA
+
+Sentry (navegador y servidor), health checks para UptimeRobot y analítica sin
+cookies. **Todo funciona con las variables vacías**: sin configurar nada no se
+envía nada a ningún tercero y la app no cambia.
+
+### El problema de arquitectura que había que resolver primero
+
+El proyecto son **scripts clásicos**, no módulos ES: `@sentry/browser` no se
+puede cargar con un `<script defer src>`. La solución fue hacer de
+`src/core/monitoring.js` el **único módulo ES del proyecto**, cargado con
+`<script type="module">` desde `index.html` y `landing.html` — que son inputs
+de Rollup, así que lo empaqueta junto al SDK. Expone una API mínima en
+`window.fvMonitor`, y los scripts clásicos la llaman con guarda
+(`window.fvMonitor?.capture(...)`).
+
+Hizo falta además:
+- Excluir `monitoring.js` del copiado de scripts clásicos en `vite.config.js`,
+  o habría quedado en `dist/` un fichero muerto con un `import` sin resolver.
+- Que el middleware de desarrollo **salte los módulos de verdad**: solo
+  existe para sustituir `import.meta` en los clásicos, y a un módulo le
+  rompería los *bare imports*.
+
+### Efecto secundario inesperado y bueno
+
+Con `VITE_SENTRY_DSN` vacía, Terser demuestra que `_enabled` es siempre
+`false` y **elimina el SDK entero**: el bundle queda en 16 KB. Con DSN sube a
+96 KB (33 KB comprimido). Es decir, **coste cero mientras no se configure**.
+
+### Privacidad: la pieza central
+
+Los patrones de redacción viven en `src/core/redact-patterns.json`, que es
+**fuente única** — la importa `monitoring.js` (módulo ES, vía Vite) y la lee
+`server.cjs` (CommonJS, vía require). Está en JSON precisamente porque es el
+único formato que los dos pueden leer sin duplicar código.
+
+Redacta importes (con € y sin él), formato español e inglés, IBAN, tarjetas,
+correos, JWT, cabeceras Authorization, las claves de los 4 proveedores de IA
+y los uid de Firebase. **El mensaje del error sigue siendo legible**, que es
+la condición para que Sentry sirva de algo.
+
+| Desactivado | Por qué |
+|---|---|
+| Session Replay | Graba la pantalla; aquí la pantalla **es** el dato |
+| `tracesSampleRate` | Cada traza lleva URL y tiempos |
+| Migas de consola y de clic | El texto pulsado puede ser un importe o un nombre |
+| `HttpContext` (navegador) | Añade URL completa, cabeceras y user agent |
+| `RequestData` (servidor) | Cabeceras con Authorization, cookies, query y cuerpo |
+| `LocalVariablesAsync` (servidor) | **Los valores de las variables locales**: importes, uid, tokens |
+| `Console` (los dos) | Logs con rutas e identificadores |
+
+El usuario se identifica solo con un hash de 16 caracteres calculado **en el
+navegador**: el uid no sale nunca.
+
+### Fuga real encontrada al probarlo
+
+Monté un receptor falso de Sentry y disparé el error de prueba. El mensaje
+salía redactado, pero `pre_context`, `context_line` y `post_context` —las
+líneas de código que adjunta la integración `ContextLines`— llevaban **el
+IBAN y el token en claro**, porque están escritos literalmente en el fuente
+del propio error de prueba. El frontend ya las borraba; el servidor no.
+
+Se decidió **redactarlas en vez de borrarlas**: sin source maps en el
+servidor son lo que hace legible una traza, pero si alguien deja una cadena
+con pinta de token escrita en el código, saldría tal cual. Verificado después:
+8 redacciones aplicadas, 0 fugas.
+
+### Dos bugs del servidor corregidos
+
+1. **`/api/health` era inalcanzable para un monitor externo.** El chequeo de
+   `FINOVA_PROXY_SECRET` corre para todo `/api/*` **antes** del enrutado, así
+   que UptimeRobot apuntando directamente a Railway habría recibido un 403 y
+   reportado una caída permanente. Ahora la salud se responde antes de esa
+   comprobación; el resto de endpoints siguen protegidos (verificado con
+   curl: health 200, `/api/ai-status` 403). Se quitó además el `uptime` que
+   exponía, que es estado interno.
+2. **No había apagado ordenado ni manejadores de proceso.** El encargo decía
+   «mantén el graceful shutdown» dando por hecho que existía: no existía. En
+   cada despliegue de Railway se cortaban las peticiones en vuelo y se perdía
+   hasta **5 minutos** de estado del rate limit (`_saveRateLimits` corre cada
+   300 s). Ahora: cerrar → guardar → `flush` de Sentry → salir, en ese orden,
+   y un test fija el orden. `uncaughtException` sale por ahí para que el error
+   llegue a Sentry antes; `unhandledRejection` **no** tumba el servidor,
+   porque suele venir de una petición concreta.
+
+Y una tercera, menor: `_isAdminUid` rechazaba `dev-uid` por `_UID_RE`, así que
+**el panel de admin era imposible de probar en local**. Se acepta solo cuando
+`FINOVA_DISABLE_AUTH=true`, es decir cuando ya no hay autenticación en
+absoluto.
+
+### Source maps: por qué quedan OPCIONALES
+
+Hallazgo que cambia la recomendación: `vite.config.js` usa
+`mangle.toplevel: false` (el HTML llama a las funciones por nombre con
+`onclick`), así que **los nombres de función se conservan en producción** —
+comprobado en `dist/`: `_txCreate`, `renderFiscalidad`, `openFeedbackModal`.
+
+Las trazas de Sentry van a ser legibles sin hacer nada. Lo que se pierde es el
+número de línea. Implementado como paso opcional (`npm run build:sentry`), que
+genera, sube y **borra** los mapas, y **aborta si queda alguno**. Verificado:
+build normal 0 mapas, con `VITE_SOURCEMAP=1` 3 mapas, tras el borrado 0.
+
+### Analítica
+
+**Cloudflare Web Analytics descartada**: no admite eventos personalizados, y
+el encargo necesita 8. Recomendada **Umami Cloud** (plan gratuito, eventos con
+propiedades, sin cookies), con Plausible como alternativa de pago. El código
+detecta cuál está cargada, así que cambiar son dos variables.
+
+`track()` tiene **dos listas blancas cerradas** (nombres de evento y de
+propiedad) y, además, **descarta todos los números**: un número es lo único
+que puede ser un importe. Un valor con pinta de cifra también se tira, y los
+valores con lista cerrada que llegan con algo inesperado pasan a `otro`.
+
+Respeta Do Not Track, Global Privacy Control, localhost, modo demo y el
+interruptor de Ajustes.
+
+### Pruebas
+
+**51 tests nuevos** (`src/tests/monitoring.test.js`). Con un receptor falso de
+Sentry y curl contra el servidor arrancado:
+
+| Prueba | Resultado |
+|---|---|
+| Importe, IBAN, correo y token en el error de prueba | **los 4 redactados**, 0 fugas ✅ |
+| El evento no lleva `request`, `server_name` ni correo | ✅ |
+| `user` solo con el hash de 16 caracteres | ✅ |
+| `tags` solo con método y ruta sin query | ✅ |
+| `/api/health` con `FINOVA_PROXY_SECRET` puesta | **200** (antes 403) ✅ |
+| `/api/ai-status` sin la cabecera del proxy | **403** (sigue protegido) ✅ |
+| `/api/health/deep` sin secreto / con secreto malo | **404** las dos ✅ |
+| `/api/health/deep` con secreto correcto | **200** con los 3 chequeos ✅ |
+| CSP servida sin variables / con `SENTRY_INGEST_ORIGIN` | comodines / host exacto ✅ |
+| La app con TODAS las variables vacías | arranca y responde 200 ✅ |
+| `find dist -name "*.map"` | **0** ✅ |
+
+### Lo que NO se pudo verificar
+
+1. **El apagado ordenado con una señal real.** Windows no tiene SIGTERM
+   POSIX: `taskkill` es una muerte dura y el `kill -INT` de Git Bash no llegó
+   al proceso de Node. La lógica está cubierta con tests que fijan el orden
+   (cerrar → guardar → flush → salir) y la idempotencia, pero **el
+   comportamiento real solo se verá en Railway**, que es Linux.
+2. **Sentry de verdad.** Todo se probó contra un receptor local que capturaba
+   los *envelopes*. No hay cuenta de Sentry, así que no se ha visto un evento
+   en su panel ni se ha probado la subida de source maps.
+3. **La analítica de verdad.** Sin cuenta de Umami no se ha cargado su script
+   ni se ha visto un evento llegar.
+4. **La CSP en un navegador.** Se verificó la cabecera que se sirve, no que un
+   navegador real no bloquee nada. Hay que mirar la consola tras desplegar.
+5. **Los precios y límites de los planes.** Marcados `[VERIFICAR]` en
+   `MONITORING_SETUP.md` con el sitio donde comprobarlos. No los doy por
+   ciertos.
+
+### Aviso de `npm audit`
+
+`@sentry/node@11` arrastra `@sentry/bundler-plugins` como dependencia de
+**ejecución**, y de ahí vienen avisos en `deepmerge`, `glob` y `minimatch`.
+Ese paquete solo se usa para subir source maps en tiempo de build: el servidor
+en marcha no lo llama nunca. `npm audit fix` propone **bajar a la v10** (cambio
+de versión mayor), que es peor negocio que el aviso. **No se ha hecho**, queda
+documentado para revisar en un par de meses.
+
+Ver `MONITORING_SETUP.md` (configuración manual) y `MONITORING_CHECKLIST.md`
+(rutina diaria de 10 minutos para los primeros 30 días).
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más

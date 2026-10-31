@@ -385,3 +385,44 @@ async function adminMarkFeedbackRead(id, read, btn) {
     if (typeof showToast === 'function') showToast('No se pudo guardar', 'error');
   }
 }
+
+/* ─── Pruebas de monitorización (solo admin) ─────────────────── */
+
+function _adminMonResult(html) {
+  const el = document.getElementById('admin-mon-result');
+  if (el) el.innerHTML = html;
+}
+
+/** Lanza un error en el NAVEGADOR y comprueba que Sentry está activo. */
+function adminTestErrorFront() {
+  const mon = window.fvMonitor;
+  if (!mon) {
+    _adminMonResult('<p style="color:var(--down);font-size:13px">El módulo de monitorización no está cargado (¿falta VITE_SENTRY_DSN?).</p>');
+    return;
+  }
+  if (!mon.enabled) {
+    _adminMonResult('<p style="color:var(--text-muted);font-size:13px">Sentry no está enviando: falta <code>VITE_SENTRY_DSN</code>, estás en localhost, o lo has desactivado en Ajustes → Privacidad.</p>');
+    return;
+  }
+  mon._testError();
+  _adminMonResult('<p style="color:var(--up);font-size:13px">Error de prueba enviado desde el navegador. Debe aparecer en Sentry en unos segundos, con el importe, el correo y el token <strong>redactados</strong>.</p>');
+}
+
+/** Lanza un error en el SERVIDOR vía el endpoint protegido. */
+async function adminTestErrorServer() {
+  _adminMonResult('<p style="font-size:13px;color:var(--text-muted)">Enviando…</p>');
+  try {
+    const authH = await _getAuthHeader();
+    const res = await fetch('/api/admin/test-error', {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' }, authH),
+      body: '{}',
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || ('Error ' + res.status));
+    _adminMonResult('<p style="color:' + (json.enviado ? 'var(--up)' : 'var(--text-muted)') +
+      ';font-size:13px">' + (typeof escapeHtml === 'function' ? escapeHtml(json.mensaje) : json.mensaje) + '</p>');
+  } catch (e) {
+    _adminMonResult('<p style="color:var(--down);font-size:13px">No se pudo lanzar el error de prueba en el servidor.</p>');
+  }
+}

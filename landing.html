@@ -2735,8 +2735,12 @@ async function lpJoinWaitlist(e) {
      así que landing.js sigue encontrando `firebase` ya definido, pero los dos
      SDK dejan de bloquear el parser al final del documento (index.html ya los
      cargaba así; aquí se habían quedado sin defer). -->
+<!-- Monitorización de errores (ver el comentario en index.html). -->
+<script type="module" src="/src/core/monitoring.js"></script>
+
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script defer src="src/core/analytics.js"></script>
 <script defer src="src/auth/auth-shared.js"></script>
 <script defer src="landing.js"></script>
 <!-- Hard fallback: reveal everything after 2 s regardless of what happened above -->

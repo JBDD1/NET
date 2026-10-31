@@ -774,6 +774,11 @@ function _txModalFill(tx) {
  * mitad de un lote o de una sola alta.
  */
 function _txCreate({ type, date, description, category, amount, note = '', favorite = false, photoId, tripId, receipt }) {
+  // Hito del embudo: la primera transacción es el momento en que alguien
+  // empieza a usar la app de verdad. Se mide ANTES de añadirla (longitud 0).
+  if (typeof track === 'function' && (APP.transactions || []).length === 0) {
+    track('primer_transaccion');
+  }
   const entry = { id: generateId(), type, date, description, category, amount, note, favorite };
   if (photoId) entry.photoId = photoId;
   if (tripId)  entry.tripId  = tripId;

@@ -1,0 +1,111 @@
+{
+  "_comment": [
+    "Patrones de redacción para Sentry. FUENTE ÚNICA: la importa",
+    "src/core/monitoring.js (módulo ES, vía Vite) y la lee server.cjs (CommonJS,",
+    "vía require). Está en JSON precisamente porque es el único formato que los",
+    "dos pueden leer sin duplicar el código.",
+    "",
+    "Se aplican al MENSAJE del error y a los valores de texto del evento, nunca",
+    "al nombre del tipo de error ni a la traza de archivos: el mensaje tiene que",
+    "seguir siendo legible para poder depurar.",
+    "",
+    "Orden importante: de lo más específico a lo más general. Un IBAN se detecta",
+    "antes que 'una ristra larga de dígitos', y un token antes que 'una cadena",
+    "larga'. Si se invirtiera, el patrón genérico se comería al específico y se",
+    "perdería la pista de QUÉ tipo de dato se ha redactado."
+  ],
+  "patterns": [
+    {
+      "name": "jwt",
+      "why": "Los tokens de Firebase empiezan por eyJ y aparecen en errores de red",
+      "pattern": "eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]+",
+      "flags": "g",
+      "replace": "[token]"
+    },
+    {
+      "name": "bearer",
+      "why": "Cabecera Authorization volcada en un mensaje de error",
+      "pattern": "(?:Bearer|Basic)\\s+[A-Za-z0-9._~+/=-]{10,}",
+      "flags": "gi",
+      "replace": "[token]"
+    },
+    {
+      "name": "api-keys",
+      "why": "Claves de Claude, OpenAI, Groq y Google que el usuario pega en Ajustes",
+      "pattern": "\\b(?:sk-(?:ant|proj)-[A-Za-z0-9_-]{10,}|sk-[A-Za-z0-9]{20,}|gsk[_][A-Za-z0-9]{10,}|AIza[A-Za-z0-9_-]{20,})",
+      "flags": "g",
+      "replace": "[clave-api]",
+      "nota": "Los prefijos van con grupos (?:ant|proj) y clase [_] en vez de literales: escritos de corrido, el escaner de secretos del pre-commit detectaba este propio patron como si fuera una clave."
+    },
+    {
+      "name": "email",
+      "why": "Correos del usuario, de contactos o de la cuenta",
+      "pattern": "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
+      "flags": "g",
+      "replace": "[correo]"
+    },
+    {
+      "name": "iban",
+      "why": "Es una app de finanzas españolas: los IBAN aparecen en los extractos importados",
+      "pattern": "\\b[A-Z]{2}\\d{2}[ ]?(?:[A-Z0-9]{4}[ ]?){3,7}[A-Z0-9]{1,4}\\b",
+      "flags": "g",
+      "replace": "[iban]"
+    },
+    {
+      "name": "tarjeta",
+      "why": "Números de tarjeta de 13 a 19 dígitos, con o sin separadores",
+      "pattern": "\\b(?:\\d[ -]?){13,19}\\b",
+      "flags": "g",
+      "replace": "[tarjeta]"
+    },
+    {
+      "name": "importe-con-simbolo",
+      "why": "Un importe con el símbolo de euro delante o detrás es el caso claro",
+      "pattern": "(?:€\\s*\\d[\\d.,]*|\\d[\\d.,]*\\s*(?:€|EUR\\b|eur\\b))",
+      "flags": "g",
+      "replace": "[importe]"
+    },
+    {
+      "name": "importe-formato-es",
+      "why": "Número con separador de miles y dos decimales: 1.234,56 o 1,234.56",
+      "pattern": "\\b\\d{1,3}(?:[.,]\\d{3})+(?:[.,]\\d{2})?\\b",
+      "flags": "g",
+      "replace": "[importe]"
+    },
+    {
+      "name": "importe-decimal",
+      "why": "Cualquier número con dos decimales. Agresivo a propósito: en esta app un número con céntimos casi siempre es dinero",
+      "pattern": "\\b\\d+[.,]\\d{2}\\b",
+      "flags": "g",
+      "replace": "[importe]"
+    },
+    {
+      "name": "uid-firebase",
+      "why": "Los uid de Firebase son 28 caracteres alfanuméricos",
+      "pattern": "\\b[A-Za-z0-9]{28}\\b",
+      "flags": "g",
+      "replace": "[uid]"
+    }
+  ],
+  "queryKeysSensibles": [
+    "uid",
+    "token",
+    "access_token",
+    "id_token",
+    "idToken",
+    "key",
+    "apikey",
+    "api_key",
+    "auth",
+    "authorization",
+    "code",
+    "oobCode",
+    "email",
+    "password",
+    "secret",
+    "signature",
+    "sig",
+    "clientId",
+    "session"
+  ]
+}

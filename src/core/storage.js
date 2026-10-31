@@ -412,7 +412,14 @@ const _debouncedServerSync = debounce(async () => {
       body: JSON.stringify({ data }),
       signal: AbortSignal.timeout(10000),
     });
-  } catch (_) {}
+  } catch (e) {
+    // La sincronización falla en silencio a propósito para el usuario (no se
+    // le va a interrumpir por esto), pero nosotros sí queremos saberlo: si
+    // falla para todos, nadie tiene copia en el servidor.
+    // Los errores de red están en ignoreErrors, así que estar sin conexión no
+    // llena el panel de ruido.
+    window.fvMonitor?.capture(e, 'sync-subida');
+  }
 }, 3000);
 
 function loadData() {
@@ -432,6 +439,10 @@ function loadData() {
     }
   } catch (e) {
     console.error('Error cargando datos:', e);
+    // Datos corruptos en localStorage es el fallo más difícil de reproducir y
+    // el que más daño hace: el usuario ve la app vacía. Reportarlo es lo único
+    // que permite enterarse de que está pasando.
+    window.fvMonitor?.capture(e, 'cargar-datos');
   }
 
   const _arrays = [

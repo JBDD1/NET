@@ -1830,6 +1830,19 @@
         <div id="admin-fb-list"></div>
       </div>
 
+      <!-- Monitorización -->
+      <div class="card" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px;flex-wrap:wrap">
+          <h3 class="card-title" style="margin:0"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-activity"/></svg> Monitorización</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" id="btn-admin-test-error-front" class="btn-secondary">Probar error (navegador)</button>
+            <button type="button" id="btn-admin-test-error-server" class="btn-secondary">Probar error (servidor)</button>
+          </div>
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin:0 0 10px;line-height:1.6">Lanza un error controlado para comprobar que llega a Sentry. El mensaje lleva un importe, un correo, un IBAN y un token <strong>falsos</strong> a propósito: al verlo en Sentry debes encontrarlos redactados como <code>[importe]</code>, <code>[correo]</code>, <code>[iban]</code> y <code>[token]</code>.</p>
+        <div id="admin-mon-result" class="admin-health-result" role="status" aria-live="polite"></div>
+      </div>
+
       <!-- Health check -->
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -2046,6 +2059,32 @@
       </div>
 
 
+
+      <!-- Privacidad -->
+      <div class="card">
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-shield"/></svg> Privacidad</h3>
+        <div class="settings-row">
+          <div class="settings-info">
+            <div class="settings-name">Enviar informes de errores</div>
+            <div class="settings-desc">Cuando algo falla, nos envía el mensaje del error y en qué pantalla estabas, para poder arreglarlo. <strong>Nunca</strong> incluye tus importes, transacciones ni saldos: se redactan antes de salir del navegador. <a href="privacidad.html#s9" target="_blank" rel="noopener">Más detalles</a></div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="settings-error-reports" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="settings-row">
+          <div class="settings-info">
+            <div class="settings-name">Estadísticas de uso anónimas</div>
+            <div class="settings-desc">Cuenta visitas y qué funciones se usan, sin cookies y sin identificarte. Nos dice qué merece la pena mejorar.</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="settings-analytics" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="settings-privacy-note" class="settings-desc" style="margin-top:4px;font-size:11.5px"></div>
+      </div>
 
       <!-- Ayuda y feedback -->
       <div class="card">
@@ -2678,6 +2717,13 @@
   <!-- ═══════════════════════════════════════════════════════════════ -->
 
   <!-- Firebase Auth SDK (compat) -->
+  <!-- Monitorización de errores. type="module" a propósito: es el único script
+       del proyecto que importa de node_modules (@sentry/browser), así que lo
+       empaqueta Rollup. Va PRIMERO para capturar los errores de arranque; el
+       resto de la app lo usa con guarda (window.fvMonitor?.capture). Si no hay
+       VITE_SENTRY_DSN, no envía nada y la app funciona igual. -->
+  <script type="module" src="/src/core/monitoring.js"></script>
+
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
@@ -2686,6 +2732,7 @@
   <script defer src="src/core/state.js"></script>
   <script defer src="src/core/api.js"></script>
   <script defer src="src/core/utils.js"></script>
+  <script defer src="src/core/analytics.js"></script>
   <script defer src="src/core/charts.js"></script>
   <script defer src="src/core/calcs.js"></script>
   <script defer src="src/core/storage.js"></script>

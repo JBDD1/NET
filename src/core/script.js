@@ -1248,6 +1248,11 @@ async function _withPortfolioImport(btn, mode) {
 }
 
 async function _withPdf(fnName, btn) {
+  // Único punto por el que pasan las tres exportaciones a PDF (mensual,
+  // fiscal, cartera): se mide aquí en vez de en cada una.
+  if (typeof track === 'function') {
+    track('informe_pdf_descargado', { tipo: String(fnName).replace(/^export|PDF$/g, '').toLowerCase() || 'otro' });
+  }
   if (!requireAccountFor('exportar a PDF')) return;
   const original = btn ? btn.innerHTML : null;
   if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
@@ -2587,6 +2592,14 @@ function _confirmOFXImport() {
     showToast(`${importedCount} transacciones importadas desde ${_pendingImportSource} ✓`, 'success');
   }
 
+  // La propiedad 'banco' lleva el FORMATO detectado ('CSV', 'Excel',
+  // 'OFX/QFX'), no el nombre del banco: la app no identifica al banco, detecta
+  // la estructura del fichero de forma genérica. Nunca va el nombre del
+  // archivo ni nada de su contenido.
+  if (importedCount > 0 && typeof track === 'function') {
+    track('importacion_csv_ok', { banco: _pendingImportSource });
+  }
+
   if (importedCount > 0) _offerBalanceSync();
 }
 
@@ -3031,6 +3044,12 @@ function _rowsToBankTransactions(allRows) {
       });
     } catch (e) {
       skippedRows.push(headerIdx + i + 2); // 1-based, contando la fila de cabecera real
+      // Solo la PRIMERA fila que falla, y sin el contenido de la fila: si un
+      // extracto de 400 líneas falla entero, no se mandan 400 eventos, y el
+      // texto de la fila son los movimientos del usuario.
+      if (skippedRows.length === 1) {
+        window.fvMonitor?.capture(e, 'import-csv', { filasTotales: rows.length });
+      }
     }
   });
 

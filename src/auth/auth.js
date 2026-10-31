@@ -416,6 +416,9 @@ async function signUpEmail(email, password, name) {
     } catch (e) {
       _verifySendError = fvAuthErrMsg(e?.code);
     }
+    // Sin el correo, sin el uid y sin el nombre: solo que ha habido un alta y
+    // por qué método.
+    if (typeof track === 'function') track('registro_completado', { metodo: 'email', origen: 'app' });
   } catch (err) {
     // Si la creación falla (correo ya en uso, red, contraseña débil…) hay que
     // DESHACER el nombre puesto arriba: si no, queda pegado en APP y, al

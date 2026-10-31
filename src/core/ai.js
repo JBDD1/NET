@@ -946,7 +946,18 @@ async function aiSend() {
   try {
     const reply = await callAI(onChunk);
     aiHistory.push({ role: 'assistant', content: reply || streamText });
+    // Solo que se ha usado y con qué proveedor. Nunca la pregunta ni la
+    // respuesta ni nada del contexto financiero enviado.
+    if (typeof track === 'function') {
+      track('asesor_ia_usado', { proveedor: (typeof APP !== 'undefined' && APP.aiProvider) || 'servidor' });
+    }
   } catch (err) {
+    // __rate_limited__ y __all_failed__ son señales internas esperadas, no
+    // fallos: no se reportan. Lo demás sí, porque significa que el proveedor
+    // ha devuelto algo que no sabemos tratar.
+    if (err.message !== '__rate_limited__' && err.message !== '__all_failed__') {
+      window.fvMonitor?.capture(err, 'asesor-ia');
+    }
     if (err.message !== '__rate_limited__') {
       let content;
       if (err.message === '__all_failed__') {

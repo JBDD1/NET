@@ -348,6 +348,8 @@ async function _fbSubmit() {
   // Éxito: se limpia el borrador para que el próximo feedback salga en blanco.
   _fbDraft  = null;
   _fbRating = 0;
+  // Solo el tipo. Nunca el mensaje ni el correo.
+  if (typeof track === 'function') track('feedback_enviado', { tipo: d.type });
   _fbShowSuccess();
 }
 

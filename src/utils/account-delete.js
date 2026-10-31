@@ -453,6 +453,10 @@ async function _adRunDelete(provider) {
     console.error('[Finova] Restos que no se pudieron borrar en este navegador:', failed);
   }
 
+  // Se mide ANTES de redirigir: después ya no corre nada de esta página. Sin
+  // ninguna propiedad: saber cuántas bajas hay es útil, saber de quién no.
+  if (typeof track === 'function') track('cuenta_borrada');
+
   // El mensaje final lo muestra la landing: aquí ya no queda storage donde
   // dejarlo, así que viaja en la URL.
   location.replace('landing.html?deleted=1');

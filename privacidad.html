@@ -354,9 +354,10 @@ try {
     <a href="#s6">6. Tus derechos</a>
     <a href="#s7">7. Eliminación de cuenta y datos</a>
     <a href="#s8">8. Feedback y soporte</a>
-    <a href="#s9">9. Menores de edad</a>
-    <a href="#s10">10. Cambios en esta política</a>
-    <a href="#s11">11. Normativa aplicable</a>
+    <a href="#s9">9. Analítica y monitorización de errores</a>
+    <a href="#s10">10. Menores de edad</a>
+    <a href="#s11">11. Cambios en esta política</a>
+    <a href="#s12">12. Normativa aplicable</a>
   </nav>
 
   <!-- CONTENT -->
@@ -528,17 +529,64 @@ try {
     </div>
 
     <div class="doc-section" id="s9">
-      <h2><span class="doc-section-num">9</span>Menores de edad</h2>
-      <p>Finova no está dirigida a menores de 18 años y no recopilamos conscientemente datos de menores.</p>
+      <h2><span class="doc-section-num">9</span>Analítica y monitorización de errores</h2>
+
+      <p>Usamos dos herramientas para saber cuándo algo se rompe y qué partes de la aplicación se usan. Las dos están configuradas de la forma más restrictiva que permiten, y las dos se pueden desactivar desde <strong>Ajustes → Privacidad</strong>.</p>
+
+      <h3>9.1 Informes de errores (Sentry)</h3>
+      <p>Cuando algo falla, enviamos a <strong>Sentry</strong> un informe del error. Esto es lo que contiene:</p>
+      <ul>
+        <li>El <strong>mensaje del error</strong> y la traza del código, con los nombres de nuestras funciones.</li>
+        <li>El <strong>nombre</strong> de la pantalla en la que estabas, no su contenido.</li>
+        <li>Tu navegador, sistema operativo, idioma y tamaño de ventana.</li>
+        <li>La versión de la aplicación.</li>
+        <li>Si has iniciado sesión, un <strong>código derivado criptográficamente</strong> de tu identificador, no reversible, para saber si varios errores le pasan a la misma persona.</li>
+      </ul>
+
+      <p>Y esto es lo que <strong>no</strong> contiene, porque se elimina en tu propio navegador antes de enviarse:</p>
+      <ul>
+        <li><strong>Ningún importe.</strong> Cualquier cifra con decimales o con el símbolo del euro se sustituye por <code>[importe]</code>.</li>
+        <li><strong>Ningún número de cuenta ni de tarjeta</strong> (<code>[iban]</code>, <code>[tarjeta]</code>).</li>
+        <li><strong>Ningún correo electrónico</strong> (<code>[correo]</code>), ni el tuyo ni el de nadie.</li>
+        <li><strong>Ninguna clave de API ni token de sesión</strong> (<code>[clave-api]</code>, <code>[token]</code>).</li>
+        <li>Ni cookies, ni cabeceras de la petición, ni los parámetros de la dirección web.</li>
+        <li><strong>Ni una grabación de tu pantalla.</strong> Sentry ofrece una función que graba la sesión del usuario; está desactivada y no se va a activar: en esta aplicación, lo que se ve en pantalla <em>es</em> el dato sensible.</li>
+      </ul>
+
+      <p>Tampoco se envían los valores de las variables internas del programa, que es donde con más facilidad aparecería una cifra tuya.</p>
+
+      <p><strong>Dónde se procesa:</strong> Sentry es una empresa estadounidense que ofrece alojamiento en la Unión Europea. Usamos la <strong>región de la UE</strong> para que los informes no salgan del territorio europeo. <span class="doc-tag" style="display:inline-block;margin:0">[REVISAR CON ABOGADO]</span> Si en algún momento se usara la región de Estados Unidos, sería una transferencia internacional de datos y habría que documentarla aquí con su base jurídica.</p>
+
+      <p><strong>Base jurídica:</strong> interés legítimo en que la aplicación funcione y en detectar fallos de seguridad. Puedes oponerte desactivando el interruptor de Ajustes, y entonces no se envía nada.</p>
+
+      <h3>9.2 Estadísticas de uso</h3>
+      <p>Para saber qué partes de la aplicación se usan y qué merece la pena mejorar, recogemos estadísticas agregadas <strong>sin cookies</strong>: la página visitada, de dónde vienes, el tipo de navegador y el país aproximado.</p>
+      <p>Además contamos ocho acciones concretas, y solo eso: que alguien ha <strong>completado un registro</strong>, ha creado su <strong>primera transacción</strong>, ha añadido su <strong>primer activo</strong>, ha <strong>importado un extracto</strong> (con el formato detectado, por ejemplo «CSV», nunca su contenido), ha <strong>usado el Asesor IA</strong>, ha <strong>descargado un informe</strong>, nos ha <strong>enviado feedback</strong> o ha <strong>borrado su cuenta</strong>.</p>
+      <p>Estos contadores no llevan ninguna cifra tuya. El código que los envía tiene una lista cerrada de nombres permitidos y descarta cualquier número, así que un importe no puede salir por aquí ni por error.</p>
+
+      <h3>9.3 Sin cookies y sin banner</h3>
+      <p>Ninguna de las dos herramientas instala cookies ni guarda nada en tu dispositivo para identificarte. Por eso <strong>no verás un banner de cookies</strong>: la obligación de pedir consentimiento previo se activa cuando una web almacena o accede a información de tu equipo, y aquí no ocurre.</p>
+      <p>Lo único que guardamos en tu navegador relacionado con esto es <strong>tu decisión de desactivarlas</strong>, si la tomas, precisamente para poder respetarla. Eso está exento de consentimiento porque es estrictamente necesario para cumplir lo que has pedido.</p>
+      <p><span class="doc-tag" style="display:inline-block;margin:0">[REVISAR CON ABOGADO]</span> Esta conclusión depende de que las herramientas sigan siendo sin cookies y de cómo se interprete el uso de un proveedor externo para la analítica. Es el punto de esta política que conviene revisar con un profesional antes del lanzamiento.</p>
+
+      <h3>9.4 Cómo desactivarlo</h3>
+      <p>En <strong>Ajustes → Privacidad</strong> hay dos interruptores independientes: «Enviar informes de errores» y «Estadísticas de uso anónimas». Al apagarlos deja de enviarse nada, y la decisión se recuerda en este dispositivo.</p>
+      <p>Respetamos además la señal <strong>«Do Not Track»</strong> y <strong>Global Privacy Control</strong> de tu navegador: si las tienes activadas, no se envía nada aunque los interruptores estén encendidos. Tampoco se envía nada cuando usas la aplicación en modo demo.</p>
+      <p>Si quieres que eliminemos informes de error ya enviados, escríbenos a <a href="mailto:MyFinova1@gmail.com">MyFinova1@gmail.com</a>. Ten en cuenta que, al no guardar tu identificador en claro, localizarlos requiere que nos digas aproximadamente cuándo ocurrió el fallo.</p>
     </div>
 
     <div class="doc-section" id="s10">
-      <h2><span class="doc-section-num">10</span>Cambios en esta política</h2>
-      <p>Podemos actualizar esta política de privacidad para reflejar cambios en la aplicación o en la normativa aplicable. Si hacemos cambios significativos, lo indicaremos de forma visible en la aplicación. La fecha de "Última actualización" al principio de este documento siempre refleja la versión más reciente.</p>
+      <h2><span class="doc-section-num">10</span>Menores de edad</h2>
+      <p>Finova no está dirigida a menores de 18 años y no recopilamos conscientemente datos de menores.</p>
     </div>
 
     <div class="doc-section" id="s11">
-      <h2><span class="doc-section-num">11</span>Normativa aplicable</h2>
+      <h2><span class="doc-section-num">11</span>Cambios en esta política</h2>
+      <p>Podemos actualizar esta política de privacidad para reflejar cambios en la aplicación o en la normativa aplicable. Si hacemos cambios significativos, lo indicaremos de forma visible en la aplicación. La fecha de "Última actualización" al principio de este documento siempre refleja la versión más reciente.</p>
+    </div>
+
+    <div class="doc-section" id="s12">
+      <h2><span class="doc-section-num">12</span>Normativa aplicable</h2>
       <p>Esta política se rige por la normativa española y europea de protección de datos, incluyendo el <strong>Reglamento General de Protección de Datos (RGPD/GDPR)</strong> en lo que resulte aplicable, dado que la mayor parte del tratamiento de datos ocurre localmente en el dispositivo del usuario y no en servidores de Finova.</p>
       <div class="doc-highlight">
         <p>📬 <strong>Contacto:</strong> <a href="mailto:MyFinova1@gmail.com">MyFinova1@gmail.com</a></p>

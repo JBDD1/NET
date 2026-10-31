@@ -233,7 +233,10 @@ function lpSubmit() {
       // ?verify=1 hace que la app muestre "Revisa tu correo" al entrar. Sin
       // esto, quien se registra en la landing aterriza en el dashboard sin
       // enterarse de que tiene un correo pendiente.
-      .then(() => { location.href = 'index.html?verify=1'; })
+      .then(() => {
+        if (typeof track === 'function') track('registro_completado', { metodo: 'email', origen: 'landing' });
+        location.href = 'index.html?verify=1';
+      })
       .catch(err => { _setLoading(false); _showError(fvAuthErrMsg(err.code)); });
   } else {
     _lpAuth.signInWithEmailAndPassword(email, pass)

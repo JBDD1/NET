@@ -46,6 +46,22 @@ function getSalesByYear(year) {
 
 /** Renderiza todo el módulo de fiscalidad */
 function renderFiscalidad() {
+  // Los cálculos fiscales no tenían ningún try/catch: una venta con datos
+  // raros (una fecha inválida, un precio que no es número) rompía el render y
+  // la sección se quedaba en blanco sin que nadie se enterara. Ahora el fallo
+  // se reporta y el usuario ve un aviso en vez de una pantalla vacía.
+  try {
+    return _renderFiscalidadInner();
+  } catch (e) {
+    console.error('[Finova] Fallo al calcular la fiscalidad:', e);
+    window.fvMonitor?.capture(e, 'fiscalidad', { ejercicio: getFiscalYear?.() });
+    if (typeof showToast === 'function') {
+      showToast('No se pudo calcular la fiscalidad con estos datos. Revisa tus ventas del ejercicio.', 'error');
+    }
+  }
+}
+
+function _renderFiscalidadInner() {
   // ─── Inicialización ──────────────────────────────────────────
   initFiscalYearSelect();
   const year  = getFiscalYear();

@@ -82,6 +82,11 @@ function copyStaticAssets(outDir = 'dist', mode = 'production') {
     for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
       // Los tests (src/tests/**) son solo para desarrollo, no se despliegan.
       if (entry.name === 'tests' && srcDir === 'src') continue;
+      // monitoring.js es un MÓDULO ES (importa @sentry/browser), no un script
+      // clásico: lo empaqueta Rollup desde el <script type="module"> de
+      // index.html y landing.html. Copiarlo aquí dejaría en dist/ un fichero
+      // muerto con un import sin resolver que nadie carga.
+      if (entry.name === 'monitoring.js') continue;
       const srcPath  = resolve(srcDir, entry.name);
       const destPath = resolve(destDir, entry.name);
       if (entry.isDirectory()) { await copyJsDir(srcPath, destPath, env); continue; }
@@ -136,6 +141,11 @@ function devClassicScripts(mode) {
         fs.readFile(filePath, 'utf8', (err, data) => {
           if (err) return next();
           if (!data.includes('import.meta')) return next(); // deja pasar los que no lo necesitan
+          // Un fichero con imports REALES es un módulo ES, no un script
+          // clásico: lo tiene que transformar Vite para resolver los bare
+          // imports ('@sentry/browser' no es una ruta que el navegador sepa
+          // cargar). Este middleware existe solo para los clásicos.
+          if (/^\s*import\s[\s\S]*?\sfrom\s/m.test(data)) return next();
           res.setHeader('Content-Type', 'text/javascript');
           res.end(stripImportMeta(data, env));
         });
@@ -180,8 +190,17 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       emptyOutDir: true,
 
-      // CRÍTICO: sin source maps en producción — revelan el código original
-      sourcemap: isProd ? false : 'inline',
+      // CRÍTICO: sin source maps en producción — revelan el código original.
+      //
+      // VITE_SOURCEMAP=1 los genera igualmente, para el flujo OPCIONAL de
+      // subirlos a Sentry y borrarlos antes de desplegar
+      // (npm run build:sentry). Nunca se activa por accidente: hay que pasar
+      // la variable a mano.
+      //
+      // Nota: en este proyecto los source maps importan MENOS que en un
+      // bundle normal, porque mangle.toplevel es false y los nombres de
+      // función se conservan en dist/. Ver MONITORING_SETUP.md.
+      sourcemap: isProd ? (process.env.VITE_SOURCEMAP === '1' ? true : false) : 'inline',
 
       // Minificación con terser (más agresiva que esbuild por defecto).
       // Mismas opciones que PROD_TERSER_OPTIONS arriba (compartidas con el

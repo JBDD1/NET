@@ -68,6 +68,12 @@ function _extraAdmins() {
 }
 
 function _isAdminUid(uid) {
+  // Con FINOVA_DISABLE_AUTH=true no hay autenticación en absoluto (el servidor
+  // lo avisa a gritos al arrancar y es solo para local), así que el uid de
+  // desarrollo cuenta como admin. Sin esto el panel de administración era
+  // imposible de probar en local: _requireAuth devuelve 'dev-uid', que no pasa
+  // _UID_RE porque tiene un guion y 7 caracteres.
+  if (!_AUTH_ENABLED && uid === 'dev-uid') return true;
   if (!uid || !_UID_RE.test(uid)) return false;
   const meta = _readMeta(uid);
   if (!meta) return false;
@@ -220,10 +226,29 @@ const _SEC = {
   'Cross-Origin-Opener-Policy':   'same-origin-allow-popups',
 };
 
+// ─── Dominios de monitorización permitidos en la CSP ──────────
+//
+// Sentry: el host de ingesta depende de la REGIÓN del proyecto
+// (oXXXX.ingest.sentry.io para EE. UU., oXXXX.ingest.de.sentry.io para la UE),
+// y el número de organización solo se conoce al crear el proyecto. En vez de
+// adivinarlo, se permiten los dos comodines: son hosts controlados por Sentry,
+// así que sigue siendo mucho más estrecho que abrir https: entero.
+//
+// Cuando sepas tu DSN, puedes apretarlo con SENTRY_INGEST_ORIGIN y dejar solo
+// el tuyo exacto. Ver MONITORING_SETUP.md.
+const _SENTRY_CSP = process.env.SENTRY_INGEST_ORIGIN
+  ? process.env.SENTRY_INGEST_ORIGIN
+  : 'https://*.ingest.sentry.io https://*.ingest.de.sentry.io';
+
+// Analítica: el host depende de la herramienta y de si la autoalojas. Vacío =
+// no se permite nada, que es lo correcto mientras no haya analítica.
+const _ANALYTICS_CSP = process.env.ANALYTICS_ORIGIN || '';
+
 // Content Security Policy — aplicado a respuestas HTML
 const _CSP = [
   "default-src 'none'",
-  "script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com https://apis.google.com",
+  ("script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com https://apis.google.com" +
+    (_ANALYTICS_CSP ? ' ' + _ANALYTICS_CSP : '')),
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https://lh3.googleusercontent.com https://jbdd1.github.io",
@@ -232,7 +257,10 @@ const _CSP = [
     "https://open.er-api.com https://api.anthropic.com https://api.openai.com " +
     "https://generativelanguage.googleapis.com https://api.groq.com " +
     "https://identitytoolkit.googleapis.com https://securetoken.googleapis.com " +
-    "https://www.googleapis.com https://*.firebaseapp.com https://*.firebase.com https://*.firebaseio.com",
+    "https://www.googleapis.com https://*.firebaseapp.com https://*.firebase.com https://*.firebaseio.com " +
+    // Sentry envía los informes de error por POST a su host de ingesta.
+    _SENTRY_CSP +
+    (_ANALYTICS_CSP ? ' ' + _ANALYTICS_CSP : ''),
   "frame-src https://*.firebaseapp.com https://accounts.google.com",
   "manifest-src 'self'",
   "worker-src 'self'",
@@ -500,7 +528,212 @@ function _buildServerSystemPrompt(anonMode, snapshot) {
 // Respuesta genérica para errores internos — log completo (con uid, ruta,
 // stack) para depurar en Railway sin reproducir el fallo; al cliente solo
 // llega un mensaje humano y accionable, nunca detalles técnicos.
+/* ─── Monitorización de errores (Sentry, servidor) ───────────── */
+
+// DSN por variable de entorno. Sin ella, nada de esto hace nada y el servidor
+// funciona igual: es un añadido, no una dependencia.
+const SENTRY_DSN_SERVER = process.env.SENTRY_DSN_SERVER || '';
+const SENTRY_ENV        = process.env.SENTRY_ENV || (process.env.NODE_ENV === 'production' ? 'production' : 'development');
+const SENTRY_RELEASE    = process.env.SENTRY_RELEASE || process.env.RAILWAY_GIT_COMMIT_SHA || '';
+
+let _sentry      = null;
+let _sentryReady = false;
+
+// Patrones de redacción: el MISMO fichero que usa el frontend
+// (src/core/monitoring.js). Está en JSON precisamente porque es el único
+// formato que un módulo ES y un CommonJS pueden leer sin duplicar nada.
+let _REDACT = { patterns: [], queryKeysSensibles: [] };
+try {
+  _REDACT = require('./src/core/redact-patterns.json');
+} catch (e) {
+  console.warn('[FINOVA/Sentry] No se pudieron cargar los patrones de redacción:', e.message);
+}
+const _REDACT_QUERY = new Set((_REDACT.queryKeysSensibles || []).map(k => k.toLowerCase()));
+
+/**
+ * Redacta importes, IBAN, correos, tokens y claves de una cadena.
+ *
+ * Un RegExp con /g guarda lastIndex entre llamadas, así que se instancia en
+ * cada uso en vez de compilarlo una vez: compartir la instancia hace que se
+ * salte coincidencias de forma intermitente, que es el peor tipo de fallo en
+ * algo cuyo trabajo es no dejar escapar datos.
+ */
+function _sentryRedact(text) {
+  if (typeof text !== 'string' || !text) return text;
+  let out = text;
+  for (const p of (_REDACT.patterns || [])) {
+    out = out.replace(new RegExp(p.pattern, p.flags || 'g'), p.replace);
+  }
+  return out;
+}
+
+function _sentryRedactUrl(url) {
+  if (typeof url !== 'string' || !url) return url;
+  try {
+    const u = new URL(url, 'http://localhost');
+    for (const k of [...u.searchParams.keys()]) {
+      if (_REDACT_QUERY.has(k.toLowerCase())) u.searchParams.set(k, '[oculto]');
+    }
+    return u.pathname + (u.search || '');
+  } catch (_) {
+    return _sentryRedact(url);
+  }
+}
+
+function _sentryRedactDeep(value, depth = 0) {
+  if (depth > 6) return value;
+  if (typeof value === 'string') return _sentryRedact(value);
+  if (Array.isArray(value)) return value.map(v => _sentryRedactDeep(v, depth + 1));
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = _sentryRedactDeep(v, depth + 1);
+    return out;
+  }
+  return value;
+}
+
+if (SENTRY_DSN_SERVER) {
+  try {
+    _sentry = require('@sentry/node');
+    _sentry.init({
+      dsn: SENTRY_DSN_SERVER,
+      environment: SENTRY_ENV,
+      release: SENTRY_RELEASE || undefined,
+
+      // Ni IP, ni cabeceras, ni cookies automáticas.
+      sendDefaultPii: false,
+      tracesSampleRate: 0,
+      maxBreadcrumbs: 10,
+
+      integrations: (defaults) => {
+        // Se quitan por nombre para que una versión nueva de Sentry pueda
+        // añadir integraciones sin que haya que reconstruir la lista.
+        const FUERA = new Set([
+          // Mete en el evento la petición completa: cabeceras (Authorization
+          // incluida), cookies, querystring y cuerpo. Es exactamente lo que no
+          // puede salir.
+          'RequestData',
+          // Captura console.* como migas. En el servidor los logs llevan
+          // rutas, uid y, si alguien depura, cualquier cosa.
+          'Console',
+          // Captura los VALORES de las variables locales de cada frame del
+          // stack. En una app de finanzas eso significa importes, uid y
+          // tokens dentro del informe de error. Es la integración más
+          // peligrosa de todas para este proyecto.
+          'LocalVariablesAsync',
+          // Los gestiona el propio servidor más abajo, para poder hacer el
+          // apagado ordenado y el flush en el orden correcto.
+          'OnUncaughtException',
+          'OnUnhandledRejection',
+          // Ruido de procesos hijo y workers: este servidor no usa ninguno.
+          'ChildProcess',
+          'WorkerThreads',
+          // No sé qué envía (nueva en v11) y no voy a enviar algo que no
+          // puedo describir en la política de privacidad.
+          'ConversationId',
+        ]);
+        return defaults.filter(i => !FUERA.has(i.name));
+      },
+
+      beforeSend(event) {
+        // Doble red: aunque RequestData esté fuera, si algo rellena request
+        // se deja solo el método y la ruta sin parámetros sensibles.
+        if (event.request) {
+          event.request = {
+            method: event.request.method,
+            url: _sentryRedactUrl(event.request.url),
+          };
+        }
+        // Usuario: solo el hash. Nunca el uid en claro ni el correo.
+        if (event.user) event.user = event.user.id ? { id: event.user.id } : undefined;
+
+        if (event.message) event.message = _sentryRedact(event.message);
+        if (event.exception && event.exception.values) {
+          for (const ex of event.exception.values) {
+            if (ex.value) ex.value = _sentryRedact(ex.value);
+            if (ex.stacktrace && ex.stacktrace.frames) {
+              for (const f of ex.stacktrace.frames) {
+                // vars son los valores de las variables locales. Fuera.
+                delete f.vars;
+                // La integración ContextLines adjunta las líneas de código de
+                // alrededor del error. Son NUESTRO código, no datos del
+                // usuario, y sin source maps en el servidor son lo que hace
+                // legible una traza — así que se conservan. Pero se redactan:
+                // si alguien deja una cadena con pinta de token o de importe
+                // escrita en el fuente, saldría tal cual. Comprobado con el
+                // error de prueba: el IBAN del propio código aparecía en claro
+                // en post_context.
+                if (f.context_line) f.context_line = _sentryRedact(f.context_line);
+                if (Array.isArray(f.pre_context))  f.pre_context  = f.pre_context.map(_sentryRedact);
+                if (Array.isArray(f.post_context)) f.post_context = f.post_context.map(_sentryRedact);
+              }
+            }
+          }
+        }
+        if (event.contexts) event.contexts = _sentryRedactDeep(event.contexts);
+        if (event.extra)    event.extra    = _sentryRedactDeep(event.extra);
+        if (event.tags)     event.tags     = _sentryRedactDeep(event.tags);
+        // El nombre del host del contenedor no aporta nada y es estado interno.
+        delete event.server_name;
+        return event;
+      },
+
+      beforeBreadcrumb(crumb) {
+        if (crumb.category === 'console') return null;
+        if (crumb.data) {
+          const d = Object.assign({}, crumb.data);
+          if (d.url) d.url = _sentryRedactUrl(d.url);
+          delete d.body; delete d.input;
+          crumb.data = _sentryRedactDeep(d);
+        }
+        if (crumb.message) crumb.message = _sentryRedact(crumb.message);
+        return crumb;
+      },
+    });
+    _sentryReady = true;
+    console.log('[FINOVA/Sentry] Monitorización de errores activa —', SENTRY_ENV);
+  } catch (e) {
+    // Que falte el paquete o falle el init no puede impedir que arranque el
+    // servidor: la monitorización es un extra.
+    console.warn('[FINOVA/Sentry] No se pudo inicializar:', e.message);
+    _sentry = null;
+    _sentryReady = false;
+  }
+}
+
+/** Hash del uid para Sentry. Mismo criterio que en el feedback: no reversible. */
+function _sentryUidTag(uid) {
+  if (!uid) return null;
+  return crypto.createHash('sha256').update('finova-monitor:' + uid).digest('hex').slice(0, 16);
+}
+
+/**
+ * Reporta una excepción a Sentry con el contexto mínimo útil.
+ * Nunca lanza: si la monitorización falla, el servidor sigue.
+ */
+function _sentryCapture(err, req, extra) {
+  if (!_sentryReady || !_sentry) return;
+  try {
+    _sentry.withScope(scope => {
+      if (req) {
+        // Solo método y ruta sin query. La ruta dice QUÉ falló; el query es
+        // donde viajan los uid y los tokens.
+        scope.setTag('metodo', String(req.method || '?'));
+        scope.setTag('ruta', _sentryRedactUrl(String(req.url || '?')).split('?')[0]);
+        const h = _sentryUidTag(req.uid);
+        if (h) scope.setUser({ id: h });
+      }
+      if (extra) scope.setContext('detalle', _sentryRedactDeep(extra));
+      _sentry.captureException(err instanceof Error ? err : new Error(_sentryRedact(String(err))));
+    });
+  } catch (_) { /* nunca romper por la monitorización */ }
+}
+
 function _serverError(req, res, e, status = 500, userMsg = null) {
+  // Cada 500 va a Sentry con la ruta y el método, sin cuerpo y con el uid
+  // hasheado. Va antes del log para que un fallo al escribir en consola no
+  // impida el reporte.
+  if (status >= 500) _sentryCapture(e, req);
   console.error('[FINOVA][ERROR]', {
     ts:      new Date().toISOString(),
     status,
@@ -2318,6 +2551,97 @@ async function handleAccountDelete(req, res) {
   });
 }
 
+
+
+/* ─── Error de prueba (solo admin) ───────────────────────────── */
+
+/**
+ * Lanza un error controlado para comprobar que la cadena hasta Sentry
+ * funciona. Protegido con _adminGuard: no es accesible para un usuario
+ * normal, y no existe en absoluto si no hay administrador configurado.
+ *
+ * El mensaje lleva a propósito un importe, un correo, un IBAN y un token
+ * falsos: así, al mirar el evento en Sentry, se VE si la redacción funciona
+ * en vez de tener que confiar en que funciona.
+ */
+async function handleAdminTestError(req, res) {
+  if ((await _adminGuard(req, res)) === null) return;
+
+  const err = new Error(
+    'Error de prueba de Finova — importe 1.234,56 €, correo carlos@ejemplo.com, ' +
+    'IBAN ES9121000418450200051332, token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NSJ9.firmafalsa'
+  );
+  err.name = 'FinovaTestError';
+
+  // Se reporta con el mismo camino que cualquier 500 real.
+  _sentryCapture(err, req, { prueba: true, nota: 'disparado desde /api/admin/test-error' });
+
+  res.writeHead(200, _apiHeaders(req));
+  res.end(JSON.stringify({
+    ok: true,
+    enviado: _sentryReady,
+    mensaje: _sentryReady
+      ? 'Error de prueba enviado a Sentry. Debe aparecer en unos segundos, con los datos ya redactados.'
+      : 'Sentry no está configurado (falta SENTRY_DSN_SERVER): no se ha enviado nada.',
+  }));
+}
+
+/* ─── Health check profundo (protegido) ──────────────────────── */
+
+// NO es público: expone si firebase-admin está inicializado, si hay clave de
+// IA y si el disco es escribible — información útil para un atacante que
+// quiera saber qué atacar. Se protege con un secreto propio, distinto del de
+// admin, para poder dárselo a un monitor sin darle una sesión de
+// administrador.
+const HEALTH_DEEP_SECRET = process.env.HEALTH_DEEP_SECRET || '';
+
+async function handleHealthDeep(req, res) {
+  // Sin secreto configurado el endpoint NO existe: se responde 404 en vez de
+  // 403 para no confirmar que está ahí.
+  if (!HEALTH_DEEP_SECRET) {
+    res.writeHead(404, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'No encontrado' }));
+  }
+  const dado = req.headers['x-health-secret'] || '';
+  // Comparación en tiempo constante: con === se puede medir el tiempo y sacar
+  // el secreto carácter a carácter.
+  const a = Buffer.from(String(dado));
+  const b = Buffer.from(HEALTH_DEEP_SECRET);
+  const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
+  if (!ok) {
+    res.writeHead(404, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'No encontrado' }));
+  }
+
+  const checks = {};
+
+  // 1. Disco: escribir y leer de verdad en el directorio de datos. Es lo que
+  //    de verdad distingue "el proceso responde" de "el proceso sirve".
+  try {
+    const probe = path.join(ROOT, 'data', '.health-probe');
+    const marca = String(Date.now());
+    fs.writeFileSync(probe, marca, 'utf8');
+    checks.disco = fs.readFileSync(probe, 'utf8') === marca ? 'ok' : 'fallo';
+    try { fs.unlinkSync(probe); } catch (_) {}
+  } catch (_) { checks.disco = 'fallo'; }
+
+  // 2. Firebase Admin: solo si el objeto está inicializado. NO se verifica
+  //    ningún token ni se llama a Google: este endpoint no puede gastar cuota
+  //    de un servicio externo en cada ping.
+  checks.auth = _adminReady ? 'ok' : 'degradado';
+
+  // 3. Clave de IA: solo si está configurada. Tampoco se llama al proveedor,
+  //    que cobra por petición.
+  checks.ia = (FINOVA_GROQ_KEY || FINOVA_AI_KEY) ? 'ok' : 'sin-configurar';
+
+  // Solo el disco tumba el servicio. Sin Firebase Admin la app sigue
+  // funcionando (verificación RS256 propia) y sin IA solo falta una función.
+  const sano = checks.disco === 'ok';
+
+  res.writeHead(sano ? 200 : 503, _apiHeaders(req, { 'Cache-Control': 'no-store' }));
+  res.end(JSON.stringify({ ok: sano, checks, ts: new Date().toISOString() }));
+}
+
 /* ─── Feedback de usuarios ───────────────────────────────────── */
 
 const FEEDBACK_FILE      = path.join(ROOT, 'data', 'feedback.jsonl');
@@ -3017,7 +3341,7 @@ _validateEnv();
 const _IS_CLOUD_DEPLOY = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID || process.env.NODE_ENV === 'production');
 
 /* ─── HTTP server ────────────────────────────────────────────── */
-http.createServer((req, res) => {
+const _finovaServer = http.createServer((req, res) => {
   // Redirigir 127.0.0.1 → localhost (Firebase Auth solo acepta 'localhost')
   if (req.headers.host && req.headers.host.startsWith('127.0.0.1')) {
     res.writeHead(301, { 'Location': `http://localhost:${PORT}${req.url}`, ..._SEC });
@@ -3031,6 +3355,22 @@ http.createServer((req, res) => {
   if (_isBlockedUA(req)) {
     res.writeHead(403, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'Forbidden' }));
+  }
+
+  // Health check PÚBLICO, y a propósito ANTES del chequeo del proxy secret:
+  // con FINOVA_PROXY_SECRET configurado, un monitor externo (UptimeRobot) que
+  // apunte directamente a Railway recibiría 403 y reportaría una caída falsa.
+  // Este endpoint no expone nada: ni versiones, ni rutas, ni variables, ni
+  // estado interno. Solo dice que el proceso responde.
+  //
+  // Tampoco pasa por _checkRateLimit: un monitor hace una petición cada pocos
+  // minutos desde la misma IP y acabaría gastando su propio cubo.
+  //
+  // La palabra "ok" del cuerpo es la que UptimeRobot busca para distinguir un
+  // servidor vivo de un 200 devuelto por una página de error del proxy.
+  if (req.method === 'GET' && req.url === '/api/health') {
+    res.writeHead(200, _apiHeaders(req, { 'Cache-Control': 'no-store' }));
+    return res.end(JSON.stringify({ ok: true, ts: new Date().toISOString() }));
   }
 
   // Verificar que la petición proviene del proxy de Vercel (cuando el secret está configurado)
@@ -3084,19 +3424,6 @@ http.createServer((req, res) => {
     return res.end();
   }
 
-  // Health check — para monitorización y despliegues (Railway reinicia el
-  // contenedor si deja de responder). Público a propósito: no expone nada
-  // sensible, solo que el proceso está vivo y desde cuándo. Sin versiones de
-  // dependencias ni rutas internas, que son información útil para un atacante.
-  if (req.method === 'GET' && req.url === '/api/health') {
-    res.writeHead(200, _apiHeaders(req));
-    return res.end(JSON.stringify({
-      ok: true,
-      uptime: Math.floor(process.uptime()),
-      ts: new Date().toISOString(),
-    }));
-  }
-
   // AI status
   if (req.method === 'GET' && req.url === '/api/ai-status') {
     return handleAIStatus(req, res);
@@ -3137,6 +3464,8 @@ http.createServer((req, res) => {
   // Metadatos de usuario (email, nombre, último acceso)
   if (req.method === 'POST' && req.url === '/api/user-meta')         return handleUserMeta(req, res);
   if (req.method === 'POST' && req.url === '/api/account/delete')    return handleAccountDelete(req, res);
+  if (req.method === 'GET'  && req.url === '/api/health/deep')       return handleHealthDeep(req, res);
+  if (req.method === 'POST' && req.url === '/api/admin/test-error')  return handleAdminTestError(req, res);
   if (req.method === 'POST' && req.url === '/api/feedback')          return handleFeedback(req, res);
   if (req.method === 'GET'  && req.url.startsWith('/api/admin/feedback')) return handleAdminFeedback(req, res);
   if (req.method === 'POST' && req.url === '/api/admin/feedback/read')    return handleAdminFeedbackRead(req, res);
@@ -3217,7 +3546,11 @@ http.createServer((req, res) => {
 // público corre fuera del contenedor y se conecta por red al puerto — un
 // bind a loopback es invisible desde ahí, aunque el proceso arranque limpio
 // y los logs no muestren ningún error.
-}).listen(PORT, '0.0.0.0', () => {
+});
+
+// Referencia al servidor para poder cerrarlo en el apagado ordenado: antes la
+// llamada iba en cadena (createServer(...).listen(...)) y no quedaba ninguna.
+const _httpServer = _finovaServer.listen(PORT, '0.0.0.0', () => {
   console.log('\x1b[36m%s\x1b[0m', `
   ╔════════════════════════════════════╗
   ║   FINOVA — Servidor listo          ║
@@ -3243,4 +3576,63 @@ http.createServer((req, res) => {
     const { exec } = require('child_process');
     exec(`start http://localhost:${PORT}`);
   }
+});
+
+/* ─── Apagado ordenado y errores no capturados ───────────────── */
+
+// Antes NO había ningún manejador de proceso ni apagado ordenado. Eso
+// significaba dos cosas en cada despliegue de Railway:
+//   · Las peticiones en vuelo se cortaban en seco.
+//   · Los cubos del rate limit se guardan cada 5 minutos (_saveRateLimits),
+//     así que se perdía hasta 5 minutos de estado y el límite se reiniciaba
+//     solo por desplegar.
+// Y un error no capturado tumbaba el proceso sin dejar rastro en ningún sitio.
+
+let _shuttingDown = false;
+
+async function _gracefulShutdown(motivo, codigo) {
+  if (_shuttingDown) return;
+  _shuttingDown = true;
+  console.log('[FINOVA] Apagando —', motivo);
+
+  // 1. Dejar de aceptar conexiones nuevas, pero terminar las que están en
+  //    curso. El callback salta cuando no queda ninguna.
+  const cerrado = new Promise(resolve => {
+    try { _httpServer.close(() => resolve()); } catch (_) { resolve(); }
+  });
+
+  // 2. Guardar el estado que se perdería.
+  try { _saveRateLimits(); } catch (e) { console.error('[FINOVA] No se pudo guardar el rate limit:', e.message); }
+
+  // 3. Vaciar la cola de Sentry ANTES de salir: si no, el error que ha
+  //    provocado el apagado es justo el que no llega.
+  if (_sentryReady && _sentry) {
+    try { await _sentry.flush(2500); } catch (_) {}
+  }
+
+  // 4. Esperar a que cierren las conexiones, con tope. Railway manda SIGKILL
+  //    a los 30 s; 8 es de sobra para terminar una petición y no deja el
+  //    contenedor colgado si una se queda abierta.
+  await Promise.race([cerrado, new Promise(r => setTimeout(r, 8000))]);
+  process.exit(codigo == null ? 0 : codigo);
+}
+
+process.on('SIGTERM', () => _gracefulShutdown('SIGTERM', 0));
+process.on('SIGINT',  () => _gracefulShutdown('SIGINT', 0));
+
+process.on('uncaughtException', err => {
+  console.error('[FINOVA] Excepción no capturada:', err && err.message);
+  _sentryCapture(err, null, { fatal: true });
+  // Se sale: tras una excepción no capturada el proceso queda en un estado
+  // que no se puede dar por bueno, y Railway lo reinicia. Pero se sale por el
+  // apagado ordenado, para que el error llegue a Sentry antes.
+  _gracefulShutdown('excepción no capturada', 1);
+});
+
+process.on('unhandledRejection', reason => {
+  console.error('[FINOVA] Promesa rechazada sin capturar:', reason && (reason.message || reason));
+  _sentryCapture(reason instanceof Error ? reason : new Error(String(reason)), null, { tipo: 'unhandledRejection' });
+  // Aquí NO se sale: una promesa rechazada suele venir de una petición
+  // concreta (una llamada a Yahoo que falla, por ejemplo) y tumbar el
+  // servidor entero por eso sería peor que el problema. Se reporta y se sigue.
 });
