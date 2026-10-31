@@ -1090,6 +1090,26 @@ async function _withReceiptScanner(btn) {
   }
 }
 
+// Borrado de cuenta (RGPD). Como los demás _with*: el identificador se
+// resuelve DENTRO del closure, nunca al construir el manejador, porque
+// account-delete.js todavía no está cargado cuando se cablea el evento.
+async function _withAccountDelete(btn) {
+  const original = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.textContent = 'Preparando…'; }
+  try {
+    if (typeof openDeleteAccountDialog !== 'function') {
+      await _lazyLoad(_LAZY_SCRIPTS.accountDelete);
+    }
+    if (typeof openDeleteAccountDialog === 'function') openDeleteAccountDialog();
+    else showToast('No se pudo cargar el borrado de cuenta', 'error');
+  } catch (err) {
+    console.error(err);
+    showToast('No se pudo cargar el borrado de cuenta', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = original; }
+  }
+}
+
 async function _withPortfolioImport(btn, mode) {
   const original = btn ? btn.innerHTML : null;
   if (btn) { btn.disabled = true; btn.textContent = 'Preparando…'; }
@@ -1232,6 +1252,7 @@ function _globalClickDispatch(e) {
     case 'run-tests':                  _ensureScript('./src/utils/tests.js').then(() => runTests()).catch(err => console.warn('[Finova] No se pudo cargar tests.js:', err.message)); break;
     case 'clear-photo-backups':        clearPhotoBackups(); break;
     case 'reset-dialog':               openResetDialog(); break;
+    case 'delete-account':             _withAccountDelete(el); break;
     // Modal
     case 'close-modal':                closeModal(); break;
     case 'modal-confirm':              modalConfirmClick(); break;

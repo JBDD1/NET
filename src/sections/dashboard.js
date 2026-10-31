@@ -644,7 +644,18 @@ function startFresh() {
 }
 
 function resetAllData() {
-  localStorage.removeItem(STORAGE_KEY);
+  // Antes borraba STORAGE_KEY, que es la clave LEGACY 'finova_data_v1'. Un
+  // usuario autenticado guarda en 'finova_<uid>_data_v1' (_getStorageKey()),
+  // asi que "Eliminar todo" no borraba nada: tras el reload los datos seguian
+  // ahi. Se borran las dos, y tambien el historial de versiones y las API
+  // keys, que tampoco se tocaban pese a anunciarse en el dialogo.
+  try { localStorage.removeItem(_getStorageKey()); } catch (_) {}
+  try { localStorage.removeItem(STORAGE_KEY);      } catch (_) {}
+  try { localStorage.removeItem(HISTORY_KEY);      } catch (_) {}
+  try { localStorage.removeItem('finova_history_v1'); } catch (_) {}
+  for (const k of [...Object.values(AI_KEYS), ...Object.values(AI_KEYS_ENC)]) {
+    try { localStorage.removeItem(k); } catch (_) {}
+  }
   location.reload();
 }
 

@@ -23,6 +23,11 @@ function _todayYM() {
 
 function _monthsAgoYM(n) {
   const d = new Date();
+  // El día se fija a 1 ANTES de restar meses. Si no, un 31 de octubre hace
+  // setMonth(9) sobre el día 31 -> "31 de septiembre" no existe -> JS lo
+  // desborda a 1 de octubre, y "el mes anterior" acaba siendo el mes actual:
+  // los tests de la escala "1m" fallaban solo los días 29, 30 y 31.
+  d.setDate(1);
   d.setMonth(d.getMonth() - n);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }

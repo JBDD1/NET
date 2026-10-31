@@ -13,9 +13,13 @@ var _SERVER_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_S
   ? (import.meta.env.VITE_SERVER_URL || '')
   : (window.location.hostname === 'localhost' ? 'http://localhost:3000' : '');
 
-async function _apiRequest(path, opts, withAuth) {
+async function _apiRequest(path, opts, withAuth, quiet) {
   opts     = opts     || {};
   withAuth = withAuth || false;
+  // quiet: no mostrar el toast genérico de 401/429/5xx. Lo usa el borrado de
+  // cuenta, donde un 401 significa "reautentícate", no "sesión caducada", y el
+  // mensaje se pinta dentro del propio modal.
+  quiet    = quiet    || false;
 
   const headers = Object.assign({}, opts.headers || {});
   if (withAuth && typeof _getAuthHeader === 'function') {
@@ -23,6 +27,8 @@ async function _apiRequest(path, opts, withAuth) {
   }
 
   const res = await fetch(_SERVER_URL + path, Object.assign({}, opts, { headers }));
+
+  if (quiet) return res;
 
   if (res.status === 401) {
     // Antes un 401 pasaba en silencio: el servidor rechazaba el token (caducado
@@ -94,6 +100,23 @@ var api = {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(body),
       }, true);
+    },
+  },
+
+  /* ── Borrado de cuenta (RGPD) ── */
+  account: {
+    // El token se pasa a mano: tras reautenticar hace falta el recién emitido
+    // (getIdToken(true)), no el de la caché que usaría _getAuthHeader, porque
+    // el servidor comprueba auth_time.
+    delete: function(body, token) {
+      return _apiRequest('/api/account/delete', {
+        method:  'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
+        },
+        body: JSON.stringify(body || {}),
+      }, !token, true);
     },
   },
 

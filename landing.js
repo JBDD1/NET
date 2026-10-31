@@ -46,6 +46,15 @@ let _lpMode = 'signin';
     console.warn('[Landing] Firebase init:', e);
   }
 
+  // ?deleted=1 — llega desde el borrado de cuenta en Ajustes. El mensaje
+  // tiene que viajar en la URL porque a esas alturas ya se ha vaciado todo el
+  // almacenamiento del navegador: no queda ningún sitio donde dejarlo.
+  // Se consume una sola vez (replaceState) para que un F5 no lo repita.
+  if (new URLSearchParams(location.search).get('deleted') === '1') {
+    _lpShowDeletedNotice();
+    history.replaceState({}, '', location.pathname);
+  }
+
   _initScrollAnimations();
   _initScrollProgress();
   _initSmoothScroll();
@@ -122,6 +131,35 @@ function lpTogglePasswordVisibility() {
   btn.classList.toggle('is-visible', show);
   btn.setAttribute('aria-pressed', String(show));
   btn.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+}
+
+/**
+ * Aviso de cuenta eliminada. Se pinta a mano en vez de con un toast porque
+ * la landing no carga script.js y no tiene showToast.
+ */
+function _lpShowDeletedNotice() {
+  const el = document.createElement('div');
+  el.setAttribute('role', 'status');
+  el.setAttribute('aria-live', 'polite');
+  el.style.cssText =
+    'position:fixed;left:50%;transform:translateX(-50%);top:18px;z-index:9999;' +
+    'max-width:min(92vw,520px);padding:14px 18px;border-radius:10px;' +
+    'background:var(--lp-surface,#1a1510);color:var(--lp-fg,#ece2cb);' +
+    'border:1px solid var(--lp-accent,#a8803e);font-size:14px;line-height:1.5;' +
+    'box-shadow:0 10px 32px rgba(0,0,0,.42);text-align:center';
+  el.textContent = 'Tu cuenta y tus datos se han eliminado correctamente.';
+  document.body.appendChild(el);
+  // No se quita solo: es la única confirmación que va a ver el usuario de una
+  // acción irreversible, así que se queda hasta que la cierre o navegue.
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Cerrar aviso');
+  close.textContent = '×';
+  close.style.cssText =
+    'margin-left:12px;background:none;border:none;color:inherit;' +
+    'font-size:18px;line-height:1;cursor:pointer;opacity:.7';
+  close.onclick = () => el.remove();
+  el.appendChild(close);
 }
 
 function _showError(msg) {

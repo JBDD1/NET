@@ -298,6 +298,10 @@ const _LIMITS = {
   session:      { byIP: { capacity: 5,  refillRate: 0.083 } },
   admin:        { byIP: { capacity: 30, refillRate: 0.5   } },
   bank:         { byIP: { capacity: 10, refillRate: 0.167 } },
+  // Borrado de cuenta: muy restrictivo. Hay ademas un limite por uid de 3/hora
+  // dentro del handler, que es el que pedia el encargo; este corta el abuso
+  // por IP antes incluso de verificar el token.
+  accountDelete: { byIP: { capacity: 5, refillRate: 5 / 3600 } },
 };
 
 // ─── Anti-bruteforce ────────────────────────────────────────────
@@ -1375,13 +1379,15 @@ function _b64urlDecode(s) {
  * _requireAuth dejaba fuera justo los endpoints de datos del usuario. Aquí
  * dentro la cubre pase por donde pase la petición.
  */
-async function _verifyFirebaseToken(authHeader, req) {
+async function _verifyFirebaseToken(authHeader, req, full = false) {
   const ip = req ? _clientIp(req) : null;
   if (ip && _isIPBlocked(ip)) throw Object.assign(new Error('IP bloqueada'), { code: 'auth/ip-blocked' });
   try {
-    const uid = await _verifyFirebaseTokenInner(authHeader);
+    const payload = await _verifyFirebaseTokenInner(authHeader);
     if (ip) _clearFailedAttempts(ip);
-    return uid;
+    // Compatibilidad: todos los llamantes previos esperan el uid a secas.
+    // Quien necesite auth_time (borrado de cuenta) pide full: true.
+    return full ? payload : payload.sub;
   } catch (e) {
     // Un token caducado es un usuario legítimo cuya sesión venció (el SDK lo
     // renueva solo): no se penaliza. Lo demás sí cuenta como intento a ciegas.
@@ -1418,7 +1424,7 @@ async function _verifyFirebaseTokenInner(authHeader) {
   const valid  = crypto.verify('sha256', input,
     { key: pubKey, padding: crypto.constants.RSA_PKCS1_PADDING }, sig);
   if (!valid) throw new Error('Firma inválida');
-  return payload.sub; // verified Firebase UID
+  return payload; // payload verificado (sub = uid, auth_time, email…)
 }
 
 // AES-256-GCM encryption for user JSON files at rest.
@@ -1784,6 +1790,13 @@ async function handleSyncUpload(req, res) {
         res.writeHead(400, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'Payload inválido' }));
       }
+      // Sin esto no habia forma de saber de quien era cada backup, asi que al
+      // borrar una cuenta sus codigos quedaban activos para siempre. Y si el
+      // codigo ya es de otro, se rechaza: antes se le sobreescribia el backup.
+      if (!_claimSyncCode(code, req.uid)) {
+        res.writeHead(403, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'Ese código ya está en uso por otra cuenta. Genera uno nuevo.' }));
+      }
       fs.writeFileSync(path.join(SYNC_DIR, `${code}.json`), data, 'utf8');
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true, saved: new Date().toISOString() }));
@@ -1802,6 +1815,17 @@ async function handleSyncDownload(req, res) {
   if (!_SYNC_CODE_RE.test(code)) {
     res.writeHead(400, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'Código inválido' }));
+  }
+  // handleSyncDownload exigia *un* token valido pero no comprobaba de quien
+  // era el backup, y syncUpload sube el dataset EN CLARO: quien conociera un
+  // codigo leia la economia completa de otro. Los codigos anteriores a este
+  // registro no tienen dueno anotado y se siguen permitiendo para no romper a
+  // quien ya los usa; los nuevos quedan atados a su uid desde la subida.
+  const owner = _syncOwnerOf(code);
+  if (owner && owner !== req.uid) {
+    console.warn('[FINOVA/Sync] Descarga rechazada: el codigo no pertenece al solicitante');
+    res.writeHead(403, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'Ese código no pertenece a tu cuenta.' }));
   }
   const file = path.join(SYNC_DIR, `${code}.json`);
   if (!fs.existsSync(file)) {
@@ -1853,6 +1877,371 @@ async function handleUserMeta(req, res) {
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true }));
     } catch (e) {
+      _serverError(req, res, e);
+    }
+  });
+}
+
+/* ─── Borrado de cuenta (RGPD art. 17 — derecho de supresión) ─── */
+
+// Los backups de sync se guardaban SOLO por código: data/sync/<code>.json, sin
+// ninguna relación con el uid. Eso tenía dos consecuencias:
+//   1. Al borrar una cuenta era imposible invalidar sus códigos, así que sus
+//      datos seguían descargables indefinidamente.
+//   2. handleSyncDownload exigía *un* token válido pero no comprobaba
+//      propiedad, y syncUpload sube el dataset EN CLARO (sin el cifrado que sí
+//      tiene data/users/). Cualquier usuario autenticado que conociera un
+//      código leía la economía completa de otro.
+// Este registro arregla las dos cosas.
+const _SYNC_OWNERS_FILE = path.join(ROOT, 'data', 'sync_owners.json');
+
+// Acepta la ruta para poder apuntar a un directorio temporal en los tests.
+function _getSyncOwnersFrom(file) {
+  try {
+    const p = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return (p && typeof p === 'object' && !Array.isArray(p)) ? p : {};
+  } catch { return {}; }
+}
+
+function _getSyncOwners() { return _getSyncOwnersFrom(_SYNC_OWNERS_FILE); }
+
+function _syncOwnerOf(code) {
+  const e = _getSyncOwners()[code];
+  return e ? e.uid : null;
+}
+
+// Devuelve false si el código ya pertenece a OTRO uid (intento de secuestro).
+function _claimSyncCode(code, uid) {
+  const owners = _getSyncOwners();
+  const cur    = owners[code];
+  if (cur && cur.uid !== uid) return false;
+  if (!cur) {
+    owners[code] = { uid, createdAt: Date.now() };
+    try { fs.writeFileSync(_SYNC_OWNERS_FILE, JSON.stringify(owners), 'utf8'); }
+    catch (e) { console.error('[FINOVA/Sync] No se pudo registrar la propiedad del código:', e.message); }
+  }
+  return true;
+}
+
+// Hash corto del uid para los logs. Nunca se registra el uid en claro, ni el
+// email, ni nada del dataset: solo lo justo para correlacionar dos líneas.
+function _uidTag(uid) {
+  return crypto.createHash('sha256').update(String(uid)).digest('hex').slice(0, 12);
+}
+
+const _REAUTH_MAX_AGE_SEC = 300; // 5 min
+
+/**
+ * ¿Es el login lo bastante reciente para permitir borrar la cuenta?
+ *
+ * Esta separada del handler para poder probarla: el camino completo necesita
+ * un token firmado por Firebase, que no se puede falsificar en un test.
+ *
+ * Un auth_time ausente, no numérico o en el futuro se trata como NO fresco:
+ * ante la duda, se pide reautenticar. Es la direccion segura del fallo.
+ */
+function _isReauthFresh(authTime, nowSec) {
+  const t = Number(authTime);
+  if (!Number.isFinite(t) || t <= 0) return false;
+  const age = nowSec - t;
+  if (age < 0) return false;          // token del futuro: reloj mal o manipulado
+  return age <= _REAUTH_MAX_AGE_SEC;
+}
+
+/**
+ * Borra TODO lo que el servidor guarda de un uid.
+ *
+ * Idempotente a propósito: si un intento falla a mitad (disco, permisos) y el
+ * usuario reintenta, lo ya borrado no provoca ningún error. Nada de lo que
+ * hace lanza: los fallos se acumulan en `errors` y se sigue, porque dejar de
+ * borrar el resto por un fichero que no se pudo tocar es lo peor que podría
+ * pasar aquí.
+ *
+ * `dirs` existe para poder probar esto contra un directorio temporal.
+ */
+async function _deleteAccountData(uid, opts = {}) {
+  const { clientId = null, dirs = null, deleteBankAtProvider = true } = opts;
+  const D = dirs || {
+    users: USERS_DIR,
+    sync:  SYNC_DIR,
+    data:  path.join(ROOT, 'data'),
+  };
+  const F = {
+    roles:       path.join(D.data, 'roles.json'),
+    ratelimit:   path.join(D.data, 'ratelimit.json'),
+    bankReq:     path.join(D.data, 'bank_requisitions.json'),
+    syncOwners:  path.join(D.data, 'sync_owners.json'),
+    extraAdmins: path.join(D.data, 'extra_admins.json'),
+    waitlist:    path.join(D.data, 'waitlist.json'),
+    analytics:   path.join(D.data, 'analytics.json'),
+  };
+
+  const report = {
+    removedFiles: [], syncCodes: 0, bankRequisitions: 0,
+    bankRevokedAtProvider: 0, keysPurged: [], errors: [],
+  };
+
+  const rm = (file, label) => {
+    try {
+      if (fs.existsSync(file)) { fs.unlinkSync(file); report.removedFiles.push(label); }
+    } catch (e) {
+      // ENOENT no es un fallo: otro intento ya lo borró.
+      if (e.code !== 'ENOENT') report.errors.push(label + ': ' + (e.code || e.message));
+    }
+  };
+
+  // Lee, muta y reescribe un JSON. Si no existe o está corrupto, no hay nada
+  // que borrar y no es un error.
+  const editJson = (file, label, fn) => {
+    let obj;
+    try {
+      if (!fs.existsSync(file)) return;
+      obj = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch (e) {
+      report.errors.push(label + ' ilegible: ' + (e.code || e.message));
+      return;
+    }
+    let changed = false;
+    try { changed = fn(obj) === true; }
+    catch (e) { report.errors.push(label + ': ' + e.message); return; }
+    if (!changed) return;
+    try {
+      fs.writeFileSync(file, JSON.stringify(obj), 'utf8');
+      report.keysPurged.push(label);
+    } catch (e) { report.errors.push(label + ' no se pudo escribir: ' + (e.code || e.message)); }
+  };
+
+  // 1. El email hay que leerlo ANTES de borrar el meta: extra_admins.json y
+  //    waitlist.json se indexan por email, no por uid, y sin el meta ya no hay
+  //    forma de resolverlo.
+  let email = null;
+  try {
+    const metaRaw = fs.readFileSync(path.join(D.users, uid + '.meta.json'), 'utf8');
+    email = (JSON.parse(metaRaw).email || '').toLowerCase().trim() || null;
+  } catch { /* ya borrado o nunca existió */ }
+
+  // 2. Backups de sync del usuario. Primero los ficheros, luego el registro:
+  //    si se cae en medio, el reintento aún sabe qué códigos quedan.
+  const owners  = _getSyncOwnersFrom(F.syncOwners);
+  const myCodes = Object.keys(owners).filter(c => owners[c] && owners[c].uid === uid);
+  for (const code of myCodes) {
+    if (!/^[0-9a-f]{6,24}$/.test(code)) continue;   // nunca construir rutas con algo sin validar
+    rm(path.join(D.sync, code + '.json'), 'sync/' + code);
+    report.syncCodes++;
+  }
+  if (myCodes.length) {
+    editJson(F.syncOwners, 'sync_owners', o => {
+      let ch = false;
+      for (const c of myCodes) if (c in o) { delete o[c]; ch = true; }
+      return ch;
+    });
+  }
+
+  // 3. Conexiones bancarias. La requisition vive en GoCardless, que es un
+  //    encargado del tratamiento: borrar solo nuestra referencia dejaría la
+  //    conexión con el banco viva allí, así que se intenta borrarla también.
+  const reqIds = [];
+  editJson(F.bankReq, 'bank_requisitions', o => {
+    let ch = false;
+    for (const [rid, entry] of Object.entries(o)) {
+      if (entry && entry.uid === uid) { reqIds.push(rid); delete o[rid]; ch = true; }
+    }
+    return ch;
+  });
+  report.bankRequisitions = reqIds.length;
+
+  if (deleteBankAtProvider && reqIds.length && GC_SECRET_ID && GC_SECRET_KEY) {
+    for (const rid of reqIds) {
+      try {
+        const token = await _gcGetToken();
+        // _gcCall hace JSON.parse siempre y un DELETE puede responder 204 sin
+        // cuerpo, así que aquí se usa _gcRaw.
+        const r = await _gcRaw('DELETE', '/api/v2/requisitions/' + encodeURIComponent(rid) + '/', null, token);
+        // 404 = ya no está allí: a efectos de borrado es un éxito.
+        if (r.status < 400 || r.status === 404) report.bankRevokedAtProvider++;
+        else report.errors.push('GoCardless ' + rid + ': HTTP ' + r.status);
+      } catch (e) {
+        report.errors.push('GoCardless ' + rid + ': ' + e.message);
+      }
+    }
+  }
+
+  // 4. Ficheros directos del uid.
+  rm(path.join(D.users, uid + '.json'),      'users/blob');
+  rm(path.join(D.users, uid + '.meta.json'), 'users/meta');
+  rm(path.join(D.users, uid + '.blocked'),   'users/blocked');
+
+  // 5. Rol.
+  editJson(F.roles, 'roles', o => {
+    if (!(uid in o)) return false;
+    delete o[uid];
+    return true;
+  });
+
+  // 6. Cubos de rate limit: el fichero persistido y los vivos en memoria.
+  editJson(F.ratelimit, 'ratelimit', o => {
+    const b = o.aiUidBuckets;
+    if (!b) return false;
+    let ch = false;
+    for (const k of Object.keys(b)) if (k === 'ai-uid:' + uid) { delete b[k]; ch = true; }
+    return ch;
+  });
+  if (!dirs) {
+    // Solo el cubo de IA. La version anterior usaba endsWith(':' + uid), que
+    // tambien casaba con 'acctdel-uid:<uid>': el borrado se reseteaba su
+    // propio limite y los 3 intentos/hora no se aplicaban nunca. Comprobado
+    // con curl: 5 borrados seguidos devolvian 200. El cubo de borrado se deja
+    // vivo A PROPOSITO, para que reintentar siga estando limitado.
+    _buckets.delete('ai-uid:' + uid);
+  }
+
+  // 7. Lo indexado por email.
+  if (email) {
+    editJson(F.extraAdmins, 'extra_admins', arr => {
+      if (!Array.isArray(arr)) return false;
+      const before = arr.length;
+      for (let i = arr.length - 1; i >= 0; i--) {
+        if (String(arr[i]).toLowerCase().trim() === email) arr.splice(i, 1);
+      }
+      return arr.length !== before;
+    });
+    // La lista de espera guarda además la IP de alta: también es dato personal.
+    editJson(F.waitlist, 'waitlist', arr => {
+      if (!Array.isArray(arr)) return false;
+      const before = arr.length;
+      for (let i = arr.length - 1; i >= 0; i--) {
+        const e = arr[i];
+        if (e && String(e.email || '').toLowerCase().trim() === email) arr.splice(i, 1);
+      }
+      return arr.length !== before;
+    });
+  }
+
+  // 8. Analítica. Va indexada por clientId (UUID del dispositivo, generado en
+  //    cliente): el servidor NO puede deducirlo del uid, así que lo manda el
+  //    propio cliente. No es una frontera de seguridad —cualquiera puede ya
+  //    enviar cualquier clientId a /api/session— y un UUID de 128 bits no se
+  //    adivina, pero queda dicho: esto solo borra una fila de estadísticas,
+  //    nunca datos de otro usuario.
+  if (clientId && /^[0-9a-f-]{32,36}$/.test(clientId)) {
+    editJson(F.analytics, 'analytics', o => {
+      if (!(clientId in o)) return false;
+      delete o[clientId];
+      return true;
+    });
+  }
+
+  return report;
+}
+
+/**
+ * POST /api/account/delete
+ *
+ * Es POST y no DELETE a propósito: el servidor aplica la comprobación de
+ * origen (CSRF), la de Content-Type y el límite de tamaño SOLO a POST, y
+ * Access-Control-Allow-Methods no incluye DELETE. Un DELETE se saltaría las
+ * tres cosas.
+ */
+async function handleAccountDelete(req, res) {
+  if (!_checkRateLimit(req, res, 'accountDelete')) return;
+
+  const uid = await _requireAuth(req, res);   // el uid SIEMPRE sale del token
+  if (uid === null) return;
+
+  // Límite estricto por uid, además del de IP: 3 por hora. Va después de la
+  // autenticación porque hasta aquí no se sabe de quién es la petición.
+  const perUid = _tokenBucket('acctdel-uid:' + uid, 3, 3 / 3600);
+  if (!perUid.ok) {
+    res.writeHead(429, _apiHeaders(req, { 'Retry-After': String(Math.max(perUid.resetIn, 1)) }));
+    return res.end(JSON.stringify({
+      error: 'Demasiados intentos de borrado. Inténtalo dentro de una hora.',
+      code:  'RATE_LIMITED',
+    }));
+  }
+
+  // Login reciente obligatorio. Sin esto, un token robado de hasta una hora
+  // de vida bastaría para destruir la cuenta.
+  if (_AUTH_ENABLED) {
+    let authTime = null;
+    try {
+      if (_adminReady) {
+        const decoded = await _adminSDK.auth().verifyIdToken((req.headers['authorization'] || '').slice(7).trim(), true);
+        authTime = decoded.auth_time;
+      } else {
+        const payload = await _verifyFirebaseToken(req.headers['authorization'], req, true);
+        authTime = payload.auth_time;
+      }
+    } catch (e) {
+      res.writeHead(401, _apiHeaders(req));
+      return res.end(JSON.stringify({ error: 'Sesión no válida. Vuelve a iniciar sesión.', code: 'REAUTH_REQUIRED' }));
+    }
+    if (!_isReauthFresh(authTime, Math.floor(Date.now() / 1000))) {
+      res.writeHead(401, _apiHeaders(req));
+      return res.end(JSON.stringify({
+        error: 'Por seguridad, vuelve a confirmar tu identidad antes de borrar la cuenta.',
+        code:  'REAUTH_REQUIRED',
+      }));
+    }
+  }
+
+  let body = '';
+  let oversize = false;
+  req.on('data', c => {
+    if (oversize) return;
+    body += c;
+    if (body.length > 4096) { oversize = true; body = ''; }
+  });
+  req.on('end', async () => {
+    try {
+      // Del body solo se acepta clientId, y solo para la fila de analítica.
+      // El uid NUNCA sale de aquí.
+      let clientId = null;
+      if (!oversize && body) {
+        try { clientId = JSON.parse(body).clientId || null; } catch { /* opcional */ }
+      }
+
+      const report = await _deleteAccountData(uid, { clientId });
+
+      // Firebase Auth. revokeRefreshTokens/deleteUser solo existen con el
+      // Admin SDK; sin él (dev, o despliegue sin service account) el servidor
+      // no puede tocar la cuenta de Auth y se le dice al cliente que la borre
+      // él con user.delete(), que puede porque acaba de reautenticarse.
+      let authDeleted = false;
+      if (_adminReady) {
+        try {
+          // Revocar ANTES de borrar: así, si el borrado falla, los tokens que
+          // queden vivos ya no sirven para nada.
+          await _adminSDK.auth().revokeRefreshTokens(uid);
+          await _adminSDK.auth().deleteUser(uid);
+          authDeleted = true;
+        } catch (e) {
+          // user-not-found = ya estaba borrado. Es el caso del reintento.
+          if (e.code === 'auth/user-not-found') authDeleted = true;
+          else report.errors.push('firebase-auth: ' + (e.code || e.message));
+        }
+      }
+
+      if (report.errors.length) {
+        console.error('[FINOVA/AccountDelete] fallos parciales', {
+          ts: new Date().toISOString(), uidTag: _uidTag(uid), errors: report.errors,
+        });
+        res.writeHead(500, _apiHeaders(req));
+        return res.end(JSON.stringify({
+          error: 'No se pudo completar el borrado. No se ha borrado nada en este dispositivo; inténtalo de nuevo.',
+          code:  'INTERNAL_ERROR',
+        }));
+      }
+
+      console.log('[FINOVA/AccountDelete] cuenta borrada', {
+        ts: new Date().toISOString(), uidTag: _uidTag(uid),
+        syncCodes: report.syncCodes, bankRequisitions: report.bankRequisitions, authDeleted,
+      });
+      res.writeHead(200, _apiHeaders(req));
+      res.end(JSON.stringify({ ok: true, authDeleted }));
+    } catch (e) {
+      console.error('[FINOVA/AccountDelete] fallo', {
+        ts: new Date().toISOString(), uidTag: _uidTag(uid), message: e?.message?.slice(0, 200),
+      });
       _serverError(req, res, e);
     }
   });
@@ -2304,6 +2693,7 @@ http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/api/user-data')         return handleUserDataPost(req, res);
   // Metadatos de usuario (email, nombre, último acceso)
   if (req.method === 'POST' && req.url === '/api/user-meta')         return handleUserMeta(req, res);
+  if (req.method === 'POST' && req.url === '/api/account/delete')    return handleAccountDelete(req, res);
   // Admin API
   if (req.method === 'GET'  && req.url.startsWith('/api/admin/users'))    return handleAdminUsers(req, res);
   if (req.method === 'POST' && req.url === '/api/admin/block')            return handleAdminBlock(req, res);

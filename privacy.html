@@ -81,7 +81,7 @@ a:hover{text-decoration:underline}
 <div class="doc-wrap">
   <div class="doc-eyebrow">◈ Legal</div>
   <h1 class="doc-title">Política de Privacidad</h1>
-  <div class="doc-meta">Última actualización: junio de 2025 &nbsp;·&nbsp; Aplicación web Finova</div>
+  <div class="doc-meta">Última actualización: 31 de octubre de 2026 &nbsp;·&nbsp; Aplicación web Finova</div>
 
   <div class="doc-highlight">
     <strong>Resumen en una frase:</strong> tus datos financieros viven en tu cuenta de usuario. No los vendemos, no los compartimos con terceros y no los usamos para publicidad.
@@ -153,7 +153,7 @@ a:hover{text-decoration:underline}
     <ul>
       <li><strong>Acceso</strong> — solicitar qué datos tenemos sobre ti.</li>
       <li><strong>Rectificación</strong> — corregir datos inexactos o incompletos.</li>
-      <li><strong>Supresión</strong> — solicitar el borrado de tus datos ("derecho al olvido").</li>
+      <li><strong>Supresión</strong> — borrar tu cuenta y todos tus datos tú mismo desde <strong>Ajustes → Zona de peligro → «Eliminar mi cuenta»</strong>, o solicitárnoslo ("derecho al olvido"). Ver el apartado 8.</li>
       <li><strong>Portabilidad</strong> — recibir tus datos en un formato estructurado y legible por máquina.</li>
       <li><strong>Limitación del tratamiento</strong> — solicitar que restrinjamos el uso de tus datos.</li>
       <li><strong>Oposición</strong> — oponerte al tratamiento de tus datos.</li>
@@ -163,18 +163,34 @@ a:hover{text-decoration:underline}
   </div>
 
   <div class="doc-section">
-    <h2>8. Seguridad</h2>
+    <h2>8. Eliminación de cuenta y datos</h2>
+    <p>Puedes eliminar tu cuenta y todos tus datos tú mismo desde <strong>Ajustes → Zona de peligro → «Eliminar mi cuenta»</strong>, sin necesidad de solicitárnoslo.</p>
+    <p>Para evitar borrados accidentales o ajenos, el proceso exige escribir la palabra <strong>ELIMINAR</strong>, una espera de 5 segundos y <strong>volver a identificarte</strong> en ese momento (con tu contraseña o con Google). Si tu inicio de sesión tiene más de 5 minutos, te pedimos repetirlo. Antes de confirmar puedes descargar una copia completa de tus datos en JSON.</p>
+    <p>El borrado alcanza:</p>
+    <ul>
+      <li><strong>En nuestro servidor:</strong> la copia cifrada de tus datos, tus metadatos de cuenta (correo, nombre y último acceso), tu tipo de cuenta y contadores de uso, las copias de sincronización entre dispositivos junto con sus códigos de acceso, las referencias a tus conexiones bancarias, tu entrada en la lista de espera (con la IP registrada) y la fila de estadísticas de tu dispositivo.</li>
+      <li><strong>En tu cuenta de acceso:</strong> se revocan todas tus sesiones y se elimina tu usuario de Firebase Authentication, con su correo, nombre y foto.</li>
+      <li><strong>En tu proveedor de banca abierta:</strong> pedimos a GoCardless que elimine la autorización, de modo que la conexión con tu banco se corta también en su lado.</li>
+      <li><strong>En este dispositivo:</strong> los datos financieros del almacenamiento local, el historial de versiones, tus claves de API, las fotos de tickets y la copia de respaldo guardadas en IndexedDB, las cotizaciones en caché y la cookie de sincronización.</li>
+    </ul>
+    <p>El plazo es <strong>inmediato</strong>: no hay periodo de gracia ni papelera, y los datos no son recuperables después, tampoco por nosotros. Si el proceso falla a mitad, no se borra nada de tu dispositivo para que puedas reintentarlo. En los registros del servidor solo queda la fecha y un código derivado criptográficamente de tu identificador, sin tu correo ni ningún dato personal.</p>
+    <p>Esto no afecta a las copias de seguridad que hayas descargado tú: esas quedan únicamente en tu poder.</p>
+    <p>Si prefieres que lo hagamos nosotros, escríbenos a <a href="mailto:MyFinova1@gmail.com">MyFinova1@gmail.com</a> desde la dirección de tu cuenta.</p>
+  </div>
+
+  <div class="doc-section">
+    <h2>9. Seguridad</h2>
     <p>Aplicamos medidas técnicas y organizativas razonables para proteger tus datos, incluyendo el uso de HTTPS para todas las comunicaciones, autenticación basada en tokens gestionados por Firebase y acceso restringido a los datos del servidor.</p>
     <p>A pesar de estas medidas, ningún sistema es infalible. Si detectamos una brecha de seguridad que afecte a tus datos, te notificaremos en el plazo que establece la normativa.</p>
   </div>
 
   <div class="doc-section">
-    <h2>9. Menores de edad</h2>
+    <h2>10. Menores de edad</h2>
     <p>Finova no está dirigida a menores de 16 años. No recopilamos conscientemente datos de menores. Si crees que un menor ha creado una cuenta, contáctanos y la eliminaremos.</p>
   </div>
 
   <div class="doc-section">
-    <h2>10. Cambios en esta política</h2>
+    <h2>11. Cambios en esta política</h2>
     <p>Podemos actualizar esta Política de Privacidad ocasionalmente. Cuando lo hagamos, actualizaremos la fecha en la parte superior del documento. Para cambios sustanciales, notificaremos a los usuarios registrados por correo electrónico.</p>
   </div>
 

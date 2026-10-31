@@ -331,7 +331,7 @@ try {
     <h1>Política de Privacidad</h1>
     <p>Tus datos financieros se almacenan en tu dispositivo. Esta política explica con total transparencia qué datos tratamos, cómo y por qué.</p>
     <div class="doc-meta">
-      <span>Última actualización: 31 de mayo de 2026</span>
+      <span>Última actualización: 31 de octubre de 2026</span>
       <span class="doc-meta-dot"></span>
       <span>9 secciones</span>
       <span class="doc-meta-dot"></span>
@@ -352,9 +352,10 @@ try {
     <a href="#s4">4. Tus claves de API</a>
     <a href="#s5">5. Seguridad</a>
     <a href="#s6">6. Tus derechos</a>
-    <a href="#s7">7. Menores de edad</a>
-    <a href="#s8">8. Cambios en esta política</a>
-    <a href="#s9">9. Normativa aplicable</a>
+    <a href="#s7">7. Eliminación de cuenta y datos</a>
+    <a href="#s8">8. Menores de edad</a>
+    <a href="#s9">9. Cambios en esta política</a>
+    <a href="#s10">10. Normativa aplicable</a>
   </nav>
 
   <!-- CONTENT -->
@@ -432,24 +433,75 @@ try {
       <ul>
         <li><strong>Acceso:</strong> puedes ver toda tu información directamente en la aplicación.</li>
         <li><strong>Rectificación:</strong> puedes editar o corregir cualquier dato desde la propia interfaz.</li>
-        <li><strong>Supresión:</strong> puedes borrar todos tus datos en cualquier momento desde Ajustes, o simplemente borrando los datos de navegación de tu navegador.</li>
+        <li><strong>Supresión:</strong> puedes borrar tu cuenta y todos tus datos desde Ajustes, en tu dispositivo y en nuestro servidor. Lo detallamos en el <a href="#s7">apartado 7</a>.</li>
         <li><strong>Portabilidad:</strong> puedes exportar todos tus datos en formato JSON desde la función de backup, en cualquier momento.</li>
       </ul>
       <p>Para consultas sobre los datos que sí pasan por nuestro servidor, contacta en <a href="mailto:MyFinova1@gmail.com">MyFinova1@gmail.com</a>.</p>
     </div>
 
     <div class="doc-section" id="s7">
-      <h2><span class="doc-section-num">7</span>Menores de edad</h2>
-      <p>Finova no está dirigida a menores de 18 años y no recopilamos conscientemente datos de menores.</p>
+      <h2><span class="doc-section-num">7</span>Eliminación de cuenta y datos</h2>
+
+      <p>Puedes eliminar tu cuenta y todos tus datos tú mismo, en cualquier momento y sin pedírnoslo, desde <strong>Ajustes → Zona de peligro → «Eliminar mi cuenta»</strong>.</p>
+
+      <h3>7.1 Cómo funciona</h3>
+      <p>Antes de borrar nada te pedimos tres confirmaciones, precisamente porque la acción no se puede deshacer:</p>
+      <ul>
+        <li>Escribir la palabra <strong>ELIMINAR</strong>.</li>
+        <li>Una espera de 5 segundos antes de que el botón se active.</li>
+        <li><strong>Volver a identificarte</strong> en ese mismo momento: con tu contraseña, o con Google si así creaste la cuenta. Si tu inicio de sesión tiene más de 5 minutos, te pedimos repetirlo. Así nadie puede borrar tu cuenta desde una sesión que hayas dejado abierta.</li>
+      </ul>
+      <p>En el mismo diálogo tienes el botón <strong>«Descargar copia de mis datos antes»</strong>, que exporta todo en JSON. Te recomendamos usarlo: después del borrado no podremos recuperar nada.</p>
+
+      <h3>7.2 Qué se elimina de nuestro servidor</h3>
+      <ul>
+        <li>La copia de seguridad cifrada de tus datos financieros.</li>
+        <li>Tus metadatos de cuenta: correo electrónico, nombre y fecha del último acceso.</li>
+        <li>Tu tipo de cuenta y los contadores internos de uso asociados a tu identificador.</li>
+        <li>Las copias guardadas mediante <strong>sincronización entre dispositivos</strong> y los códigos que daban acceso a ellas, que quedan invalidados.</li>
+        <li>Las referencias a tus conexiones bancarias. Además pedimos a nuestro proveedor de banca abierta (GoCardless) que elimine la autorización, de modo que la conexión con tu banco también se corta en su lado.</li>
+        <li>Tu dirección en la lista de espera del plan Premium, si te habías apuntado, incluida la dirección IP registrada en ese momento.</li>
+        <li>La fila de estadísticas de uso asociada a tu dispositivo.</li>
+      </ul>
+
+      <h3>7.3 Qué se elimina de tu cuenta de acceso</h3>
+      <p>Se revocan todas tus sesiones activas y se borra tu cuenta del servicio de autenticación (Firebase Authentication), con ella tu correo, tu nombre y tu foto de perfil. A partir de ese momento no existe ninguna cuenta de Finova asociada a ti, y tendrías que registrarte de nuevo para volver a usar la aplicación.</p>
+
+      <h3>7.4 Qué se elimina de este dispositivo</h3>
+      <ul>
+        <li>Todos tus datos financieros guardados en el almacenamiento local del navegador.</li>
+        <li>El historial de versiones y tus claves de API.</li>
+        <li>Las fotos de tickets y recibos, y la copia de respaldo del estado, ambas en IndexedDB.</li>
+        <li>Las respuestas de cotizaciones guardadas por el service worker, cuyas direcciones podrían revelar qué valores tienes en cartera.</li>
+        <li>La cookie del código de sincronización.</li>
+      </ul>
+      <p>Solo permanece la caché de los archivos de la propia aplicación (hojas de estilo, iconos y código), que no contiene ningún dato tuyo. Si has usado Finova en más dispositivos, la limpieza local ocurre en cada uno la primera vez que lo abras, ya que la cuenta y los datos del servidor ya no existen.</p>
+
+      <h3>7.5 En qué plazo</h3>
+      <p><strong>De forma inmediata.</strong> No hay periodo de gracia ni papelera: cuando la pantalla te confirma el borrado, los datos ya no están y no son recuperables, tampoco por nosotros.</p>
+      <p>Si algo falla a mitad del proceso, no se borra nada de tu dispositivo y te mostramos el error para que puedas reintentarlo. Preferimos no dejarte sin datos y con la cuenta viva.</p>
+      <p>En los registros técnicos del servidor queda constancia de que una cuenta se eliminó, con la fecha y un <strong>código derivado criptográficamente</strong> de tu identificador, del que no se puede volver atrás. No guardamos tu correo ni ningún dato personal en esos registros.</p>
+
+      <h3>7.6 Si prefieres que lo hagamos nosotros</h3>
+      <p>No es necesario, pero también puedes ejercer tu derecho de supresión escribiéndonos a <a href="mailto:MyFinova1@gmail.com">MyFinova1@gmail.com</a> desde la dirección de tu cuenta. Te responderemos dentro del plazo de un mes que fija el RGPD.</p>
+
+      <div class="doc-highlight">
+        <p>⚠️ <strong>Importante:</strong> esto no borra las copias de seguridad que hayas descargado tú a tu ordenador ni los archivos que hayas exportado. Esos quedan solo en tu poder, y eres tú quien decide qué hacer con ellos.</p>
+      </div>
     </div>
 
     <div class="doc-section" id="s8">
-      <h2><span class="doc-section-num">8</span>Cambios en esta política</h2>
-      <p>Podemos actualizar esta política de privacidad para reflejar cambios en la aplicación o en la normativa aplicable. Si hacemos cambios significativos, lo indicaremos de forma visible en la aplicación. La fecha de "Última actualización" al principio de este documento siempre refleja la versión más reciente.</p>
+      <h2><span class="doc-section-num">8</span>Menores de edad</h2>
+      <p>Finova no está dirigida a menores de 18 años y no recopilamos conscientemente datos de menores.</p>
     </div>
 
     <div class="doc-section" id="s9">
-      <h2><span class="doc-section-num">9</span>Normativa aplicable</h2>
+      <h2><span class="doc-section-num">9</span>Cambios en esta política</h2>
+      <p>Podemos actualizar esta política de privacidad para reflejar cambios en la aplicación o en la normativa aplicable. Si hacemos cambios significativos, lo indicaremos de forma visible en la aplicación. La fecha de "Última actualización" al principio de este documento siempre refleja la versión más reciente.</p>
+    </div>
+
+    <div class="doc-section" id="s10">
+      <h2><span class="doc-section-num">10</span>Normativa aplicable</h2>
       <p>Esta política se rige por la normativa española y europea de protección de datos, incluyendo el <strong>Reglamento General de Protección de Datos (RGPD/GDPR)</strong> en lo que resulte aplicable, dado que la mayor parte del tratamiento de datos ocurre localmente en el dispositivo del usuario y no en servidores de Finova.</p>
       <div class="doc-highlight">
         <p>📬 <strong>Contacto:</strong> <a href="mailto:MyFinova1@gmail.com">MyFinova1@gmail.com</a></p>

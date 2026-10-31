@@ -309,6 +309,295 @@ Ver la salida real en el informe del commit.
 
 ---
 
+## FASE 10 — Borrado de cuenta (RGPD art. 17) · ✅ COMPLETA
+
+### PASO 1 — Inventario de datos · ✅ COMPLETO
+
+Hecho leyendo el codigo, no asumiendo. Lo que no este en esta lista no se
+borra, asi que incluye tambien almacenes que el encargo no mencionaba.
+
+#### Servidor — por uid (ruta directa)
+
+| Dato | Ruta | Contenido |
+|---|---|---|
+| Blob de datos | `data/users/<uid>.json` | Todo el dataset, **cifrado** AES-256-GCM si `FINOVA_ENC_KEY` esta puesta |
+| Metadatos | `data/users/<uid>.meta.json` | **email, displayName, lastAccess, createdAt** — en claro |
+| Marca de bloqueo | `data/users/<uid>.blocked` | Fichero vacio, lo pone el panel admin |
+| Rol | `data/roles.json` | Objeto `{ uid: 'free'|'premium'|'admin' }` |
+| Cubos de rate limit | `data/ratelimit.json` | Claves `ai-uid:<uid>`, persistidas entre reinicios |
+| Cubos en memoria | `_buckets` (Map) | `ai-uid:<uid>` vivo en el proceso |
+| Requisitions bancarias | `data/bank_requisitions.json` | `{ requisitionId: { uid, createdAt } }` — conexion GoCardless |
+
+#### Servidor — por uid (ruta indirecta, hay que resolverla)
+
+| Dato | Ruta | Por que no es directo |
+|---|---|---|
+| Admin extra | `data/extra_admins.json` | Indexado por **email**, no por uid. Se saca el email de `.meta.json` antes de borrarlo |
+| Lista de espera | `data/waitlist.json` | Indexada por **email**. Igual: hay que leer meta primero |
+| Backups de sync | `data/sync/<code>.json` | **No existe ninguna relacion code -> uid.** Ver el problema de abajo |
+| Analitica | `data/analytics.json` | Indexada por `clientId` (UUID del dispositivo, generado en cliente). El servidor **no puede** mapear uid -> clientId |
+
+#### Problema encontrado: los codigos de sync no tienen dueno
+
+`data/sync/<code>.json` se escribe solo con el codigo. **El servidor no sabe
+de quien es cada codigo**, asi que al borrar una cuenta no puede invalidar sus
+backups: seguirian accesibles indefinidamente. El encargo lo pedia
+explicitamente («un codigo de sync que siga activo sigue dando acceso»).
+
+Y al mirarlo aparecio algo peor, preexistente: `handleSyncDownload` exige
+**un** token valido pero **no comprueba propiedad**, y `syncUpload` sube
+`JSON.stringify(exportable)` — el dataset completo **en texto plano**, sin el
+cifrado que si tiene `data/users/`. Cualquier usuario autenticado que conozca
+un codigo de 12 hex se descarga la economia completa de otro. El codigo viaja
+ademas en una cookie `finova_sync` (30 dias).
+
+#### Firebase
+
+Comprobado con grep: **no hay Firestore, ni Realtime Database, ni Storage**.
+Solo **Authentication**. Las coincidencias de `getStorage` en el codigo son
+`getStorageKey`/`getStorageUsage`, de localStorage.
+
+Por tanto en Firebase solo hay: el usuario de Auth (uid, email, displayName,
+photoURL, proveedor, fechas) y sus refresh tokens.
+
+#### Navegador
+
+| Tipo | Clave | Contenido |
+|---|---|---|
+| localStorage | `finova_<uid>_data_v1` | Dataset del usuario autenticado |
+| localStorage | `finova_data_v1` | Dataset legacy / modo sin cuenta |
+| localStorage | `finova_last_uid` | Ultimo uid, lo lee el boot-script del tema |
+| localStorage | `finova_history_v2` + `finova_history_v1` | Historial de versiones (snapshots del dataset) |
+| localStorage | `finova_tour_step` | Paso del tour guiado |
+| localStorage | `finova_ai_consent_v1` | Consentimiento de envio de datos a la IA |
+| localStorage | `finova_api_key`, `finova_openai_key`, `finova_gemini_key`, `finova_groq_key` | API keys en claro (version antigua) |
+| localStorage | los 4 anteriores con sufijo `_enc` | API keys cifradas AES-GCM |
+| localStorage / sessionStorage | `finova_enc_k` | Material de clave de versiones antiguas |
+| IndexedDB | `finova_photos` | Fotos de tickets y recibos |
+| IndexedDB | `finova_state` | Copia de respaldo del estado completo |
+| Cookie | `finova_sync` | Codigo de sincronizacion, 30 dias |
+| Cache SW | `finova-api-v1` | Respuestas de `/api/yahoo` y `/api/fx`; **las URL revelan los tickers de la cartera** |
+| Cache SW | `finova-v27` | Shell estatico — sin datos personales, se puede quedar |
+
+#### Bug encontrado en el borrado local que ya existia
+
+`resetAllData()` (dashboard.js) hace `localStorage.removeItem(STORAGE_KEY)`,
+y `STORAGE_KEY` es la clave **legacy** `finova_data_v1`. Un usuario
+autenticado guarda en `finova_<uid>_data_v1`, que es lo que devuelve
+`_getStorageKey()`. Es decir: el boton **«Eliminar todo» no borraba nada**
+para quien habia iniciado sesion — tras el reload los datos seguian ahi.
+Tampoco toca IndexedDB, ni el historial, ni las API keys.
+
+---
+
+### PASO 2 — Endpoint del servidor · ✅ COMPLETO
+
+**`POST /api/account/delete`** (no `DELETE`). El método es una decisión, no una
+comodidad: el servidor aplica la comprobación de origen (CSRF), la de
+Content-Type y el límite de tamaño **solo a POST**, y
+`Access-Control-Allow-Methods` no incluye DELETE. Un DELETE se habría saltado
+las tres. *Verificado con curl:* `DELETE` → 404, `POST` con
+`Origin: https://evil.com` → 403.
+
+| Requisito | Cómo queda |
+|---|---|
+| Autenticación | `_requireAuth` — el uid sale **siempre** del token, nunca del body ni de la URL |
+| Rate limit estricto | 3/hora **por uid** (`acctdel-uid:<uid>`) + 5/hora por IP antes de verificar el token |
+| Login reciente | `auth_time` con margen de 5 min → 401 `REAUTH_REQUIRED` |
+| Idempotente | Ningún borrado lanza por algo que ya no existe |
+| Logs | Solo fecha + `sha256(uid)` truncado a 12 chars. Nunca email, uid en claro ni datos |
+| Respuestas | `200 {ok:true, authDeleted}` · `REAUTH_REQUIRED` · `RATE_LIMITED` · `INTERNAL_ERROR` |
+
+**Firebase Auth:** `revokeRefreshTokens(uid)` **antes** de `deleteUser(uid)`,
+para que si el borrado falla los tokens que queden vivos ya no sirvan.
+`auth/user-not-found` se trata como éxito (es el caso del reintento).
+
+Ambas funciones existen **solo con el Admin SDK**. Sin service account
+configurada el servidor no puede tocar la cuenta de Auth, así que responde
+`authDeleted: false` y el cliente la borra con `user.delete()`, que puede
+porque acaba de reautenticarse. Así la cuenta desaparece en las dos
+configuraciones.
+
+**GoCardless:** la requisition vive en el proveedor, que es un encargado del
+tratamiento. Borrar solo nuestra referencia dejaría la conexión con el banco
+viva allí, así que se pide también `DELETE /api/v2/requisitions/<id>/`. Un 404
+cuenta como éxito. Si no hay credenciales configuradas no se llama — no se
+activa ni contrata nada.
+
+#### Arreglado de paso: el agujero de los códigos de sync
+
+Para poder invalidar los backups de un usuario hacía falta saber de quién son,
+así que se añadió `data/sync_owners.json` (`code → {uid}`). Eso cierra además
+el agujero preexistente:
+
+- **Al subir:** el código queda atado al uid. Si ya es de otro → **403** (antes
+  se le sobrescribía el backup a su dueño).
+- **Al descargar:** si el código tiene dueño y no es el solicitante → **403**.
+
+Los códigos anteriores a este registro no tienen dueño anotado y se siguen
+permitiendo, para no romper a quien ya los use. **Queda un hueco conocido:**
+esos códigos legacy siguen siendo descargables por cualquier usuario
+autenticado que los conozca. Ver los pendientes al final.
+
+---
+
+### PASO 3 — Interfaz en Ajustes · ✅ COMPLETO
+
+Fila nueva en la tarjeta **«Zona de peligro» que ya existía** — no se creó otra
+sección ni se tocó el diseño. Reutiliza `openModal`, `btn-danger`,
+`modal-danger-box` y los toasts actuales.
+
+Carga diferida (`_LAZY_SCRIPTS.accountDelete` + `_withAccountDelete`), igual
+que el escáner de tickets: 12 KB que no se descargan si nadie pulsa el botón.
+
+| Requisito | Cómo queda |
+|---|---|
+| Explica qué se borra | Transacciones, cartera, objetivos, viajes, bizums, patrimonio, fotos, API keys, copias del servidor y códigos de sync |
+| Descargar copia antes | Reutiliza `downloadBackup()`, el mismo de Ajustes |
+| Escribir ELIMINAR | Sí, y el botón exige **las dos** cosas: texto exacto **y** cuenta atrás cumplida |
+| Cuenta atrás de 5 s | Sí, y el intervalo se limpia si el modal se cierra |
+| Reautenticación | `reauthenticateWithCredential` (contraseña) o `reauthenticateWithPopup` (Google), según `providerData` |
+| `requires-recent-login` | Se vuelve a pedir la confirmación en vez de fallar |
+| Estados de carga | Botón deshabilitado + texto ("Confirmando…", "Eliminando…", "Limpiando este dispositivo…"), la convención del proyecto |
+| Errores concretos | 10 códigos traducidos: contraseña incorrecta, sin conexión, límite de intentos, popup bloqueado, cuenta distinta… |
+| Sin `alert()` | Verificado con un test |
+| Accesibilidad | `role="dialog"` + `aria-modal` + foco atrapado + Escape ya los da `openModal`; los errores van en `role="alert"` con `aria-live="assertive"` |
+| Modo demo | Diálogo distinto: avisa de que **no hay cuenta que borrar** y solo limpia lo local |
+
+Si ambos proveedores están vinculados se pide **la contraseña**, no el popup:
+es menos intrusivo y no depende de que el navegador permita ventanas.
+
+---
+
+### PASO 4 — Limpieza en el cliente · ✅ COMPLETO
+
+**La regla que gobierna el orden:** nada local se borra hasta que el servidor
+responde 200. Si se limpiara antes y el servidor fallara, el usuario se
+quedaría sin datos **y** con la cuenta viva, sin forma de reintentar. En
+cualquier error se muestra el motivo y **no se toca nada**.
+
+Tras el 200: `user.delete()` si el servidor no pudo → `signOut()` → limpieza →
+`landing.html?deleted=1`.
+
+Se barren las claves **recorriendo** el almacenamiento, no con una lista fija:
+la del dataset lleva el uid dentro (`finova_<uid>_data_v1`) y las versiones
+antiguas dejaron claves que ya no están en el código.
+
+**Dos cosas que faltaban y se encontraron repasando el flujo:** Firebase guarda
+la sesión en `firebase:authUser:<apiKey>:[DEFAULT]` (localStorage) y en la base
+`firebaseLocalStorageDb` (IndexedDB), y **ambas contienen el correo y el uid**.
+Solo se barría lo que empieza por `finova`, así que tras borrar la cuenta
+quedaba ahí un dato personal. Ahora se borran las dos.
+
+Se deja a propósito la caché `finova-v27` (css, js, iconos: sin datos
+personales) y se borra `finova-api-v1`, porque las **URL** de
+`/api/yahoo?symbols=…` revelan los tickers de la cartera.
+
+Nada de esto lanza: una base bloqueada por otra pestaña se reporta y se sigue,
+en vez de dejar `localStorage` a medias.
+
+---
+
+### PASO 5 — Documentación legal · ✅ COMPLETO
+
+`privacidad.html`: apartado **7 «Eliminación de cuenta y datos»** nuevo, con 6
+subapartados (cómo funciona, qué se borra del servidor, de la cuenta de acceso,
+de este dispositivo, en qué plazo, y cómo pedirlo por correo). Renumerados 7-9
+→ 8-10 e índice actualizado. Escrito contra lo que **de verdad** hace el
+código: menciona los 5 segundos, los 5 minutos de `auth_time`, la invalidación
+de los códigos de sync, el corte en GoCardless, y que en los logs solo queda un
+hash irreversible.
+
+**Encontrado:** `privacy.html` no es la versión inglesa — es una **segunda
+política, también en español**, con estructura distinta, que también se publica
+(`vite.config.js` la copia y `terms.html` la enlaza). Dejarla sin la sección la
+habría puesto en contradicción con la otra, así que lleva su propio apartado 8
+equivalente. **La duplicidad en sí sigue ahí** — ver pendientes.
+
+---
+
+### PASO 6 — Pruebas · ✅ COMPLETO (con dos excepciones honestas)
+
+**Emulador de Firebase Auth: no disponible** (no está instalado y no se instaló
+para no alterar el árbol de dependencias). Por eso la lógica de borrado se
+extrajo a `_deleteAccountData(uid, { dirs })`, que acepta el directorio: **17
+tests** la ejecutan de verdad contra un directorio temporal con datos falsos,
+extrayendo la función **real** de `server.cjs`.
+
+**Con curl, contra el servidor arrancado:**
+
+| Prueba | Resultado |
+|---|---|
+| Sin token | **401** ✅ |
+| Token basura | **401** ✅ |
+| `DELETE /api/account/delete` | **404** (la ruta es POST a propósito) ✅ |
+| `Origin: https://evil.com` | **403** ✅ |
+| El blob del usuario tras cada fallo | **intacto** ✅ |
+| Borrado completo | **200**, y `users/`, `sync/`, `sync_owners`, `roles`, `extra_admins` y `waitlist` vacíos ✅ |
+| Borrar **dos veces** seguidas | **200 y 200**, sin 500 ✅ |
+| 4º y 5º intento en la misma hora | **429 `RATE_LIMITED`** ✅ |
+
+**Bug que solo apareció al ejecutarlo:** el límite de 3/hora **no se aplicaba**.
+Mi propia limpieza de cubos usaba `k.endsWith(':' + uid)`, que también casa con
+`acctdel-uid:<uid>`: cada borrado se reseteaba su propio contador. Comprobado:
+5 borrados seguidos devolvían 200. Ahora solo se borra `ai-uid:<uid>`, y el
+cubo del borrado se deja vivo a propósito.
+
+**No se pudo probar con curl el camino `REAUTH_REQUIRED`**, porque hace falta un
+token firmado por Firebase y no se puede falsificar (la verificación comprueba
+la firma RS256 contra las claves públicas de Google). Por eso la comprobación
+se extrajo a `_isReauthFresh(authTime, nowSec)`, una función pura con **7
+tests**: el límite exacto de 300 s, un segundo por encima, una hora, `auth_time`
+ausente / no numérico / en el futuro, y como cadena.
+
+**Tampoco se probó con un token de otro usuario**, por la misma razón. Lo que sí
+está cubierto es lo que importa de eso: **9 tests** verifican que borrar el uid
+A no toca blob, meta, rol, cubo, backup de sync ni requisition del uid B.
+
+**Flujo de UI:** no hay navegador (sin Playwright/Puppeteer). Se recorrió en el
+código y se cubrió con **18 tests** en jsdom que cargan el fichero real: que no
+queda ninguna clave de Finova ni de Firebase, que **no se tocan** las de otras
+apps del mismo origen, que se borran las 3 bases de IndexedDB, que se borra la
+caché de API pero **no** el shell, y que la cookie caduca.
+
+**Total: 579 tests en verde, 25 suites. Build correcto.**
+
+#### Dos bugs más, corregidos de paso
+
+1. **`resetAllData()` no borraba nada si habías iniciado sesión.** Hacía
+   `removeItem(STORAGE_KEY)`, que es la clave **legacy** `finova_data_v1`, pero
+   un usuario autenticado guarda en `finova_<uid>_data_v1`. El botón «Eliminar
+   todo» era un no-op: tras el reload los datos seguían ahí. Tampoco tocaba el
+   historial ni las API keys, pese a anunciarlas en el diálogo.
+
+2. **Test que fallaba los días 29, 30 y 31.** El helper `_monthsAgoYM` hacía
+   `setMonth(getMonth() - 1)` sobre el día de hoy: un 31 de octubre pedía el
+   «31 de septiembre», que no existe, y JS lo desbordaba a 1 de octubre, con lo
+   que «el mes anterior» acababa siendo el mes actual. Salió al ejecutar la
+   suite hoy. Se fija el día a 1 antes de restar meses.
+
+---
+
+### Hallazgo que afecta al alcance en producción
+
+`_saveUserMeta()` (auth.js) y el envío de analítica están **limitados a
+localhost** por una guarda de hostname. En producción, por tanto, **no se
+escriben** `data/users/<uid>.meta.json` ni `data/analytics.json`. Consecuencias:
+
+- El borrado sigue siendo correcto e idempotente: borra lo que exista.
+- Pero en producción no hay `.meta.json` del que sacar el email, así que la
+  limpieza de `extra_admins.json` y `waitlist.json` **no se dispara** por esa
+  vía. Si alguien se apuntó a la lista de espera, su correo y su IP
+  sobrevivirían al borrado de cuenta.
+- Como efecto colateral, `_isAdminUid()` depende del meta: el panel de admin
+  tampoco debería funcionar en producción.
+
+No se ha tocado esa guarda: quitarla cambiaría **qué datos personales se envían
+al servidor en producción**, y eso es una decisión de producto y de política de
+privacidad, no un detalle de implementación. Ver pendientes.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más
@@ -332,3 +621,44 @@ Ver la salida real en el informe del commit.
    FIRE", pero el texto sobre el titular del hero todavía pone "Para la
    comunidad FIRE española". Solo se pidió cambiar el título, así que se ha
    dejado — decir si también sale.
+
+### Del borrado de cuenta (Fase 10)
+
+7. **Probar el borrado de verdad, en producción.** Es lo único que cierra el
+   círculo: hace falta Firebase real (service account) para ver
+   `revokeRefreshTokens` + `deleteUser` ejecutándose, y un navegador para el
+   popup de reautenticación de Google. Al probarlo, comprobar que tras borrar
+   un token anterior ya no vale y que la cuenta no aparece en Firebase
+   Console → Authentication.
+
+8. **Decidir si `FIREBASE_*` va a estar configurada en producción.** Si no lo
+   está, el servidor no puede borrar la cuenta de Auth y lo hace el cliente
+   con `user.delete()`. Funciona, pero depende de que el navegador complete
+   el proceso: si el usuario cierra la pestaña justo ahí, los datos del
+   servidor ya no existen pero la cuenta de Auth sigue viva (huérfana, sin
+   datos). Con el Admin SDK configurado esa ventana no existe.
+
+9. **La guarda de localhost en `_saveUserMeta` y la analítica.** Mientras
+   siga ahí, en producción no hay `.meta.json`, así que el borrado no puede
+   resolver el email y no limpia `waitlist.json` ni `extra_admins.json`. Es
+   una decisión de producto: o se quita la guarda (y se envía el email al
+   servidor también en producción, lo que hay que reflejar en la política),
+   o se acepta que la entrada en la lista de espera sobreviva al borrado y se
+   quite a mano cuando alguien lo pida.
+
+10. **Códigos de sync antiguos (anteriores a `sync_owners.json`).** No tienen
+    dueño anotado, así que se siguen permitiendo para no romper a quien los
+    use, y por tanto cualquier usuario autenticado que conozca uno puede
+    descargarlo. Opciones: caducarlos (borrar los `data/sync/*.json`
+    huérfanos pasados N días), o exigir dueño siempre y asumir que quien
+    tenga un código viejo tenga que generar uno nuevo. **Recomendado:** lo
+    segundo, porque la función ya está oculta en la interfaz para usuarios
+    autenticados (`syncCard` se esconde en `_injectAuthUI`), así que el
+    impacto es mínimo.
+
+11. **Dos políticas de privacidad.** `privacidad.html` (la que enlazan la
+    landing y `terminos.html`) y `privacy.html` (que enlaza `terms.html`) son
+    documentos distintos, los dos en español, con estructura y contenido
+    diferentes, y los dos se publican. Ahora ambos describen el borrado de
+    cuenta, pero conviene quedarse con uno solo: mantener dos políticas
+    legales en paralelo acaba en contradicciones.

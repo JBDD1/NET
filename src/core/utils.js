@@ -79,6 +79,8 @@ const _LAZY_SCRIPTS = {
   pfImport:   'src/utils/portfolio-import.js',
   // Escáner de tickets: se trae al pulsar "Escanear ticket".
   receiptScan: 'src/utils/receipt-scan.js',
+  // Borrado de cuenta: se trae al pulsar el botón de la Zona de peligro.
+  accountDelete: 'src/utils/account-delete.js',
 };
 
 /* ── _ensureScript (cache-aware dynamic loader) ── */
