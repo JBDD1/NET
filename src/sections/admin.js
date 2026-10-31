@@ -256,3 +256,132 @@ async function adminHealthCheck() {
     el.innerHTML = `<span style="color:var(--danger)">Sin respuesta del servidor (${escapeHtml(e.message)})</span>`;
   }
 }
+
+/* ─── Feedback de usuarios ───────────────────────────────────── */
+
+const _ADMIN_FB_LABEL = {
+  bug: 'Algo no funciona', idea: 'Idea', question: 'Pregunta', other: 'Otro',
+};
+
+async function adminRefreshFeedback() {
+  const box  = document.getElementById('admin-fb-list');
+  const warn = document.getElementById('admin-fb-warning');
+  if (!box) return;
+  box.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0">Cargando…</p>';
+
+  const type = document.getElementById('admin-fb-filter')?.value || '';
+  let json;
+  try {
+    const res = await api.admin.feedback(type);
+    json = await res.json();
+    if (!res.ok) throw new Error(json.error || ('Error ' + res.status));
+  } catch (e) {
+    box.innerHTML = '<p style="color:var(--down);font-size:13px;padding:8px 0">No se pudo cargar el feedback.</p>';
+    return;
+  }
+
+  // Aviso del disco efímero: sin volumen, lo que se ve aquí desaparece en el
+  // siguiente despliegue. Mejor decirlo que descubrirlo cuando ya no está.
+  if (warn) {
+    if (json.persistent === false) {
+      warn.style.display = '';
+      warn.innerHTML =
+        '<div style="padding:10px 12px;margin-bottom:12px;font-size:12.5px;line-height:1.55;' +
+        'color:var(--text-secondary);background:var(--bg-elevated);' +
+        'border:1px solid var(--down);border-radius:var(--r-sm)">' +
+        '<strong style="color:var(--down)">Disco efímero.</strong> El servidor no tiene volumen ' +
+        'persistente, así que este listado se borra en cada despliegue. El canal fiable es el ' +
+        'webhook (FEEDBACK_WEBHOOK_URL) — ver FEEDBACK_SETUP.md.</div>';
+    } else {
+      warn.style.display = 'none';
+    }
+  }
+
+  const items = json.items || [];
+  if (!items.length) {
+    box.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px 0">' +
+      (type ? 'Sin mensajes de ese tipo.' : 'Todavía no hay feedback.') + '</p>';
+    return;
+  }
+
+  box.innerHTML = '';
+  for (const e of items) {
+    const card = document.createElement('div');
+    card.className = 'admin-fb-item' + (e.read ? ' is-read' : '');
+
+    const head = document.createElement('div');
+    head.className = 'admin-fb-head';
+    const tag = document.createElement('span');
+    tag.className = 'admin-fb-type t-' + (e.type || 'other');
+    tag.textContent = _ADMIN_FB_LABEL[e.type] || e.type || '—';
+    head.appendChild(tag);
+
+    const meta = document.createElement('span');
+    const when = e.at ? new Date(e.at) : null;
+    meta.textContent = [
+      when && !isNaN(when) ? when.toLocaleString('es-ES') : '',
+      e.rating ? e.rating + '/5' : '',
+      e.uidHash ? 'uid ' + e.uidHash : 'anónimo',
+    ].filter(Boolean).join('  ·  ');
+    head.appendChild(meta);
+
+    if (e.email) {
+      const mail = document.createElement('a');
+      mail.href = 'mailto:' + encodeURIComponent(e.email) +
+        '?subject=' + encodeURIComponent('Re: tu mensaje en Finova');
+      // textContent, nunca innerHTML: el correo lo escribe el usuario.
+      mail.textContent = e.email;
+      mail.style.color = 'var(--accent)';
+      head.appendChild(mail);
+    }
+    card.appendChild(head);
+
+    const msg = document.createElement('div');
+    msg.className = 'admin-fb-msg';
+    // textContent: el mensaje es texto que ha escrito un desconocido. Con
+    // innerHTML, un mensaje con etiquetas dentro se ejecutaría en el
+    // navegador del admin.
+    msg.textContent = e.message || '';
+    card.appendChild(msg);
+
+    if (e.tech) {
+      const t = e.tech;
+      const tech = document.createElement('div');
+      tech.className = 'admin-fb-tech';
+      const lines = [
+        [t.section, t.build || t.version, t.viewport, t.theme, t.lang].filter(Boolean).join(' · '),
+        t.ua || '',
+      ];
+      if (Array.isArray(t.errors) && t.errors.length) {
+        lines.push('Errores:');
+        for (const err of t.errors) {
+          lines.push('  · ' + [err.message, err.file, err.line || null].filter(Boolean).join(' @ '));
+        }
+      }
+      tech.textContent = lines.filter(Boolean).join('\n');
+      card.appendChild(tech);
+    }
+
+    const act = document.createElement('button');
+    act.type = 'button';
+    act.className = 'btn-ghost-sm';
+    act.style.marginTop = '8px';
+    act.textContent = e.read ? 'Marcar como no leído' : 'Marcar como leído';
+    act.onclick = () => adminMarkFeedbackRead(e.id, !e.read, act);
+    card.appendChild(act);
+
+    box.appendChild(card);
+  }
+}
+
+async function adminMarkFeedbackRead(id, read, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const res = await api.admin.feedbackRead({ id, read });
+    if (!res.ok) throw new Error('Error ' + res.status);
+    adminRefreshFeedback();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = read ? 'Marcar como leído' : 'Marcar como no leído'; }
+    if (typeof showToast === 'function') showToast('No se pudo guardar', 'error');
+  }
+}

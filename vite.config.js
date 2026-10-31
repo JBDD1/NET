@@ -74,7 +74,7 @@ function copyStaticAssets(outDir = 'dist', mode = 'production') {
   const isProd = mode === 'production';
   const staticFiles = [
     'manifest.json', 'sw.js', 'robots.txt', 'sitemap.xml',
-    'privacidad.html', 'privacy.html', 'terminos.html', 'terms.html',
+    'privacidad.html', 'privacy.html', 'terminos.html', 'terms.html', 'faq.html',
   ];
 
   async function copyJsDir(srcDir, destDir, env) {

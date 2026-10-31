@@ -137,6 +137,7 @@
       <symbol id="icon-link" viewBox="0 0 24 24"><path d="M9.5 14.5 14.5 9.5"/><path d="M11 6.5 13 4.5a4 4 0 0 1 5.7 5.7L16.7 12.2"/><path d="M13 17.5 11 19.5a4 4 0 0 1-5.7-5.7L7.3 11.8"/></symbol>
       <symbol id="icon-scale" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M7 21h10"/><path d="M12 5 5 8l3.5 8h7L19 8Z"/><path d="M5 8h.01M19 8h.01"/></symbol>
       <symbol id="icon-heart" viewBox="0 0 24 24"><path d="M12 20.5S3.5 15.2 3.5 9.2A4.7 4.7 0 0 1 12 6.5a4.7 4.7 0 0 1 8.5 2.7c0 6-8.5 11.3-8.5 11.3Z"/></symbol>
+      <symbol id="icon-mail" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="M3 6.5l9 6.5 9-6.5"/></symbol>
       <symbol id="icon-bell" viewBox="0 0 24 24"><path d="M6 10a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
       <symbol id="icon-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none"/></symbol>
       <symbol id="icon-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5V18c0 1.7 3.6 3 8 3s8-1.3 8-3V5.5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></symbol>
@@ -170,6 +171,10 @@
       </div>
 
       <div id="login-form-container" class="login-form-container"></div>
+
+      <div class="login-help-row">
+        <a href="faq.html" class="login-help-link">¿Dudas? Mira las preguntas frecuentes</a>
+      </div>
 
       <div class="login-divider"><span>o continúa con</span></div>
 
@@ -311,6 +316,11 @@
     </nav>
 
     <div class="sidebar-footer">
+      <button type="button" class="nav-item" data-action="open-feedback" title="Enviar feedback">
+        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-mail"/></svg></span>
+        <span class="nav-label">Enviar feedback</span>
+      </button>
+
       <button class="nav-item" data-section="settings" title="Ajustes">
         <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg></span>
         <span class="nav-label">Ajustes</span>
@@ -1800,6 +1810,26 @@
         <p style="font-size:13px;color:var(--text-muted);margin:0">Rellena la app con transacciones, cartera, objetivos y patrimonio ficticios para probar todas las funciones. <strong style="color:var(--danger)">Sobrescribe todos tus datos actuales.</strong></p>
       </div>
 
+      <!-- Feedback de usuarios -->
+      <div class="card" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:10px;flex-wrap:wrap">
+          <h3 class="card-title" style="margin:0"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-mail"/></svg> Feedback de usuarios</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label class="sr-only" for="admin-fb-filter">Filtrar por tipo</label>
+            <select id="admin-fb-filter" class="select-input" style="width:auto;font-size:13px">
+              <option value="">Todos los tipos</option>
+              <option value="bug">Algo no funciona</option>
+              <option value="idea">Ideas</option>
+              <option value="question">Preguntas</option>
+              <option value="other">Otro</option>
+            </select>
+            <button type="button" id="btn-admin-fb-refresh" class="btn-secondary"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-refresh"/></svg> Actualizar</button>
+          </div>
+        </div>
+        <div id="admin-fb-warning" style="display:none"></div>
+        <div id="admin-fb-list"></div>
+      </div>
+
       <!-- Health check -->
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -2016,6 +2046,25 @@
       </div>
 
 
+
+      <!-- Ayuda y feedback -->
+      <div class="card">
+        <h3 class="card-title"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-info"/></svg> Ayuda</h3>
+        <div class="settings-row">
+          <div class="settings-info">
+            <div class="settings-name">Preguntas frecuentes</div>
+            <div class="settings-desc">Cómo se guardan tus datos, cómo importar del banco, qué pasa sin conexión y unas cuantas más.</div>
+          </div>
+          <button type="button" class="btn-secondary" data-action="open-faq">Ver la FAQ</button>
+        </div>
+        <div class="settings-row">
+          <div class="settings-info">
+            <div class="settings-name">Enviar feedback</div>
+            <div class="settings-desc">Cuéntanos un fallo, pide una función o pregúntanos lo que sea. Si dejas tu correo, te respondemos.</div>
+          </div>
+          <button type="button" class="btn-primary" data-action="open-feedback">Enviar feedback</button>
+        </div>
+      </div>
 
       <!-- Atajos de teclado -->
       <div class="card">
@@ -2373,6 +2422,8 @@
       <button class="mobile-menu-item" data-section="simulator"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-calculator"/></svg></span><span class="mmi-label">Simulador</span></button>
       <button class="mobile-menu-item" data-section="fiscalidad"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-percent"/></svg></span><span class="mmi-label">Fiscalidad</span></button>
       <button class="mobile-menu-item" data-section="ai"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-sparkles"/></svg></span><span class="mmi-label">Asesor IA</span></button>
+      <button type="button" class="mobile-menu-item" data-action="open-faq"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-info"/></svg></span><span class="mmi-label">Ayuda / FAQ</span></button>
+      <button type="button" class="mobile-menu-item" data-action="open-feedback"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-mail"/></svg></span><span class="mmi-label">Enviar feedback</span></button>
       <button class="mobile-menu-item" data-section="settings"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg></span><span class="mmi-label">Ajustes</span></button>
 
     </div>
@@ -2657,6 +2708,7 @@
          · admin.js     → al navegar a Admin
          · staking.js   → al pulsar una pestaña de Dividendos/Staking
          · pdf.js       → al pulsar un botón de exportar a PDF -->
+  <script defer src="src/data/faq.js"></script>
   <script defer src="src/auth/auth-shared.js"></script>
   <script defer src="src/auth/auth.js"></script>
   <script defer src="src/core/events.js"></script>

@@ -598,6 +598,109 @@ privacidad, no un detalle de implementación. Ver pendientes.
 
 ---
 
+## FASE 11 — Feedback en la app y FAQ · ✅ COMPLETA
+
+### Lo implementado
+
+| Pieza | Dónde |
+|---|---|
+| Botón de feedback | Sidebar (junto a Ajustes), menú móvil, Ajustes → Ayuda, búsqueda global |
+| Formulario | `src/utils/feedback.js` (carga diferida), modal con el sistema de diseño actual |
+| FAQ en la app | Mismo módulo, acordeón `<details>` con buscador |
+| FAQ como página | `faq.html`, con el estilo de `privacidad.html` |
+| Fuente única | `src/data/faq.js` — 14 preguntas, la usan la app y la página |
+| Endpoint | `POST /api/feedback` en `server.cjs` |
+| Panel de admin | Tarjeta «Feedback de usuarios» con filtro y marcar como leído |
+| Buffer de errores | `src/core/utils.js` — últimos 5, en memoria |
+
+**Sin botón flotante a propósito:** taparía contenido y los botones táctiles
+de la barra inferior en móvil. Va en el menú, que es donde se busca.
+
+**Sin atajo de teclado nuevo:** `n`, `i`, `g`, `t`, `p`, `/` y `Ctrl+K` están
+ocupados, y el encargo pedía no chocar con ellos.
+
+### La invariante que gobierna todo
+
+**Nunca sale un dato financiero del navegador**, ni con la casilla técnica
+marcada. Lista blanca en los dos niveles: los campos del cuerpo y los del
+informe técnico. Si mañana alguien añade un campo con datos dentro, el
+servidor lo descarta antes del disco. Hay 6 tests que fallan si se rompe.
+
+El informe técnico solo toca **tres** claves de `APP`: `activeSection`,
+`variant` y `theme`. Un test lo comprueba enumerando los accesos `APP.*` de
+la función.
+
+### Hallazgo importante: el disco es efímero
+
+No hay `railway.json` ni volumen declarado, y `data/` está en `.gitignore`.
+Sin volumen montado, Railway da un disco **efímero**: `data/feedback.jsonl`
+desaparece en cada despliegue. **El webhook es el canal fiable, no el
+fichero.** El servidor lo avisa al arrancar y el panel de admin lo muestra en
+rojo. Afecta también a `data/users/<uid>.json`, que ya existía.
+
+No se puede verificar desde el repositorio si hay volumen añadido desde el
+panel de Railway: la detección usa `RAILWAY_VOLUME_MOUNT_PATH`.
+
+### Decisiones que merecen explicación
+
+**El texto no se escapa al guardar.** Se guarda tal cual (en JSON no se
+ejecuta nada) y se escapa **en cada punto de renderizado**: el panel de admin
+usa `textContent`, y el webhook lo manda como campo JSON, que ni Discord ni
+Slack interpretan como HTML. Escapar al guardar dejaría `&lt;` literal en el
+fichero y un usuario que escriba «a < b» vería basura. Lo que sí se quita son
+los caracteres de control y los invisibles de ancho cero, que sirven para
+falsear líneas de log y esconder texto.
+
+**El honeypot responde 200.** Decirle al bot que ha fallado solo le enseña a
+afinar el siguiente intento. El mensaje se descarta y queda un `console.warn`.
+
+**El banner de los 7 días se marca como mostrado al pintarlo**, no al
+cerrarlo: si el usuario recarga sin tocarlo, tampoco debe volver a verlo.
+Preguntamos una vez; si la ignora, la respuesta es no. Y solo en el
+dashboard, nunca con un modal, la búsqueda, el tour o el login abiertos.
+
+**Una tarjeta en admin, no una pestaña.** El panel entero está hecho con
+tarjetas; meter un sistema de pestañas solo para esto rompería el patrón.
+
+### Pruebas
+
+**27 tests nuevos** (`src/tests/feedback.test.js`). Con curl, contra el
+servidor arrancado y un webhook local que recibía los envíos:
+
+| Prueba | Resultado |
+|---|---|
+| Los 4 tipos, con y sin técnica, con y sin email | **200**, 4 en el fichero y 4 en el webhook ✅ |
+| Autenticado | guarda `uidHash`, y el uid en claro **no** aparece ✅ |
+| Mensaje vacío / 9 caracteres | **400** ✅ |
+| Tipo inválido | **400** ✅ |
+| Campo extra (`balance`) | **400** — rechazado, no ignorado ✅ |
+| Honeypot relleno | **200** y **no** se guarda (4 entradas siguen siendo 4) ✅ |
+| Sin `openMs` / 500 ms | **400** ✅ |
+| Valoración 9 / email inválido | **400** ✅ |
+| Mensaje de 5.000 caracteres | **200**, guardado recortado a **2.000** ✅ |
+| Body de 1 MB | **413** ✅ |
+| 6ª petición en una hora | **429** ✅ |
+
+**Un falso positivo que merece contarse:** mi primera comprobación de «no hay
+datos financieros» buscaba la cadena `"transactions"` en el fichero y saltó.
+Era `"section":"transactions"` — el nombre de la pantalla, que es justo lo que
+el informe técnico debe llevar. La comprobación era demasiado burda; el test
+definitivo verifica la lista blanca real en vez de buscar cadenas.
+
+**Lo que NO se pudo probar:** el webhook contra la API real de Discord (hace
+falta una URL del usuario) y el flujo de interfaz en un navegador (no hay
+navegador en este entorno). Queda pendiente revisar el modal en los 5 temas y
+a 375 px, y que el foco vuelve al botón de origen al cerrar.
+
+**`faq.html` se renderiza con JavaScript** desde la fuente única, que es lo
+que evita que las dos versiones divergan. Efecto secundario: un buscador que
+no ejecute JS no indexa las respuestas. Se arregla con un paso de build que la
+pre-renderice.
+
+Ver `FEEDBACK_SETUP.md` para la configuración manual.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más

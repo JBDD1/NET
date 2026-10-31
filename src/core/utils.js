@@ -9,6 +9,74 @@
 /* Modo demo: ?demo en la URL carga datos ficticios sin tocar localStorage */
 const _isDemoMode = new URLSearchParams(location.search).has('demo');
 
+/* ─── Versión de la app ────────────────────────────────────────────
+   Se manda en el informe técnico del feedback para saber sobre qué build
+   está el usuario. Mantener en sintonía con "version" de package.json.
+   Además, al enviar se añade el nombre de la caché del service worker
+   (finova-vNN en sw.js), que es el dato que de verdad dice qué build tiene
+   cargado el navegador: la constante puede quedarse atrás, la caché no. */
+const FINOVA_VERSION = '1.0.0';
+
+/* ─── Buffer de errores en memoria (para el feedback) ──────────────
+   Los últimos 5 errores de la sesión, para poder adjuntarlos al informe
+   técnico cuando el usuario reporta un fallo. Sin esto, un "no me funciona
+   el botón" llega sin ninguna pista de qué reventó.
+
+   Tres decisiones deliberadas:
+   · EN MEMORIA, nunca en localStorage: un error puede llevar dentro un
+     fragmento de datos del usuario, y persistirlo sería guardar información
+     personal que nadie ha pedido guardar.
+   · Solo mensaje, archivo y línea. Ni el stack completo (suele arrastrar
+     valores) ni nada de APP.
+   · Truncado a 200 caracteres: lo que no quepa es ruido, y un mensaje
+     kilométrico es justo el que puede llevar datos dentro.
+
+   El build elimina console.* (drop_console en vite.config.js), así que esto
+   NO depende de la consola: engancha window.onerror y unhandledrejection,
+   que siguen funcionando en producción. */
+const _FV_ERR_MAX = 5;
+const _fvErrorBuffer = [];
+
+function _fvRecordError(kind, message, file, line) {
+  const clean = v => String(v == null ? '' : v).slice(0, 200);
+  const entry = {
+    kind,
+    message: clean(message),
+    // Solo el nombre del archivo, no la URL completa: una URL puede llevar
+    // parámetros, y los parámetros pueden llevar cualquier cosa.
+    file: clean(String(file || '').split('/').pop().split('?')[0]),
+    line: Number(line) || 0,
+    at: new Date().toISOString(),
+  };
+  _fvErrorBuffer.push(entry);
+  // Se tiran los más antiguos: en un bucle de errores, los últimos son los
+  // que importan.
+  while (_fvErrorBuffer.length > _FV_ERR_MAX) _fvErrorBuffer.shift();
+}
+
+/** Copia del buffer, lo más reciente primero. */
+function fvRecentErrors() {
+  return _fvErrorBuffer.slice().reverse();
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', e => {
+    // Los errores de carga de recursos (<img>, <script>) llegan aquí sin
+    // mensaje: se registra el recurso, que es la información útil.
+    if (e && e.target && e.target !== window && e.target.tagName) {
+      _fvRecordError('resource', 'No se pudo cargar ' + e.target.tagName.toLowerCase(),
+        e.target.src || e.target.href, 0);
+      return;
+    }
+    _fvRecordError('error', e?.message, e?.filename, e?.lineno);
+  }, true);
+
+  window.addEventListener('unhandledrejection', e => {
+    const r = e?.reason;
+    _fvRecordError('promise', (r && (r.message || r.code)) || r, '', 0);
+  });
+}
+
 /* ─── Scroll reveal — fade-in sutil al entrar en viewport ──────────
    Marca cualquier elemento con [data-reveal] (o [data-reveal-group]
    para un conjunto con [data-reveal-item] hijos) y llama a
@@ -81,6 +149,10 @@ const _LAZY_SCRIPTS = {
   receiptScan: 'src/utils/receipt-scan.js',
   // Borrado de cuenta: se trae al pulsar el botón de la Zona de peligro.
   accountDelete: 'src/utils/account-delete.js',
+  // Feedback y FAQ: comparten módulo porque el formulario enlaza a la FAQ y
+  // la FAQ enlaza al formulario; separarlos obligaría a cargar los dos de
+  // todas formas.
+  feedback: 'src/utils/feedback.js',
 };
 
 /* ── _ensureScript (cache-aware dynamic loader) ── */

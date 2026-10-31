@@ -64,6 +64,8 @@ const CRITICAL_ASSETS = [
   './src/sections/fiscal.js',
   './src/sections/simulator.js',
   './src/utils/pdf.js',
+  './src/data/faq.js',
+  './faq.html',
   './manifest.json',
   './icon.svg',
   './icon-192.png',

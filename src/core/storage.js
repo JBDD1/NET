@@ -446,6 +446,12 @@ function loadData() {
 
   if (!APP.clientId) APP.clientId = crypto.randomUUID();
 
+  // Primer arranque y contador de sesiones, para la petición puntual de
+  // feedback. Se cuenta aquí (una vez por carga de página) y no en cada
+  // guardado, que dispararía el contador a cientos en una sola sesión.
+  if (!APP.firstUseAt) APP.firstUseAt = new Date().toISOString();
+  APP.sessionCount = (Number(APP.sessionCount) || 0) + 1;
+
   const raw = localStorage.getItem(_getStorageKey());
   if (!raw || !JSON.parse(raw || '{}').theme) {
     if (window.matchMedia?.('(prefers-color-scheme: light)').matches) APP.theme = 'light';

@@ -103,6 +103,37 @@ var api = {
     },
   },
 
+  /* ── Feedback (admin) ── */
+  // Los demás endpoints de administración se llaman con fetch directo desde
+  // admin.js; estos dos pasan por aquí para heredar el manejo de 401/429.
+  admin: {
+    feedback: function(type) {
+      return _apiRequest('/api/admin/feedback' + (type ? '?type=' + encodeURIComponent(type) : ''), {}, true);
+    },
+    feedbackRead: function(body) {
+      return _apiRequest('/api/admin/feedback/read', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body || {}),
+      }, true);
+    },
+  },
+
+  /* ── Feedback ── */
+  // withAuth true: si hay sesión se manda el token para asociar el uid
+  // (hasheado en el servidor). Si no hay, _getAuthHeader devuelve {} y el
+  // feedback entra como anónimo — que es justo lo que necesita alguien que
+  // no puede iniciar sesión.
+  // quiet true: los errores los pinta el propio modal, con el plan B por
+  // correo; un toast genérico encima sería ruido y confundiría.
+  feedback: function(body) {
+    return _apiRequest('/api/feedback', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body || {}),
+    }, true, true);
+  },
+
   /* ── Borrado de cuenta (RGPD) ── */
   account: {
     // El token se pasa a mano: tras reautenticar hace falta el recién emitido

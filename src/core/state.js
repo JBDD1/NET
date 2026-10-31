@@ -213,6 +213,13 @@ let APP = {
   // ID anónimo de cliente — generado una vez, nunca cambia — usado para métricas de retención
   clientId: '',
 
+  // Para la petición puntual de feedback (una sola vez, a los 7 días y con
+  // al menos 5 sesiones). Se guardan en el dispositivo: no se envían a
+  // ningún sitio y no sirven para perfilar nada.
+  firstUseAt: '',            // ISO del primer arranque
+  sessionCount: 0,           // arranques de la app
+  feedbackPromptShown: false,
+
   // Autenticación Firebase (no se persiste en localStorage)
   uid:       null,
   userEmail: null,

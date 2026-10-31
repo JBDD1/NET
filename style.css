@@ -8716,3 +8716,171 @@ tr[tabindex="0"]:focus {
   font-size: 12px; color: var(--text-muted); text-decoration: underline;
 }
 .fv-verify-links button:hover { color: var(--accent); }
+
+/* ══ FEEDBACK Y FAQ EN LA APP ═══════════════════════════════════ */
+
+/* Aviso de la FAQ, arriba del formulario */
+.fb-faq-hint {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 12px; margin-bottom: 16px;
+  font-size: 12.5px; line-height: 1.5; color: var(--text-secondary);
+  background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+}
+.fb-faq-hint .icon { flex-shrink: 0; color: var(--text-muted); }
+
+/* Enlace con aspecto de enlace pero semántica de botón */
+.fb-link-btn {
+  background: none; border: none; padding: 0;
+  font: inherit; font-size: inherit; color: var(--accent);
+  text-decoration: underline; cursor: pointer;
+}
+.fb-link-btn:hover { opacity: .8; }
+
+.fb-optional { font-weight: 400; color: var(--text-muted); font-size: .9em; }
+.fb-hint { margin-top: 5px; font-size: 11.5px; line-height: 1.55; color: var(--text-muted); }
+
+.fb-count-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-top: 5px; }
+.fb-count { flex-shrink: 0; font-size: 11.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.fb-count.is-low  { color: var(--text-muted); }
+.fb-count.is-near { color: var(--down); }
+
+.fb-field-error { font-size: 12px; line-height: 1.5; color: var(--down); }
+
+/* Valoración 1-5. Botones de 44 px para que se puedan pulsar en móvil. */
+.fb-rating { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fb-star {
+  width: 44px; height: 44px; padding: 0;
+  font: inherit; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums;
+  color: var(--text-secondary); background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle); border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.fb-star:hover { border-color: var(--border-default); }
+.fb-star.is-on { color: var(--bg-base); background: var(--accent); border-color: var(--accent); }
+
+.fb-check { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--text-primary); cursor: pointer; }
+.fb-check input { width: 17px; height: 17px; flex-shrink: 0; accent-color: var(--accent); cursor: pointer; }
+
+.fb-tech-peek {
+  margin-top: 9px; padding: 10px 12px; max-height: 190px; overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; line-height: 1.6;
+  color: var(--text-secondary); background: var(--bg-base);
+  border: 1px solid var(--border-subtle); border-radius: var(--r-sm);
+  white-space: pre-wrap; word-break: break-word;
+}
+
+/* Honeypot: fuera de la vista sin display:none, que algunos bots detectan.
+   aria-hidden y tabindex="-1" lo mantienen fuera del alcance de un lector
+   de pantalla y del tabulador. */
+.fb-honeypot {
+  position: absolute !important; left: -9999px !important;
+  width: 1px; height: 1px; overflow: hidden;
+}
+
+.fb-privacy {
+  margin: 4px 0 14px; font-size: 11.5px; line-height: 1.6; color: var(--text-muted);
+}
+.fb-privacy strong { color: var(--text-secondary); }
+.fb-privacy a { color: var(--accent); }
+
+.fb-ok { padding: 6px 0 14px; }
+.fb-ok-title { font-size: 16px; font-weight: 600; color: var(--up); margin-bottom: 7px; }
+.fb-ok-body  { margin: 0; font-size: 13.5px; line-height: 1.65; color: var(--text-secondary); }
+
+/* FAQ dentro del modal */
+.faq-list { max-height: 54vh; overflow-y: auto; margin: 0 -2px; padding: 0 2px; }
+.faq-item {
+  border: 1px solid var(--border-subtle); border-radius: var(--r-sm);
+  background: var(--bg-elevated); margin-bottom: 8px; overflow: hidden;
+}
+.faq-item[open] { border-color: var(--border-default); }
+.faq-q {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 14px; cursor: pointer; list-style: none;
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+}
+.faq-q::-webkit-details-marker { display: none; }
+.faq-q:hover { background: var(--bg-hover); }
+.faq-q:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.faq-chevron { flex-shrink: 0; color: var(--text-muted); transition: transform .18s ease; }
+.faq-item[open] .faq-chevron { transform: rotate(90deg); }
+.faq-a {
+  padding: 0 14px 14px; font-size: 13.5px; line-height: 1.7; color: var(--text-secondary);
+}
+.faq-a strong { color: var(--text-primary); }
+.faq-a a { color: var(--accent); }
+.faq-a code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: var(--bg-base); padding: 1px 5px; border-radius: 4px;
+}
+.faq-empty {
+  padding: 22px 14px; text-align: center; font-size: 13px; line-height: 1.6;
+  color: var(--text-muted); border: 1px dashed var(--border-default); border-radius: var(--r-sm);
+}
+.faq-cta {
+  margin-top: 16px; padding: 16px; text-align: center;
+  border-top: 1px solid var(--border-subtle);
+}
+.faq-cta-title { font-size: 14.5px; font-weight: 600; color: var(--text-primary); margin-bottom: 5px; }
+.faq-cta-body  { margin: 0 0 13px; font-size: 13px; color: var(--text-secondary); }
+
+/* Enlace a la FAQ en la pantalla de login */
+.login-help-row { margin-top: 14px; text-align: center; }
+.login-help-link { font-size: 12.5px; color: var(--text-muted); text-decoration: underline; }
+.login-help-link:hover { color: var(--accent); }
+
+/* Banner de petición de feedback (una sola vez, a los 7 días) */
+.fb-banner {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 13px 15px; margin-bottom: 18px;
+  background: var(--bg-elevated); border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+}
+.fb-banner-text { flex: 1 1 240px; font-size: 13.5px; line-height: 1.55; color: var(--text-primary); }
+.fb-banner-actions { display: flex; gap: 8px; align-items: center; }
+.fb-banner-close {
+  background: none; border: none; padding: 6px; cursor: pointer;
+  color: var(--text-muted); line-height: 1;
+  min-width: 44px; min-height: 44px;
+}
+.fb-banner-close:hover { color: var(--text-primary); }
+
+/* Panel de admin: lista de feedback */
+.admin-fb-item {
+  padding: 13px 14px; margin-bottom: 9px;
+  background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+}
+.admin-fb-item.is-read { opacity: .55; }
+.admin-fb-head {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 7px;
+  font-size: 11.5px; color: var(--text-muted);
+}
+.admin-fb-type {
+  padding: 2px 8px; border-radius: 99px; font-weight: 600; font-size: 11px;
+  background: var(--bg-base); border: 1px solid var(--border-subtle); color: var(--text-secondary);
+}
+.admin-fb-type.t-bug { color: var(--down); border-color: var(--down); }
+.admin-fb-type.t-idea { color: var(--up); border-color: var(--up); }
+.admin-fb-msg {
+  font-size: 13.5px; line-height: 1.65; color: var(--text-primary);
+  white-space: pre-wrap; word-break: break-word; margin-bottom: 8px;
+}
+.admin-fb-tech {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px;
+  line-height: 1.6; color: var(--text-muted); white-space: pre-wrap; word-break: break-word;
+  margin-top: 7px; padding-top: 7px; border-top: 1px dashed var(--border-subtle);
+}
+
+/* Móvil: el modal a pantalla casi completa y los botones alcanzables */
+@media (max-width: 480px) {
+  .faq-list { max-height: 48vh; }
+  .fb-count-row { flex-direction: column; gap: 4px; }
+  .fb-rating { gap: 5px; }
+  .fb-star { width: 44px; height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faq-chevron { transition: none; }
+}

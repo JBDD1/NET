@@ -837,6 +837,23 @@ async function init() {
     }
   });
 
+  // index.html#feedback y #faq — los enlaces que llegan desde faq.html.
+  // Sin esto, el botón "Abrir Finova y escribirnos" de la página de la FAQ
+  // dejaba al usuario en el dashboard sin que pasara nada.
+  (() => {
+    const h = (location.hash || '').toLowerCase();
+    if (h !== '#feedback' && h !== '#faq') return;
+    // Se consume para que un F5 no vuelva a abrirlo.
+    try { history.replaceState({}, '', location.pathname + location.search); } catch (_) {}
+    // Pequeño retardo: el modal se abre después de que la app haya pintado,
+    // o aparece sobre una pantalla a medio renderizar.
+    setTimeout(() => _withFeedback(null, h === '#faq' ? 'faq' : 'feedback'), 400);
+  })();
+
+  // Petición puntual de feedback. Muy conservadora a propósito: una sola vez
+  // en la vida de la instalación.
+  _maybeAskForFeedback();
+
   // 15b. Inicializar pestañas internas
   initInnerTabs();
 
@@ -1093,6 +1110,101 @@ async function _withReceiptScanner(btn) {
 // Borrado de cuenta (RGPD). Como los demás _with*: el identificador se
 // resuelve DENTRO del closure, nunca al construir el manejador, porque
 // account-delete.js todavía no está cargado cuando se cablea el evento.
+// Feedback y FAQ. Como los demás _with*: el identificador se resuelve DENTRO
+// del closure, porque feedback.js aún no está cargado cuando se cablea el
+// evento. 'mode' decide qué abrir: el formulario o la FAQ.
+/* ─── Petición puntual de feedback ─────────────────────────────── */
+
+// Las cuatro condiciones que deben cumplirse TODAS. Si cualquiera falla, no
+// se pide nada y no se marca como mostrado: se volverá a evaluar mañana.
+const _FB_ASK_DAYS     = 7;
+const _FB_ASK_SESSIONS = 5;
+
+function _maybeAskForFeedback() {
+  // 1. Nunca en demo: no hay nadie a quien preguntar, y los datos son falsos.
+  if (_isDemoMode) return;
+  // 2. Una sola vez en la vida de la instalación.
+  if (APP.feedbackPromptShown) return;
+  // 3. Siete días desde el primer arranque Y cinco sesiones. Las dos cosas:
+  //    alguien que abrió la app una vez hace un mes no tiene nada que contar,
+  //    y alguien que la ha abierto 20 veces hoy tampoco la conoce aún.
+  if (!APP.firstUseAt) return;
+  const days = (Date.now() - new Date(APP.firstUseAt).getTime()) / 86400000;
+  if (!(days >= _FB_ASK_DAYS)) return;
+  if ((Number(APP.sessionCount) || 0) < _FB_ASK_SESSIONS) return;
+
+  // 4. Nunca en medio de algo. Un banner que aparece mientras rellenas un
+  //    formulario o importas un extracto es una interrupción, no una
+  //    pregunta. Se espera al siguiente arranque.
+  const modalOpen  = document.getElementById('modalOverlay')?.classList.contains('open');
+  const searchOpen = document.getElementById('searchOverlay')?.classList.contains('open');
+  const onboarding = document.getElementById('onboarding-overlay')?.style.display !== 'none';
+  const loginOpen  = document.getElementById('login-screen')?.style.display === 'flex';
+  if (modalOpen || searchOpen || onboarding || loginOpen) return;
+  // Y solo en el dashboard: es la única pantalla donde el usuario no está a
+  // mitad de una tarea.
+  if (APP.activeSection !== 'dashboard') return;
+
+  _renderFeedbackBanner();
+}
+
+function _renderFeedbackBanner() {
+  const host = document.getElementById('section-dashboard');
+  if (!host || document.getElementById('fb-ask-banner')) return;
+
+  // Se marca como mostrado AQUÍ, no al cerrarlo: si el usuario recarga sin
+  // tocarlo, tampoco debe volver a verlo. Preguntamos una vez; si la ignora,
+  // la respuesta es no.
+  APP.feedbackPromptShown = true;
+  saveData();
+
+  const el = document.createElement('div');
+  el.id = 'fb-ask-banner';
+  el.className = 'fb-banner';
+  el.setAttribute('role', 'region');
+  el.setAttribute('aria-label', 'Petición de opinión');
+  el.innerHTML = `
+    <div class="fb-banner-text">
+      <strong>¿Cómo te va con Finova?</strong>
+      Cuéntanos qué mejorarías. Nos sirve de verdad: somos pocos y leemos todo.
+    </div>
+    <div class="fb-banner-actions">
+      <button type="button" class="btn-primary" data-action="open-feedback">Contar algo</button>
+      <button type="button" class="fb-banner-close" aria-label="Cerrar este aviso">
+        <svg class="icon icon-sm" aria-hidden="true"><use href="#icon-close"/></svg>
+      </button>
+    </div>`;
+
+  el.querySelector('.fb-banner-close').onclick = () => el.remove();
+  // Arriba del dashboard, empujando el contenido: no se superpone a nada ni
+  // tapa ningún botón.
+  host.insertBefore(el, host.firstChild);
+}
+
+async function _withFeedback(btn, mode) {
+  const original = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.textContent = 'Abriendo…'; }
+  try {
+    if (typeof openFeedbackModal !== 'function') {
+      await _lazyLoad(_LAZY_SCRIPTS.feedback);
+    }
+    if (mode === 'faq') {
+      if (typeof openFaqModal === 'function') openFaqModal();
+      else showToast('No se pudo cargar la ayuda', 'error');
+    } else if (typeof openFeedbackModal === 'function') {
+      // Un modo distinto de 'faq' se pasa como tipo preseleccionado.
+      openFeedbackModal(mode && mode !== 'feedback' ? mode : null);
+    } else {
+      showToast('No se pudo cargar el formulario de feedback', 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('No se pudo cargar el formulario de feedback', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = original; }
+  }
+}
+
 async function _withAccountDelete(btn) {
   const original = btn ? btn.innerHTML : null;
   if (btn) { btn.disabled = true; btn.textContent = 'Preparando…'; }
@@ -1253,6 +1365,8 @@ function _globalClickDispatch(e) {
     case 'clear-photo-backups':        clearPhotoBackups(); break;
     case 'reset-dialog':               openResetDialog(); break;
     case 'delete-account':             _withAccountDelete(el); break;
+    case 'open-feedback':              _withFeedback(el, 'feedback'); break;
+    case 'open-faq':                   _withFeedback(el, 'faq'); break;
     // Modal
     case 'close-modal':                closeModal(); break;
     case 'modal-confirm':              modalConfirmClick(); break;
@@ -3942,6 +4056,29 @@ function searchAll(q) {
     }
   });
 
+  // Acciones de ayuda. Se añaden antes de los recurrentes para que, al
+  // escribir "feedback" o "ayuda", salgan arriba y no detrás de una lista de
+  // transacciones que casualmente contengan esa palabra.
+  const _ACTIONS = [
+    { title: 'Enviar feedback', sub: 'Cuéntanos un fallo, una idea o una pregunta',
+      icon: '✉', badge: 'Ayuda',
+      words: 'feedback enviar fallo bug error idea sugerencia sugerir contacto contactar reportar problema queja escribir',
+      run: () => _withFeedback(null, 'feedback') },
+    { title: 'Ayuda / FAQ', sub: 'Preguntas frecuentes sobre Finova',
+      icon: '?', badge: 'Ayuda',
+      words: 'ayuda faq preguntas frecuentes duda dudas como funciona manual soporte',
+      run: () => _withFeedback(null, 'faq') },
+  ];
+  const _qNorm = ql.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  _ACTIONS.forEach(a => {
+    const hay = (a.title + ' ' + a.sub + ' ' + a.words).toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (hay.includes(_qNorm)) {
+      results.unshift({ type: 'action', icon: a.icon, badge: a.badge,
+        title: a.title, sub: a.sub, run: a.run });
+    }
+  });
+
   // Recurrentes
   (APP.recurring || []).forEach(r => {
     if ([r.description, r.category].some(f => f?.toLowerCase().includes(ql))) {
@@ -4004,7 +4141,11 @@ function searchGoTo(idx) {
   const r = results[idx];
   if (!r) return;
   closeSearch();
-  navigateTo(r.section);
+  // Un resultado puede ser una ACCIÓN (abrir el feedback, abrir la FAQ) en
+  // vez de una sección. Antes todo resultado acababa en navigateTo, así que
+  // no había forma de poner nada que no fuera una sección en la búsqueda.
+  if (typeof r.run === 'function') { r.run(); return; }
+  if (r.section) navigateTo(r.section);
 }
 
 function searchMoveActive(dir) {

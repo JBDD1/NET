@@ -302,6 +302,10 @@ const _LIMITS = {
   // dentro del handler, que es el que pedia el encargo; este corta el abuso
   // por IP antes incluso de verificar el token.
   accountDelete: { byIP: { capacity: 5, refillRate: 5 / 3600 } },
+  // Feedback: 5/hora por IP. Hay otro límite por uid dentro del handler,
+  // porque una IP compartida (una oficina, un operador móvil) no debe
+  // gastar el cupo de todos los que están detrás.
+  feedback:      { byIP: { capacity: 5, refillRate: 5 / 3600 } },
 };
 
 // ─── Anti-bruteforce ────────────────────────────────────────────
@@ -2314,6 +2318,378 @@ async function handleAccountDelete(req, res) {
   });
 }
 
+/* ─── Feedback de usuarios ───────────────────────────────────── */
+
+const FEEDBACK_FILE      = path.join(ROOT, 'data', 'feedback.jsonl');
+const FEEDBACK_READ_FILE = path.join(ROOT, 'data', 'feedback_read.json');
+const FEEDBACK_WEBHOOK_URL   = process.env.FEEDBACK_WEBHOOK_URL   || '';
+// Documentada pero NO implementada: sin un servicio de correo configurado,
+// mandar notificaciones es imposible y simularlo sería mentir. Ver
+// FEEDBACK_SETUP.md. Se lee aquí solo para poder avisar al arrancar.
+const FEEDBACK_NOTIFY_EMAIL  = process.env.FEEDBACK_NOTIFY_EMAIL  || '';
+
+const _FB_TYPES_OK = ['bug', 'idea', 'question', 'other'];
+const _FB_MSG_MIN  = 10;
+const _FB_MSG_MAX  = 2000;
+const _FB_BODY_MAX = 20_000;          // 20 KB
+const _FB_MIN_OPEN_MS = 3000;
+// Solo estos campos se aceptan del cliente. Cualquier otro = petición
+// rechazada, no ignorada en silencio: si alguien manda un campo que no
+// esperamos, es que algo va mal y conviene enterarse.
+const _FB_ALLOWED_KEYS = ['type', 'message', 'email', 'rating', 'tech', 'hp', 'openMs'];
+// Y del informe técnico solo estas. Así, si alguien añade mañana un campo al
+// cliente con datos financieros dentro, no llega al disco.
+const _FB_TECH_KEYS = ['version', 'build', 'section', 'theme', 'ua', 'lang',
+                       'screen', 'viewport', 'dpr', 'online', 'demo', 'errors'];
+
+/**
+ * Limpia una cadena para guardarla y reenviarla.
+ *
+ * NO convierte < en &lt;: el texto se guarda como JSON (donde no puede
+ * ejecutarse nada) y se escapa EN CADA PUNTO DE RENDERIZADO — el panel de
+ * admin lo pinta con textContent, y el webhook lo manda como campo JSON, que
+ * ni Discord ni Slack interpretan como HTML. Escapar aquí además dejaría
+ * "&lt;" guardado literalmente y un usuario que escriba "a < b" vería basura.
+ *
+ * Lo que sí se quita son los caracteres de control y los invisibles, que
+ * sirven para falsear líneas de log y para esconder texto.
+ */
+const _FB_ZERO_WIDTH = new Set([0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF]);
+
+function _fbClean(v, max) {
+  const raw = String(v == null ? '' : v);
+  let out = '';
+  for (const ch of raw) {
+    const c = ch.codePointAt(0);
+    // Caracteres de control: sirven para falsear lineas de log. Se permiten
+    // salto de linea (10) y tabulador (9), que el usuario escribe de verdad.
+    if (c < 32 && c !== 10 && c !== 9) continue;
+    if (c === 127) continue;
+    // Invisibles de ancho cero: sirven para esconder texto dentro de otro.
+    if (_FB_ZERO_WIDTH.has(c)) continue;
+    out += ch;
+  }
+  return out.trim().slice(0, max);
+}
+
+/** Hash del uid: permite agrupar los mensajes de una persona sin guardar quién es. */
+function _fbUidHash(uid) {
+  if (!uid) return null;
+  return crypto.createHash('sha256').update('finova-feedback:' + uid).digest('hex').slice(0, 16);
+}
+
+function _fbReadIds() {
+  try {
+    const p = JSON.parse(fs.readFileSync(FEEDBACK_READ_FILE, 'utf8'));
+    return Array.isArray(p) ? p : [];
+  } catch { return []; }
+}
+
+/** Reenvío al webhook. Nunca rompe la petición del usuario. */
+async function _fbForwardToWebhook(entry) {
+  if (!FEEDBACK_WEBHOOK_URL) return;
+
+  const LABEL = { bug: 'Algo no funciona', idea: 'Idea', question: 'Pregunta', other: 'Otro' };
+  const lines = [
+    '**' + (LABEL[entry.type] || entry.type) + '**  ·  `' + entry.id + '`',
+    '',
+    entry.message,
+    '',
+    entry.email ? 'Responder a: ' + entry.email : 'Sin correo de respuesta',
+  ];
+  if (entry.rating) lines.push('Valoración: ' + entry.rating + '/5');
+  if (entry.uidHash) lines.push('Usuario: ' + entry.uidHash + ' (hash)');
+  if (entry.tech) {
+    lines.push('', '`' + [entry.tech.section, entry.tech.build || entry.tech.version,
+                          entry.tech.viewport, entry.tech.theme].filter(Boolean).join(' · ') + '`');
+    if (entry.tech.ua) lines.push('`' + String(entry.tech.ua).slice(0, 160) + '`');
+    if (Array.isArray(entry.tech.errors) && entry.tech.errors.length) {
+      lines.push('Últimos errores:');
+      for (const e of entry.tech.errors.slice(0, 5)) {
+        lines.push('· ' + [e.message, e.file, e.line].filter(Boolean).join(' @ '));
+      }
+    }
+  }
+  const text = lines.join('\n').slice(0, 1800);
+
+  // `content` lo entiende Discord; `text` lo entiende Slack; Make y Zapier
+  // reciben el JSON entero. Mandar los dos campos hace que el mismo payload
+  // sirva para los cuatro sin configurar nada.
+  const body = JSON.stringify({ content: text, text, feedback: entry });
+
+  try {
+    const r = await fetch(FEEDBACK_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) {
+      console.error('[FINOVA/Feedback] El webhook respondió', r.status, '— el feedback sí se guardó');
+    }
+  } catch (e) {
+    // Un webhook caído no puede costarle al usuario su mensaje.
+    console.error('[FINOVA/Feedback] No se pudo reenviar al webhook:', e.message);
+  }
+}
+
+async function handleFeedback(req, res) {
+  if (!_checkRateLimit(req, res, 'feedback')) return;
+
+  // Autenticación OPCIONAL: con token válido se asocia el uid (hasheado);
+  // sin token, el feedback entra como anónimo. Un usuario que no puede
+  // entrar es justo el que más necesita poder escribirnos.
+  let uid = null;
+  if (_AUTH_ENABLED) {
+    const authHeader = req.headers['authorization'] || '';
+    if (authHeader.startsWith('Bearer ')) {
+      try {
+        const payload = await _verifyFirebaseToken(authHeader, req, true);
+        uid = payload.sub;
+        req.uid = uid;
+      } catch (_) { uid = null; }   // token malo = anónimo, no error
+    }
+  } else if (req.headers['authorization']) {
+    uid = 'dev-uid';
+  }
+
+  // Límite por uid además del de IP: 5/hora. Una IP compartida (una oficina,
+  // un operador móvil) no debe gastar el cupo de todos.
+  if (uid) {
+    const b = _tokenBucket('fb-uid:' + uid, 5, 5 / 3600);
+    if (!b.ok) {
+      res.writeHead(429, _apiHeaders(req, { 'Retry-After': String(Math.max(b.resetIn, 1)) }));
+      return res.end(JSON.stringify({
+        error: 'Has enviado varios mensajes seguidos. Espera un rato antes del siguiente.',
+        code: 'RATE_LIMITED',
+      }));
+    }
+  }
+
+  if (!_requireJson(req, res)) return;
+
+  let body = '';
+  let oversize = false;
+  req.on('data', c => {
+    if (oversize) return;
+    body += c;
+    if (body.length > _FB_BODY_MAX) { oversize = true; body = ''; }
+  });
+
+  req.on('end', async () => {
+    try {
+      if (oversize) {
+        res.writeHead(413, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'El mensaje es demasiado grande.' }));
+      }
+
+      let data;
+      try { data = JSON.parse(body); } catch {
+        res.writeHead(400, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'Petición mal formada.' }));
+      }
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        res.writeHead(400, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'Petición mal formada.' }));
+      }
+
+      // Campos desconocidos: se rechaza en vez de ignorarlos.
+      const extra = Object.keys(data).filter(k => !_FB_ALLOWED_KEYS.includes(k));
+      if (extra.length) {
+        res.writeHead(400, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'Petición no válida.' }));
+      }
+
+      // Honeypot: un campo que ninguna persona ve. Si viene con algo, es un
+      // bot. Se responde 200 a propósito: decirle que ha fallado solo le
+      // enseña a afinar el siguiente intento.
+      if (_fbClean(data.hp, 50)) {
+        console.warn('[FINOVA/Feedback] Honeypot relleno — descartado. IP:', _clientIp(req));
+        res.writeHead(200, _apiHeaders(req));
+        return res.end(JSON.stringify({ ok: true }));
+      }
+
+      // Tiempo mínimo con el formulario abierto.
+      const openMs = Number(data.openMs);
+      if (!Number.isFinite(openMs) || openMs < _FB_MIN_OPEN_MS) {
+        res.writeHead(400, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'Revisa el mensaje y vuelve a enviarlo.' }));
+      }
+
+      const type = String(data.type || '');
+      if (!_FB_TYPES_OK.includes(type)) {
+        res.writeHead(400, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'Tipo de feedback no válido.' }));
+      }
+
+      const message = _fbClean(data.message, _FB_MSG_MAX);
+      if (message.length < _FB_MSG_MIN) {
+        res.writeHead(400, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'El mensaje es demasiado corto.' }));
+      }
+
+      let email = null;
+      if (data.email != null && data.email !== '') {
+        if (typeof data.email !== 'string') {
+          res.writeHead(400, _apiHeaders(req));
+          return res.end(JSON.stringify({ error: 'Correo no válido.' }));
+        }
+        const e = _fbClean(data.email, 254).toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)) {
+          res.writeHead(400, _apiHeaders(req));
+          return res.end(JSON.stringify({ error: 'Correo no válido.' }));
+        }
+        email = e;
+      }
+
+      let rating = null;
+      if (data.rating != null) {
+        const r = Number(data.rating);
+        if (!Number.isInteger(r) || r < 1 || r > 5) {
+          res.writeHead(400, _apiHeaders(req));
+          return res.end(JSON.stringify({ error: 'Valoración no válida.' }));
+        }
+        rating = r;
+      }
+
+      // Informe técnico: lista blanca estricta. Lo que no esté en
+      // _FB_TECH_KEYS se descarta, aunque el cliente lo mande.
+      let tech = null;
+      if (data.tech != null) {
+        if (typeof data.tech !== 'object' || Array.isArray(data.tech)) {
+          res.writeHead(400, _apiHeaders(req));
+          return res.end(JSON.stringify({ error: 'Información técnica no válida.' }));
+        }
+        tech = {};
+        for (const k of _FB_TECH_KEYS) {
+          const v = data.tech[k];
+          if (v == null) continue;
+          if (k === 'errors') {
+            if (!Array.isArray(v)) continue;
+            tech.errors = v.slice(0, 5).map(e => ({
+              kind:    _fbClean(e?.kind, 20),
+              message: _fbClean(e?.message, 200),
+              file:    _fbClean(e?.file, 80),
+              line:    Number(e?.line) || 0,
+            })).filter(e => e.message || e.file);
+          } else if (typeof v === 'boolean' || typeof v === 'number') {
+            tech[k] = v;
+          } else {
+            tech[k] = _fbClean(v, 300);
+          }
+        }
+      }
+
+      const entry = {
+        id:        crypto.randomBytes(8).toString('hex'),
+        at:        new Date().toISOString(),
+        type, message, email, rating, tech,
+        uidHash:   _fbUidHash(uid),
+        // La IP no se guarda: para el rate limit ya está en memoria, y en un
+        // mensaje de feedback no aporta nada que justifique conservarla.
+      };
+
+      // El fichero puede fallar (disco lleno, o efímero y sin permisos) y el
+      // webhook puede estar caído. Mientras UNO de los dos funcione, el
+      // mensaje no se ha perdido y se responde ok.
+      let stored = false;
+      try {
+        fs.appendFileSync(FEEDBACK_FILE, JSON.stringify(entry) + '\n', 'utf8');
+        stored = true;
+      } catch (e) {
+        console.error('[FINOVA/Feedback] No se pudo escribir en disco:', e.code || e.message);
+      }
+
+      // Se espera al webhook para poder saber si al menos uno de los dos
+      // canales ha funcionado antes de decirle al usuario que llegó.
+      let forwarded = false;
+      if (FEEDBACK_WEBHOOK_URL) {
+        const before = Date.now();
+        await _fbForwardToWebhook(entry);
+        forwarded = Date.now() - before >= 0;   // _fbForward no lanza nunca
+      }
+
+      if (!stored && !FEEDBACK_WEBHOOK_URL) {
+        // Ni disco ni webhook: el mensaje se habría perdido. Se dice, para
+        // que el cliente ofrezca el plan B por correo.
+        res.writeHead(500, _apiHeaders(req));
+        return res.end(JSON.stringify({
+          error: 'No hemos podido guardar tu mensaje.',
+          code:  'INTERNAL_ERROR',
+        }));
+      }
+
+      res.writeHead(200, _apiHeaders(req));
+      res.end(JSON.stringify({ ok: true, id: entry.id }));
+    } catch (e) {
+      _serverError(req, res, e);
+    }
+  });
+}
+
+/* ─── Admin: listar y marcar como leído ──────────────────────── */
+
+async function handleAdminFeedback(req, res) {
+  if ((await _adminGuard(req, res)) === null) return;
+  try {
+    const urlObj = new URL(req.url, 'http://localhost');
+    const typeF  = urlObj.searchParams.get('type') || '';
+    const limit  = Math.min(200, Math.max(1, parseInt(urlObj.searchParams.get('limit') || '50', 10)));
+
+    let lines = [];
+    try {
+      lines = fs.readFileSync(FEEDBACK_FILE, 'utf8').split('\n').filter(Boolean);
+    } catch { lines = []; }   // sin fichero todavía: lista vacía, no error
+
+    const readIds = new Set(_fbReadIds());
+    const items = [];
+    // De atrás adelante: lo más reciente primero, y así no hay que parsear
+    // el fichero entero cuando ya hay miles de líneas.
+    for (let i = lines.length - 1; i >= 0 && items.length < limit; i--) {
+      let e;
+      try { e = JSON.parse(lines[i]); } catch { continue; }
+      if (typeF && e.type !== typeF) continue;
+      e.read = readIds.has(e.id);
+      items.push(e);
+    }
+
+    res.writeHead(200, _apiHeaders(req));
+    res.end(JSON.stringify({
+      ok: true, items, total: lines.length, unread: lines.length - readIds.size,
+      // Para que el panel pueda avisar de que el disco es efímero.
+      persistent: !!process.env.RAILWAY_VOLUME_MOUNT_PATH,
+    }));
+  } catch (e) {
+    _serverError(req, res, e);
+  }
+}
+
+async function handleAdminFeedbackRead(req, res) {
+  if ((await _adminGuard(req, res)) === null) return;
+  if (!_requireJson(req, res)) return;
+  let body = '';
+  req.on('data', c => { body += c; if (body.length > 4096) body = body.slice(0, 4096); });
+  req.on('end', () => {
+    try {
+      const { id, read } = JSON.parse(body);
+      if (typeof id !== 'string' || !/^[0-9a-f]{16}$/.test(id)) {
+        res.writeHead(400, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'Id no válido.' }));
+      }
+      // Se guardan los ids leídos en un fichero aparte en vez de reescribir
+      // el .jsonl: así el registro sigue siendo de solo añadir, que es lo que
+      // lo hace robusto si el proceso muere a mitad.
+      const ids = new Set(_fbReadIds());
+      if (read === false) ids.delete(id); else ids.add(id);
+      fs.writeFileSync(FEEDBACK_READ_FILE, JSON.stringify([...ids].slice(-5000)), 'utf8');
+      res.writeHead(200, _apiHeaders(req));
+      res.end(JSON.stringify({ ok: true }));
+    } catch (e) {
+      _serverError(req, res, e);
+    }
+  });
+}
+
 /* ─── Admin API ───────────────────────────────────────────────── */
 // Verifica token Y rol admin. Devuelve uid verificado o null (401/403 ya enviado).
 // adminUid del body/query ya no se usa — el uid viene del token Firebase.
@@ -2761,6 +3137,9 @@ http.createServer((req, res) => {
   // Metadatos de usuario (email, nombre, último acceso)
   if (req.method === 'POST' && req.url === '/api/user-meta')         return handleUserMeta(req, res);
   if (req.method === 'POST' && req.url === '/api/account/delete')    return handleAccountDelete(req, res);
+  if (req.method === 'POST' && req.url === '/api/feedback')          return handleFeedback(req, res);
+  if (req.method === 'GET'  && req.url.startsWith('/api/admin/feedback')) return handleAdminFeedback(req, res);
+  if (req.method === 'POST' && req.url === '/api/admin/feedback/read')    return handleAdminFeedbackRead(req, res);
   // Admin API
   if (req.method === 'GET'  && req.url.startsWith('/api/admin/users'))    return handleAdminUsers(req, res);
   if (req.method === 'POST' && req.url === '/api/admin/block')            return handleAdminBlock(req, res);
@@ -2845,6 +3224,19 @@ http.createServer((req, res) => {
   ║   Puerto: ${PORT}
   ╚════════════════════════════════════╝
   `);
+  // Avisos del feedback. Importa saberlo al desplegar: sin volumen declarado,
+  // Railway da un disco EFIMERO y data/feedback.jsonl desaparece en cada
+  // redeploy. En ese caso el webhook es el canal fiable, no el fichero.
+  if (!process.env.RAILWAY_VOLUME_MOUNT_PATH) {
+    console.warn('[FINOVA/Feedback] Disco efímero (sin volumen declarado): data/feedback.jsonl se perderá al redesplegar. Configura FEEDBACK_WEBHOOK_URL como canal principal — ver FEEDBACK_SETUP.md');
+  }
+  if (!FEEDBACK_WEBHOOK_URL) {
+    console.warn('[FINOVA/Feedback] Sin FEEDBACK_WEBHOOK_URL — el feedback solo se guarda en disco');
+  }
+  if (FEEDBACK_NOTIFY_EMAIL) {
+    console.warn('[FINOVA/Feedback] FEEDBACK_NOTIFY_EMAIL está puesta pero NO hay servicio de correo configurado: no se enviará ningún aviso. Ver FEEDBACK_SETUP.md');
+  }
+
   // Abrir el navegador solo tiene sentido en desarrollo local; en Railway
   // 'start' no es un comando válido (Linux) y no hay pantalla que abrir.
   if (!_IS_CLOUD_DEPLOY) {

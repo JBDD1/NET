@@ -110,6 +110,10 @@
   _on('btn-admin-refresh-users','click', function () { _withAdmin(function () { adminRefreshUsers(); }); });
   _on('btn-admin-load-demo',    'click', _adminLoadDemoData);
   _on('btn-admin-health-check', 'click', function () { _withAdmin(function () { adminHealthCheck(); }); });
+  _on('btn-admin-fb-refresh',   'click', function () { _withAdmin(function () { adminRefreshFeedback(); }); });
+  // El filtro recarga directamente: no tiene sentido obligar a pulsar
+  // "Actualizar" después de cambiar el desplegable.
+  _on('admin-fb-filter',        'change', function () { _withAdmin(function () { adminRefreshFeedback(); }); });
 
   // ── Settings ──────────────────────────────────────────────────
   _on('btn-notifications-manager', 'click', openNotificationsManager);
