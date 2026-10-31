@@ -17,7 +17,10 @@ import fs from 'fs';
 import path from 'path';
 import vm from 'vm';
 
-const AUTH = fs.readFileSync(path.join(process.cwd(), 'src/auth/auth.js'), 'utf8');
+const AUTH   = fs.readFileSync(path.join(process.cwd(), 'src/auth/auth.js'), 'utf8');
+// auth.js depende de auth-shared.js (mapa de errores, politica de contrasenas,
+// actionCodeSettings). index.html lo carga antes; aqui se replica ese orden.
+const SHARED = fs.readFileSync(path.join(process.cwd(), 'src/auth/auth-shared.js'), 'utf8');
 
 /** auth.js usa import.meta.env; se sustituye igual que hace vite.config.js. */
 const stripImportMeta = c => c
@@ -35,7 +38,10 @@ function makeAuth({ failWith = null } = {}) {
         uid: 'u1', email: 'nuevo@test.com',
         displayName: null,          // clave: aún no hay nombre
         photoURL: null,
+        emailVerified: false,
         updateProfile: async p => { user.displayName = p.displayName; calls.updateProfile++; },
+        sendEmailVerification: async opts => { calls.verifySent.push(opts); },
+        reload: async () => {},
         getIdToken: async () => 'tok',
       };
       // Firebase avisa del cambio de sesión ANTES de que updateProfile corra.
@@ -43,7 +49,8 @@ function makeAuth({ failWith = null } = {}) {
       return { user };
     },
     signInWithEmailAndPassword: async () => {
-      const user = { uid: 'u2', email: 'otro@test.com', displayName: null, photoURL: null, getIdToken: async () => 'tok' };
+      const user = { uid: 'u2', email: 'otro@test.com', displayName: null, photoURL: null,
+                     emailVerified: true, reload: async () => {}, getIdToken: async () => 'tok' };
       if (authStateCb) await authStateCb(user);
       return { user };
     },
@@ -54,12 +61,15 @@ function makeAuth({ failWith = null } = {}) {
 
 function load({ failWith = null } = {}) {
   APP = { userName: '', userEmail: '', cashAccounts: [], transactions: [] };
-  calls = { updateProfile: 0, injectAuthUI: 0, msgs: [] };
+  calls = { updateProfile: 0, injectAuthUI: 0, msgs: [], verifySent: [] };
   authStateCb = null;
 
   ctx = vm.createContext({
     APP, console,
-    document: { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] },
+    document: {
+      getElementById: () => null, querySelector: () => null, querySelectorAll: () => [],
+      addEventListener() {}, visibilityState: 'visible',
+    },
     location: { hostname: 'localhost', search: '', port: '3000', pathname: '/', replace() {} },
     localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
     URLSearchParams, fetch: async () => ({ ok: false, json: async () => ({}) }),
@@ -67,7 +77,12 @@ function load({ failWith = null } = {}) {
     showToast() {}, init: async () => {}, saveData() {},
     _lazyLoad: () => Promise.resolve(), _LAZY_SCRIPTS: {},
     AbortSignal: { timeout: () => null },
+    navigator: { onLine: true },
+    window: { addEventListener() {} },
+    escapeHtml: v => String(v),
   });
+  // Mismo orden que index.html: primero el compartido, luego auth.js.
+  vm.runInContext(stripImportMeta(SHARED), ctx, { filename: 'auth-shared.js' });
   vm.runInContext(stripImportMeta(AUTH), ctx, { filename: 'auth.js' });
 
   // Sustitutos observables de lo que auth.js llamaría al pintar la UI
@@ -112,9 +127,18 @@ describe('Registro desde la app — el nombre no se pierde', () => {
   test('una contraseña corta se rechaza ANTES de crear la cuenta', async () => {
     const fns = load();
     await fns.signUpEmail('nuevo@test.com', '123', 'Carlos');
-    expect(calls.msgs[0]).toMatch(/6 caracteres/);
+    expect(calls.msgs[0]).toMatch(/8 caracteres/);
     expect(APP.uid).toBeUndefined();     // no se llegó a crear nada
     expect(APP.userName).toBe('');       // ni se tocó el nombre
+  });
+
+  test('7 caracteres tampoco valen: la politica es 8', async () => {
+    // El limite estaba en 6 dentro de signUpEmail y en 8 en _submitLogin:
+    // llamar a signUpEmail directamente se saltaba la politica nueva.
+    const fns = load();
+    await fns.signUpEmail('nuevo@test.com', '1234567', 'Carlos');
+    expect(calls.msgs[0]).toMatch(/8 caracteres/);
+    expect(APP.uid).toBeUndefined();
   });
 
   test('si el registro FALLA, el nombre no se queda pegado en APP', async () => {

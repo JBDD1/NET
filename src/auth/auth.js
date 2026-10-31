@@ -37,7 +37,11 @@ const DEV_HOSTNAME_RE = /^(localhost|127\.0\.0\.1)$/;
 // ─── Estado interno ───────────────────────────────────────────────
 let _fbAuth          = null;
 let _appInitialized  = false;
-let _loginMode       = 'signin'; // 'signin' | 'signup'
+let _loginMode       = 'signin'; // 'signin' | 'signup' | 'reset' | 'verify'
+// createUserWithEmailAndPassword dispara onAuthStateChanged de inmediato. Sin
+// esta bandera, el listener metía al recién registrado directo en la app y la
+// pantalla "Revisa tu correo" no llegaba a verse nunca.
+let _signupPendingVerify = false;
 let _pendingPhoto    = null;     // foto pendiente de confirmar en el modal
 
 // ─── Punto de entrada ─────────────────────────────────────────────
@@ -83,6 +87,8 @@ async function initAuth() {
       APP.userEmail = user.email || '';
       APP.userName  = APP.userName || user.displayName || '';
       APP.userPhoto = user.photoURL || '';
+      // Los usuarios de Google llegan ya verificados por Google.
+      APP.emailVerified = !!user.emailVerified;
       APP.isAdmin   = ADMIN_EMAILS.some(e => e.toLowerCase() === (user.email || '').toLowerCase());
 
       _maybeStartDevMonitor(user.email);
@@ -96,26 +102,32 @@ async function initAuth() {
       // Cargar datos del servidor si no hay datos locales para este UID
       await _loadUserDataFromServer(user.uid);
 
+      // Acaba de registrarse y aún no ha verificado: se le enseña "Revisa tu
+      // correo" en vez de entrar directo. No es un muro — desde ahí puede
+      // seguir a la app, que es la política acordada: explorar sí, gastar
+      // dinero o subir datos al servidor no (ver fvVerifiedOrWarn).
+      // _signupPendingVerify cubre el registro hecho DENTRO de la app.
+      // ?verify=1 cubre el hecho en la landing, que llega aquí como una carga
+      // de página nueva: la bandera no sobrevive a la navegación.
+      const _wantsVerify = _signupPendingVerify ||
+        new URLSearchParams(location.search).get('verify') === '1';
+      if (_wantsVerify && !user.emailVerified) {
+        _signupPendingVerify = false;
+        // Se consume para que un F5 no reabra la pantalla si el usuario ya
+        // eligió seguir explorando.
+        try { history.replaceState({}, '', location.pathname); } catch (_) {}
+        _showVerifyScreen(user.email || '');
+        return;
+      }
+      // Verificado ya (o es de Google): si venía con ?verify=1 se limpia igual,
+      // para que el parámetro no quede pegado en la barra de direcciones.
+      if (_wantsVerify) {
+        _signupPendingVerify = false;
+        try { history.replaceState({}, '', location.pathname); } catch (_) {}
+      }
+
       if (!_appInitialized) {
-        _appInitialized = true;
-        _hideLoginScreen();
-        // init() oculta #app-loading en su ÚLTIMA línea. Si revienta antes
-        // (datos corruptos en localStorage, una sección que falla al pintar),
-        // el spinner se queda fijo a z-index 9999 tapando la app entera y el
-        // usuario ve un "cargando" eterno tras iniciar sesión. Este listener
-        // es async y nada recoge su rechazo: el try de abajo solo envuelve el
-        // REGISTRO del listener, no su ejecución. Así que se captura aquí.
-        try {
-          await init();
-          _injectAuthUI();
-        } catch (err) {
-          console.error('[Finova Auth] Fallo al arrancar la app:', err);
-          const loading = document.getElementById('app-loading');
-          if (loading) loading.classList.add('hidden');
-          if (typeof showToast === 'function') {
-            showToast('No se pudo cargar la app. Recarga la página.', 'error');
-          }
-        }
+        await _enterApp();
       } else {
         // Re-login con usuario diferente en la misma pestaña → recarga limpia
         location.reload();
@@ -124,6 +136,32 @@ async function initAuth() {
   } catch (err) {
     console.error('[Finova Auth] Error al inicializar Firebase:', err);
     init(); // fallback sin auth
+  }
+}
+
+// Arranque de la app tras autenticarse. Extraído del listener porque la
+// pantalla de verificación también necesita entrar por aquí cuando el usuario
+// elige "Explorar la app mientras tanto".
+async function _enterApp() {
+  if (_appInitialized) return;
+  _appInitialized = true;
+  _hideLoginScreen();
+  // init() oculta #app-loading en su ÚLTIMA línea. Si revienta antes (datos
+  // corruptos en localStorage, una sección que falla al pintar), el spinner se
+  // queda fijo a z-index 9999 tapando la app entera y el usuario ve un
+  // "cargando" eterno tras iniciar sesión. Quien llama a esto es un listener
+  // async de onAuthStateChanged, y nada recoge su rechazo, así que se captura
+  // aquí dentro.
+  try {
+    await init();
+    _injectAuthUI();
+  } catch (err) {
+    console.error('[Finova Auth] Fallo al arrancar la app:', err);
+    const loading = document.getElementById('app-loading');
+    if (loading) loading.classList.add('hidden');
+    if (typeof showToast === 'function') {
+      showToast('No se pudo cargar la app. Recarga la página.', 'error');
+    }
   }
 }
 
@@ -228,6 +266,10 @@ function _hideLoginScreen() {
 
 // ─── Renderiza el formulario de login / registro ──────────────────
 function _renderLoginForm(mode) {
+  // Si venía una cuenta atrás de reenvío, su botón está a punto de
+  // desaparecer: el intervalo se limpia solo al no encontrarlo, pero dejarlo
+  // corriendo hasta 60 s sin necesidad no tiene sentido.
+  fvClearCooldowns();
   _loginMode = mode;
   const container = document.getElementById('login-form-container');
   if (!container) return;
@@ -235,45 +277,57 @@ function _renderLoginForm(mode) {
   if (mode === 'signin') {
     container.innerHTML = `
       <div class="login-field">
-        <label class="login-label">Correo electrónico</label>
+        <label class="login-label" for="login-email">Correo electrónico</label>
         <input type="email" id="login-email" class="login-input"
           placeholder="tu@correo.com" autocomplete="email"
           onkeydown="if(event.key==='Enter')_submitLogin()" />
       </div>
       <div class="login-field">
-        <label class="login-label">Contraseña</label>
-        <input type="password" id="login-password" class="login-input"
-          placeholder="••••••••" autocomplete="current-password"
-          onkeydown="if(event.key==='Enter')_submitLogin()" />
+        <label class="login-label" for="login-password">Contraseña</label>
+        <div class="fv-pw-wrap">
+          <input type="password" id="login-password" class="login-input"
+            placeholder="••••••••" autocomplete="current-password"
+            onkeydown="if(event.key==='Enter')_submitLogin()" />
+          <button type="button" class="fv-pw-toggle" aria-pressed="false"
+            aria-label="Mostrar contraseña"
+            onclick="fvTogglePassword('login-password', this)"><svg class="icon fv-pw-eye" aria-hidden="true"><use href="#icon-eye"/></svg><svg class="icon fv-pw-eye-off" aria-hidden="true"><use href="#icon-eye-off"/></svg></button>
+        </div>
       </div>
-      <div id="login-error" class="login-msg" role="alert" style="display:none"></div>
+      <div id="login-error" class="login-msg" role="alert" aria-live="assertive" style="display:none"></div>
       <button type="button" class="login-btn-primary" id="login-submit-btn"
         onclick="_submitLogin()">Iniciar sesión</button>
-      <button type="button" class="login-forgot"
-        onclick="sendPasswordReset(document.getElementById('login-email')?.value)">
-        ¿Olvidaste tu contraseña?
+      <button type="button" class="login-forgot" onclick="_renderResetForm()">
+        ¿Has olvidado tu contraseña?
       </button>`;
   } else {
     container.innerHTML = `
       <div class="login-field">
-        <label class="login-label">Tu nombre</label>
+        <label class="login-label" for="login-name">Tu nombre</label>
         <input type="text" id="login-name" class="login-input"
           placeholder="Nombre (opcional)" autocomplete="name"
           onkeydown="if(event.key==='Enter')_submitLogin()" />
       </div>
       <div class="login-field">
-        <label class="login-label">Correo electrónico</label>
+        <label class="login-label" for="login-email">Correo electrónico</label>
         <input type="email" id="login-email" class="login-input"
           placeholder="tu@correo.com" autocomplete="email"
           onkeydown="if(event.key==='Enter')_submitLogin()" />
       </div>
       <div class="login-field">
-        <label class="login-label">Contraseña</label>
-        <input type="password" id="login-password" class="login-input"
-          placeholder="Mínimo 6 caracteres" autocomplete="new-password"
-          onkeydown="if(event.key==='Enter')_submitLogin()" />
+        <label class="login-label" for="login-password">Contraseña</label>
+        <div class="fv-pw-wrap">
+          <input type="password" id="login-password" class="login-input"
+            placeholder="Mínimo ${FV_PASSWORD_MIN} caracteres" autocomplete="new-password"
+            aria-describedby="login-pw-meter"
+            oninput="fvRenderStrength('login-pw-meter', this.value)"
+            onkeydown="if(event.key==='Enter')_submitLogin()" />
+          <button type="button" class="fv-pw-toggle" aria-pressed="false"
+            aria-label="Mostrar contraseña"
+            onclick="fvTogglePassword('login-password', this)"><svg class="icon fv-pw-eye" aria-hidden="true"><use href="#icon-eye"/></svg><svg class="icon fv-pw-eye-off" aria-hidden="true"><use href="#icon-eye-off"/></svg></button>
+        </div>
+        <div id="login-pw-meter" class="fv-pw-meter" aria-live="polite" style="display:none"></div>
       </div>
-      <div id="login-error" class="login-msg" role="alert" style="display:none"></div>
+      <div id="login-error" class="login-msg" role="alert" aria-live="assertive" style="display:none"></div>
       <button type="button" class="login-btn-primary" id="login-submit-btn"
         onclick="_submitLogin()">Crear cuenta</button>`;
   }
@@ -289,8 +343,18 @@ function _submitLogin() {
   const password = document.getElementById('login-password')?.value;
   const name     = document.getElementById('login-name')?.value.trim() || '';
   if (!email || !password) return _showLoginMsg('Introduce tu correo y contraseña.', 'error');
-  if (_loginMode === 'signup') signUpEmail(email, password, name);
-  else                         signInEmail(email, password);
+  if (!fvIsValidEmail(email)) return _showLoginMsg('El correo no tiene un formato válido.', 'error');
+
+  // La contraseña se valida en cliente SOLO al registrarse. En el inicio de
+  // sesión no: una cuenta antigua puede tener 6 caracteres, y rechazarla aquí
+  // dejaría a su dueño fuera de su propia cuenta.
+  if (_loginMode === 'signup') {
+    const problem = fvPasswordProblem(password);
+    if (problem) return _showLoginMsg(problem, 'error');
+    signUpEmail(email, password, name);
+  } else {
+    signInEmail(email, password);
+  }
 }
 
 function _setLoginLoading(loading) {
@@ -322,7 +386,8 @@ async function signInEmail(email, password) {
 }
 
 async function signUpEmail(email, password, name) {
-  if (password.length < 6) return _showLoginMsg('La contraseña debe tener al menos 6 caracteres.', 'error');
+  const _pwProblem = fvPasswordProblem(password);
+  if (_pwProblem) return _showLoginMsg(_pwProblem, 'error');
   _setLoginLoading(true);
   try {
     // createUserWithEmailAndPassword dispara onAuthStateChanged DE INMEDIATO,
@@ -334,11 +399,22 @@ async function signUpEmail(email, password, name) {
     // El registro desde la landing no tenía el fallo porque encadena
     // updateProfile ANTES de navegar a index.html.
     if (name) APP.userName = name;
+    // Se marca ANTES de crear la cuenta: el listener se dispara dentro de la
+    // llamada de abajo, así que si se pusiera después ya habría pasado.
+    _signupPendingVerify = true;
     const cred = await _fbAuth.createUserWithEmailAndPassword(email, password);
     if (name) {
       await cred.user.updateProfile({ displayName: name });
       // Si la UI ya se pintó con el listener, se refresca con el nombre bueno.
       if (typeof _injectAuthUI === 'function' && _appInitialized) _injectAuthUI();
+    }
+    // El correo de verificación va DESPUÉS de updateProfile para que la
+    // plantilla pueda usar %DISPLAY_NAME%. Si falla el envío, la cuenta ya
+    // existe: no se deshace nada, se avisa y se ofrece reenviar.
+    try {
+      await cred.user.sendEmailVerification(fvActionCodeSettings('index.html'));
+    } catch (e) {
+      _verifySendError = fvAuthErrMsg(e?.code);
     }
   } catch (err) {
     // Si la creación falla (correo ya en uso, red, contraseña débil…) hay que
@@ -346,6 +422,7 @@ async function signUpEmail(email, password, name) {
     // iniciar sesión después con otra cuenta, se mostraría ese nombre ajeno
     // (onAuthStateChanged hace `APP.userName || …`, así que lo respetaría).
     if (name && APP.userName === name) APP.userName = '';
+    _signupPendingVerify = false;
     console.error('[Finova Auth] signUpEmail error:', err.code, err.message);
     _setLoginLoading(false);
     _showLoginMsg(_authErrMsg(err.code));
@@ -364,15 +441,314 @@ async function signInGoogle() {
   }
 }
 
-async function sendPasswordReset(email) {
-  if (!email) return _showLoginMsg('Introduce tu correo para recuperar la contraseña.', 'error');
-  try {
-    await _fbAuth.sendPasswordResetEmail(email);
-    _showLoginMsg('Correo de recuperación enviado. Revisa tu bandeja de entrada.', 'success');
-  } catch (err) {
-    console.error('[Finova Auth] sendPasswordReset error:', err.code, err.message);
-    _showLoginMsg(_authErrMsg(err.code));
+// Mensaje ÚNICO del restablecimiento, pase lo que pase. Decir "no existe esa
+// cuenta" convierte el formulario en un comprobador de quién está registrado.
+const _RESET_GENERIC_MSG =
+  'Si existe una cuenta con ese correo, te hemos enviado un enlace para restablecer la contraseña. Revisa también la carpeta de spam.';
+
+function _renderResetForm() {
+  fvClearCooldowns();
+  _loginMode = 'reset';
+  const container = document.getElementById('login-form-container');
+  if (!container) return;
+
+  // Si venía escrito en el login, se arrastra para no obligar a teclearlo otra vez.
+  const prefill = document.getElementById('login-email')?.value || '';
+
+  container.innerHTML = `
+    <p class="login-hint" style="margin:0 0 14px;font-size:13px;color:var(--text-muted);line-height:1.55">
+      Escribe tu correo y te enviaremos un enlace para crear una contraseña nueva.
+    </p>
+    <div class="login-field">
+      <label class="login-label" for="reset-email">Correo electrónico</label>
+      <input type="email" id="reset-email" class="login-input"
+        placeholder="tu@correo.com" autocomplete="email"
+        value="${String(prefill).replace(/"/g, '&quot;')}"
+        onkeydown="if(event.key==='Enter')_submitPasswordReset()" />
+    </div>
+    <div id="login-error" class="login-msg" role="alert" aria-live="assertive" style="display:none"></div>
+    <button type="button" class="login-btn-primary" id="reset-submit-btn"
+      onclick="_submitPasswordReset()">Enviar enlace</button>
+    <button type="button" class="login-forgot" onclick="_renderLoginForm('signin')">
+      ← Volver a iniciar sesión
+    </button>`;
+
+  setTimeout(() => document.getElementById('reset-email')?.focus(), 80);
+}
+
+async function _submitPasswordReset() {
+  const input = document.getElementById('reset-email');
+  const email = (input?.value || '').trim();
+  const btn   = document.getElementById('reset-submit-btn');
+
+  if (!email)                 return _showLoginMsg('Introduce tu correo electrónico.', 'error');
+  if (!fvIsValidEmail(email)) return _showLoginMsg('El correo no tiene un formato válido.', 'error');
+
+  if (!navigator.onLine) {
+    return _showLoginMsg('Sin conexión. Comprueba tu red y vuelve a intentarlo.', 'error');
   }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try {
+    await _fbAuth.sendPasswordResetEmail(email, fvActionCodeSettings('index.html'));
+  } catch (err) {
+    // auth/user-not-found NO se distingue: el mensaje de éxito se muestra
+    // igual. Solo se separan los errores que no filtran nada y que el usuario
+    // necesita para actuar (límite de intentos, red).
+    if (err?.code === 'auth/too-many-requests' || err?.code === 'auth/network-request-failed') {
+      if (btn) { btn.disabled = false; btn.textContent = 'Enviar enlace'; }
+      return _showLoginMsg(fvAuthErrMsg(err.code), 'error');
+    }
+    // El resto se traga a propósito: lo que vea el usuario es el mismo
+    // mensaje genérico que si hubiera funcionado.
+  }
+  _showLoginMsg(_RESET_GENERIC_MSG, 'success');
+  // Cuenta atrás de 60 s antes de poder reenviar.
+  if (btn) fvStartCooldown(btn, 'Enviar de nuevo', FV_RESEND_COOLDOWN_SEC);
+}
+
+// Compatibilidad: el nombre antiguo sigue existiendo por si algo lo llama.
+async function sendPasswordReset(email) {
+  _renderResetForm();
+  const input = document.getElementById('reset-email');
+  if (input && email) input.value = email;
+}
+
+/* ─── Pantalla "Revisa tu correo" ──────────────────────────────── */
+
+// Si el envío del correo de verificación falló durante el registro, el motivo
+// se guarda aquí para enseñarlo en la pantalla en vez de perderlo.
+let _verifySendError = '';
+
+function _showVerifyScreen(email) {
+  fvClearCooldowns();
+  _loginMode = 'verify';
+
+  // La pantalla de login puede estar oculta si el registro vino de la landing.
+  const login   = document.getElementById('login-screen');
+  const loading = document.getElementById('app-loading');
+  const main    = document.getElementById('mainContent');
+  if (loading) loading.classList.add('hidden');
+  if (login)   login.style.display = 'flex';
+  if (main)    main.inert = true;
+
+  const container = document.getElementById('login-form-container');
+  if (!container) return;
+
+  // Las pestañas Iniciar sesión / Registrarse no tienen sentido aquí.
+  const tabs = document.querySelector('.login-tabs');
+  if (tabs) tabs.style.display = 'none';
+  const divider = document.querySelector('.login-divider');
+  if (divider) divider.style.display = 'none';
+  const gbtn = document.querySelector('.login-btn-google');
+  if (gbtn) gbtn.style.display = 'none';
+
+  const safeEmail = typeof escapeHtml === 'function'
+    ? escapeHtml(email)
+    : String(email).replace(/[<>&"]/g, '');
+
+  container.innerHTML = `
+    <h2 style="margin:0 0 10px;font-size:18px;font-weight:600">Revisa tu correo</h2>
+    <p style="margin:0 0 4px;font-size:14px;color:var(--text-secondary);line-height:1.6">
+      Hemos enviado un enlace de verificación a
+    </p>
+    <p style="margin:0 0 14px;font-size:14px" class="fv-verify-mail">${safeEmail}</p>
+
+    <div class="fv-verify-note">
+      Si no lo ves en unos minutos, mira en <strong>spam</strong> o en
+      <strong>correo no deseado</strong>: al ser el primer correo que te
+      enviamos, es donde suele acabar.
+    </div>
+
+    <div id="login-error" class="login-msg" role="alert" aria-live="assertive" style="display:none"></div>
+
+    <div class="fv-verify-actions">
+      <button type="button" class="login-btn-primary" id="verify-check-btn"
+        onclick="_verifyCheckNow()">Ya lo he verificado</button>
+      <button type="button" class="btn-secondary" id="verify-resend-btn"
+        onclick="_verifyResend()">Reenviar correo</button>
+    </div>
+
+    <div class="fv-verify-links">
+      <button type="button" onclick="_verifyContinue()">Explorar la app mientras tanto</button>
+      <button type="button" onclick="_verifyChangeAccount()">Usar otra cuenta</button>
+    </div>`;
+
+  if (_verifySendError) {
+    _showLoginMsg('No pudimos enviar el correo: ' + _verifySendError + ' Pulsa «Reenviar correo».', 'error');
+    _verifySendError = '';
+  }
+  // El correo acaba de salir al registrarse: la cuenta atrás empieza ya, para
+  // que nadie pulse "Reenviar" tres veces y acabe en auth/too-many-requests.
+  const rb = document.getElementById('verify-resend-btn');
+  if (rb) fvStartCooldown(rb, 'Reenviar correo', FV_RESEND_COOLDOWN_SEC);
+
+  setTimeout(() => document.getElementById('verify-check-btn')?.focus(), 80);
+}
+
+async function _verifyResend() {
+  const user = _fbAuth?.currentUser;
+  const btn  = document.getElementById('verify-resend-btn');
+  if (!user) return _showLoginMsg('Tu sesión ha caducado. Vuelve a iniciar sesión.', 'error');
+  if (!navigator.onLine) return _showLoginMsg('Sin conexión. Comprueba tu red y vuelve a intentarlo.', 'error');
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try {
+    await user.sendEmailVerification(fvActionCodeSettings('index.html'));
+    _showLoginMsg('Correo reenviado. Revisa tu bandeja y la carpeta de spam.', 'success');
+    if (btn) fvStartCooldown(btn, 'Reenviar correo', FV_RESEND_COOLDOWN_SEC);
+  } catch (err) {
+    _showLoginMsg(fvAuthErrMsg(err?.code), 'error');
+    // Con too-many-requests se deja la cuenta atrás puesta igualmente: volver
+    // a pulsar de inmediato solo repetiría el error.
+    if (btn) fvStartCooldown(btn, 'Reenviar correo', FV_RESEND_COOLDOWN_SEC);
+  }
+}
+
+async function _verifyCheckNow() {
+  const user = _fbAuth?.currentUser;
+  const btn  = document.getElementById('verify-check-btn');
+  if (!user) return _showLoginMsg('Tu sesión ha caducado. Vuelve a iniciar sesión.', 'error');
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Comprobando…'; }
+  try {
+    await user.reload();
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Ya lo he verificado'; }
+    return _showLoginMsg(fvAuthErrMsg(err?.code), 'error');
+  }
+
+  if (user.emailVerified) {
+    APP.emailVerified = true;
+    // Token nuevo: el servidor comprueba email_verified DENTRO del token, y el
+    // de la caché todavía lo lleva en false. Sin este refresco, la IA y la
+    // sincronización seguirían rechazadas después de verificar.
+    try { await user.getIdToken(true); } catch (_) {}
+    _showLoginMsg('Correo verificado. Entrando…', 'success');
+    return _verifyContinue();
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Ya lo he verificado'; }
+  _showLoginMsg('Todavía no nos consta verificado. Abre el enlace del correo y vuelve a pulsar aquí.', 'error');
+}
+
+/** Restaura la pantalla de login a su estado normal (tabs, Google, divider). */
+function _restoreLoginChrome() {
+  const tabs = document.querySelector('.login-tabs');
+  if (tabs) tabs.style.display = '';
+  const divider = document.querySelector('.login-divider');
+  if (divider) divider.style.display = '';
+  const gbtn = document.querySelector('.login-btn-google');
+  if (gbtn) gbtn.style.display = '';
+}
+
+function _verifyContinue() {
+  fvClearCooldowns();
+  _restoreLoginChrome();
+  _enterApp();
+}
+
+async function _verifyChangeAccount() {
+  fvClearCooldowns();
+  _restoreLoginChrome();
+  try { await _fbAuth.signOut(); } catch (_) {}
+  location.href = location.pathname;
+}
+
+/* ─── Verificación desde otro dispositivo ──────────────────────── */
+
+// El usuario abre el enlace en el móvil mientras la app sigue abierta en el
+// ordenador. Firebase NO avisa: emailVerified solo cambia al recargar el
+// usuario. Sin esto habría que pedirle cerrar sesión y volver a entrar, que es
+// exactamente lo que el encargo quería evitar.
+let _verifyPollBusy = false;
+
+async function _refreshVerifiedState() {
+  if (_verifyPollBusy) return;
+  const user = _fbAuth?.currentUser;
+  if (!user || user.emailVerified) return;   // ya está: nada que refrescar
+  _verifyPollBusy = true;
+  try {
+    await user.reload();
+    if (user.emailVerified) {
+      APP.emailVerified = true;
+      // Token nuevo, o el servidor seguiría viendo email_verified:false.
+      try { await user.getIdToken(true); } catch (_) {}
+      if (typeof showToast === 'function') {
+        showToast('Correo verificado. Ya tienes acceso completo.', 'success');
+      }
+      if (typeof _injectAuthUI === 'function' && _appInitialized) _injectAuthUI();
+    }
+  } catch (_) { /* sin conexión: se reintenta en el siguiente foco */ }
+  finally { _verifyPollBusy = false; }
+}
+
+if (typeof document !== 'undefined') {
+  // Al volver a la pestaña, que es justo cuando el usuario acaba de verificar
+  // en el otro dispositivo. No hay sondeo periódico a propósito: gastaría
+  // peticiones cada X segundos para algo que ocurre una vez.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') _refreshVerifiedState();
+  });
+  window.addEventListener('focus', _refreshVerifiedState);
+}
+
+/* ─── Puerta de las funciones que exigen verificación ──────────── */
+
+// Se usa desde ai.js y storage.js. Devuelve true si se puede seguir.
+// El modo demo y el modo sin Firebase pasan: ahí no hay cuenta que verificar.
+function fvVerifiedOrWarn(feature) {
+  if (typeof _isDemoMode !== 'undefined' && _isDemoMode) return true;
+  const user = _fbAuth?.currentUser;
+  if (!user) return true;                 // sin auth configurada
+  if (user.emailVerified) return true;
+
+  const label = feature || 'esta función';
+  if (typeof openModal === 'function') {
+    openModal('Verifica tu correo', `
+      <p style="margin:0 0 12px;font-size:14px;color:var(--text-secondary);line-height:1.6">
+        Para usar <strong>${typeof escapeHtml === 'function' ? escapeHtml(label) : label}</strong>
+        necesitamos confirmar que tu correo es tuyo.
+      </p>
+      <p style="margin:0 0 12px;font-size:13px;color:var(--text-muted);line-height:1.6">
+        Es lo que nos permite evitar que se creen cuentas falsas para consumir
+        el Asesor IA, que tiene coste por consulta, y asegurarnos de que podemos
+        devolverte el acceso si pierdes la contraseña.
+      </p>
+      <p style="margin:0;font-size:13px;color:var(--text-muted);line-height:1.6">
+        Te enviamos el enlace a <strong>${typeof escapeHtml === 'function' ? escapeHtml(user.email || '') : (user.email || '')}</strong>.
+        Mira también la carpeta de spam.
+      </p>
+      <div id="login-error" class="login-msg" role="alert" aria-live="assertive" style="display:none;margin-top:12px"></div>`,
+      null);
+    const btn = document.getElementById('modalConfirm');
+    if (btn) {
+      btn.textContent = 'Reenviar correo';
+      btn.onclick = async (e) => {
+        e?.preventDefault?.();
+        btn.disabled = true; btn.textContent = 'Enviando…';
+        try {
+          await user.sendEmailVerification(fvActionCodeSettings('index.html'));
+          btn.textContent = 'Correo enviado ✓';
+          if (typeof showToast === 'function') {
+            showToast('Correo reenviado. Revisa tu bandeja y la carpeta de spam.', 'success');
+          }
+        } catch (err) {
+          btn.disabled = false; btn.textContent = 'Reenviar correo';
+          if (typeof showToast === 'function') showToast(fvAuthErrMsg(err?.code), 'error');
+        }
+      };
+    }
+    const cancel = document.getElementById('modalCancel');
+    if (cancel) cancel.textContent = 'Ya lo he verificado';
+    if (cancel) cancel.onclick = async () => {
+      await _refreshVerifiedState();
+      if (typeof closeModal === 'function') closeModal();
+    };
+  } else if (typeof showToast === 'function') {
+    showToast('Verifica tu correo para usar ' + label + '.', 'error');
+  }
+  return false;
 }
 
 async function authLogout() {
@@ -385,27 +761,12 @@ async function authLogout() {
   }
 }
 
+// El mapa de errores vive en auth-shared.js, que cargan TANTO index.html
+// como landing.html. Antes había uno aquí y otro en landing.js, con 18 y 12
+// códigos y textos distintos para el mismo error. Esto queda como puente
+// para no tocar los call sites.
 function _authErrMsg(code) {
-  const MAP = {
-    'auth/user-not-found':           'No existe ninguna cuenta con ese correo.',
-    'auth/wrong-password':           'Contraseña incorrecta.',
-    'auth/invalid-email':            'El correo no tiene un formato válido.',
-    'auth/email-already-in-use':     'Ya existe una cuenta con ese correo. Inicia sesión.',
-    'auth/weak-password':            'La contraseña es demasiado débil (mínimo 6 caracteres).',
-    'auth/too-many-requests':        'Demasiados intentos fallidos. Espera unos minutos.',
-    'auth/network-request-failed':   'Error de red. Comprueba tu conexión a internet.',
-    'auth/popup-blocked':            'El navegador bloqueó el popup. Permite los popups para esta página.',
-    'auth/invalid-credential':       'Correo o contraseña incorrectos.',
-    'auth/user-disabled':            'Esta cuenta ha sido desactivada.',
-    'auth/operation-not-allowed':    'Este método de inicio de sesión no está habilitado. Actívalo en Firebase Console → Authentication → Método de acceso.',
-    'auth/admin-restricted-operation': 'El registro de nuevas cuentas está desactivado temporalmente.',
-    'auth/missing-email':            'Introduce tu correo electrónico.',
-    'auth/missing-password':         'Introduce tu contraseña.',
-    'auth/invalid-login-credentials':'Correo o contraseña incorrectos.',
-    'auth/account-exists-with-different-credential': 'Ya existe una cuenta con ese correo usando otro método de inicio de sesión.',
-    'auth/unauthorized-domain':      `Dominio no autorizado (${location.hostname}). Accede desde http://localhost:3000 — no uses 127.0.0.1 ni ninguna otra IP.`,
-  };
-  return MAP[code] || `Error de autenticación (${code || 'desconocido'}). Inténtalo de nuevo.`;
+  return fvAuthErrMsg(code);
 }
 
 // ─── Inyectar UI de usuario en el sidebar existente ──────────────

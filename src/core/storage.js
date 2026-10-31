@@ -178,7 +178,7 @@ function _saveDataNow() {
   }
   try {
     const { claudeApiKey, openaiApiKey, geminiApiKey, groqApiKey,
-            uid, userEmail, userPhoto, isAdmin,
+            uid, userEmail, userPhoto, isAdmin, emailVerified,
             ...toSave } = APP;
     const MAX_PATTERNS = 500;
     if (toSave.categoryPatterns) {
@@ -389,6 +389,11 @@ function saveData() {
 // Sincronización al servidor (debounced 3 s) — solo cuando el usuario está autenticado
 const _debouncedServerSync = debounce(async () => {
   if (!APP.uid || _isDemoMode) return;
+  // Sin correo verificado el servidor devuelve 403 (EMAIL_NOT_VERIFIED): no se
+  // intenta siquiera. En silencio a proposito — esto corre en CADA guardado, y
+  // avisar aqui seria un aviso cada pocos segundos. El usuario se entera
+  // cuando pulsa algo que lo necesita, con el motivo y el boton de reenviar.
+  if (APP.emailVerified === false) return;
   const data = localStorage.getItem(_getStorageKey());
   if (!data) return;
   try {

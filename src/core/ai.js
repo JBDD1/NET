@@ -903,6 +903,12 @@ async function aiSend() {
   const message = (input?.value || '').trim();
   if (!message) return;
 
+  // El Asesor IA tiene coste por consulta: sin correo verificado, crear
+  // cuentas desechables para consumirlo sería gratis. El servidor lo rechaza
+  // igualmente (403 EMAIL_NOT_VERIFIED en /api/ai); esto evita el viaje y,
+  // sobre todo, explica el motivo y ofrece reenviar el correo.
+  if (typeof fvVerifiedOrWarn === 'function' && !fvVerifiedOrWarn('el Asesor IA')) return;
+
   // AI-02: request consent before the first call that would share financial data
   await _checkAiConsent();
 
@@ -1135,6 +1141,7 @@ ${monthlyStr}`;
 }
 
 async function aiAnalyzeHabits() {
+  if (typeof fvVerifiedOrWarn === 'function' && !fvVerifiedOrWarn('el análisis de hábitos')) return;
   const ctx = buildHabitsContext();
   if (!ctx) { showToast('Necesitas al menos 5 transacciones del último año para analizar hábitos', 'error'); return; }
 

@@ -3136,6 +3136,9 @@ function syncGenerateCode(btn) {
 
 async function syncUpload() {
   if (!requireAccountFor('sincronizar entre dispositivos')) return;
+  // A diferencia del sync automático (que se omite en silencio en storage.js),
+  // esto lo ha pulsado el usuario: toca explicar por qué no va.
+  if (typeof fvVerifiedOrWarn === 'function' && !fvVerifiedOrWarn('la sincronización entre dispositivos')) return;
   const code = APP.syncCode;
   if (!code) return showToast('Genera un código primero', 'error');
   const btn = document.getElementById('btn-sync-upload');

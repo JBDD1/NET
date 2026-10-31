@@ -119,13 +119,27 @@ function lpSwitchTab(mode) {
   if (fw) fw.style.display     = mode === 'signin' ? '' : 'none';
   if (sb) sb.textContent       = mode === 'signup' ? 'Crear cuenta' : 'Iniciar sesión';
   if (pi) pi.autocomplete      = mode === 'signup' ? 'new-password' : 'current-password';
+  if (pi) pi.placeholder       = mode === 'signup' ? ('Mínimo ' + FV_PASSWORD_MIN + ' caracteres') : '••••••••';
+  // El medidor de fortaleza solo al registrarse: en el inicio de sesión no
+  // aporta nada y además revelaría la calidad de la contraseña ya existente.
+  const pm = document.getElementById('lpPwMeter');
+  if (pm) { pm.innerHTML = ''; pm.style.display = 'none'; }
   _clearError();
+}
+
+// Se llama desde el oninput del campo. Fuera del modo registro no pinta nada.
+function lpPwInput(value) {
+  if (_lpMode !== 'signup') return;
+  fvRenderStrength('lpPwMeter', value);
 }
 
 function lpTogglePasswordVisibility() {
   const input = document.getElementById('lpPasswordInput');
   const btn   = document.getElementById('lpPasswordToggle');
   if (!input || !btn) return;
+  // La clase que alterna los dos SVG es lp-pw-toggle (de landing.html), no la
+  // fv-pw-toggle que usa fvTogglePassword, así que el cambio de icono se hace
+  // aquí y solo se delega el resto.
   const show = input.type === 'password';
   input.type = show ? 'text' : 'password';
   btn.classList.toggle('is-visible', show);
@@ -195,19 +209,36 @@ function lpSubmit() {
   const pass  = document.getElementById('lpPasswordInput')?.value;
   const name  = document.getElementById('lpNameInput')?.value.trim() || '';
   if (!email) return _showError('Introduce tu correo electrónico.');
+  if (!fvIsValidEmail(email)) return _showError('El correo no tiene un formato válido.');
   if (!pass)  return _showError('Introduce tu contraseña.');
+  if (!navigator.onLine) return _showError('Sin conexión. Comprueba tu red y vuelve a intentarlo.');
   _setLoading(true); _clearError();
 
   if (_lpMode === 'signup') {
-    if (pass.length < 6) { _setLoading(false); return _showError('La contraseña debe tener al menos 6 caracteres.'); }
+    // Política de contraseñas compartida con la app (auth-shared.js). Antes
+    // aquí eran 6 caracteres y en la app 8: la misma cuenta se aceptaba o se
+    // rechazaba según por dónde entraras.
+    const problem = fvPasswordProblem(pass);
+    if (problem) { _setLoading(false); return _showError(problem); }
+
     _lpAuth.createUserWithEmailAndPassword(email, pass)
-      .then(cred => name ? cred.user.updateProfile({ displayName: name }) : null)
-      .then(() => { location.href = 'index.html'; })
-      .catch(err => { _setLoading(false); _showError(_lpErrMsg(err.code)); });
+      .then(cred => (name ? cred.user.updateProfile({ displayName: name }) : null)
+        // El correo de verificación se envía DESDE AQUÍ, no al llegar a la
+        // app: si se dejara para index.html, un registro desde la landing que
+        // nunca llegue a cargar la app se quedaría sin correo.
+        .then(() => cred.user.sendEmailVerification(fvActionCodeSettings('index.html')))
+        // Si el envío falla, la cuenta ya existe: no se bloquea la entrada.
+        // Desde la pantalla "Revisa tu correo" se puede reenviar.
+        .catch(e => { console.error('[Landing] sendEmailVerification:', e?.code); }))
+      // ?verify=1 hace que la app muestre "Revisa tu correo" al entrar. Sin
+      // esto, quien se registra en la landing aterriza en el dashboard sin
+      // enterarse de que tiene un correo pendiente.
+      .then(() => { location.href = 'index.html?verify=1'; })
+      .catch(err => { _setLoading(false); _showError(fvAuthErrMsg(err.code)); });
   } else {
     _lpAuth.signInWithEmailAndPassword(email, pass)
       .then(() => { location.href = 'index.html'; })
-      .catch(err => { _setLoading(false); _showError(_lpErrMsg(err.code)); });
+      .catch(err => { _setLoading(false); _showError(fvAuthErrMsg(err.code)); });
   }
 }
 
@@ -220,32 +251,43 @@ function lpSignInGoogle() {
       // Cerrar el popup a mano no es un error que haya que enseñar, pero el
       // botón tiene que volver a su sitio igualmente.
       _setLoading(false);
-      if (err.code !== 'auth/popup-closed-by-user') _showError(_lpErrMsg(err.code));
+      if (err.code !== 'auth/popup-closed-by-user') _showError(fvAuthErrMsg(err.code));
     });
 }
 
-function lpSendReset() {
+// Mismo mensaje pase lo que pase. Decir "no existe esa cuenta" convierte el
+// formulario en un comprobador gratuito de quién está registrado.
+const _LP_RESET_MSG =
+  'Si existe una cuenta con ese correo, te hemos enviado un enlace para restablecer la contraseña. Revisa también la carpeta de spam.';
+
+async function lpSendReset() {
   const email = document.getElementById('lpEmailInput')?.value.trim();
+  const btn   = document.querySelector('#lpForgotWrap .lp-forgot-btn');
+
   if (!email) return _showError('Introduce tu correo para recuperar la contraseña.');
-  _lpAuth.sendPasswordResetEmail(email)
-    .then(() => _showSuccess('Correo de recuperación enviado. Revisa tu bandeja.'))
-    .catch(err => _showError(_lpErrMsg(err.code)));
+  if (!fvIsValidEmail(email)) return _showError('El correo no tiene un formato válido.');
+  if (!navigator.onLine) return _showError('Sin conexión. Comprueba tu red y vuelve a intentarlo.');
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  try {
+    await _lpAuth.sendPasswordResetEmail(email, fvActionCodeSettings('index.html'));
+  } catch (err) {
+    // Solo se distinguen los errores que no filtran nada y que el usuario
+    // necesita para actuar. user-not-found se trata como éxito.
+    if (err?.code === 'auth/too-many-requests' || err?.code === 'auth/network-request-failed') {
+      if (btn) { btn.disabled = false; btn.textContent = '¿Has olvidado tu contraseña?'; }
+      return _showError(fvAuthErrMsg(err.code));
+    }
+  }
+  _showSuccess(_LP_RESET_MSG);
+  if (btn) fvStartCooldown(btn, 'Enviar de nuevo', FV_RESEND_COOLDOWN_SEC);
 }
 
+// El mapa de errores vive en auth-shared.js, que cargan TANTO landing.html
+// como index.html. Antes había uno aquí (12 códigos) y otro en auth.js (18),
+// con textos distintos para el mismo error. Esto queda como puente.
 function _lpErrMsg(code) {
-  return ({
-    'auth/user-not-found':            'No existe ninguna cuenta con ese correo.',
-    'auth/wrong-password':            'Contraseña incorrecta.',
-    'auth/invalid-email':             'El correo no tiene un formato válido.',
-    'auth/email-already-in-use':      'Ya existe una cuenta con ese correo. Inicia sesión.',
-    'auth/weak-password':             'Contraseña demasiado débil (mínimo 6 caracteres).',
-    'auth/too-many-requests':         'Demasiados intentos fallidos. Espera unos minutos.',
-    'auth/network-request-failed':    'Error de red. Comprueba tu conexión.',
-    'auth/popup-blocked':             'El navegador bloqueó el popup. Permite los popups para esta página.',
-    'auth/invalid-credential':        'Correo o contraseña incorrectos.',
-    'auth/invalid-login-credentials': 'Correo o contraseña incorrectos.',
-    'auth/unauthorized-domain':       `Dominio no autorizado (${location.hostname}). Añádelo en Firebase Console → Authentication → Authorized domains.`,
-  })[code] || `Error (${code || 'desconocido'}).`;
+  return fvAuthErrMsg(code);
 }
 
 /* ── Themes ───────────────────────────────────────────────────── */

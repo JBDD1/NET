@@ -8673,3 +8673,46 @@ tr[tabindex="0"]:focus {
 .rs-conf--high { background: var(--up-soft);   color: var(--up); }
 .rs-conf--mid  { background: var(--accent-soft); color: var(--accent); }
 .rs-conf--low  { background: var(--down-soft); color: var(--down); }
+
+/* ── Medidor de fortaleza de contraseña (auth-shared.js) ──────── */
+/* Discreto a propósito: una barra fina y una palabra. No bloquea nada. */
+.fv-pw-meter { margin-top: 6px; }
+.fv-pw-track {
+  height: 3px; border-radius: 2px; background: var(--border-subtle);
+  overflow: hidden; margin-bottom: 4px;
+}
+.fv-pw-fill { height: 100%; border-radius: 2px; transition: width .18s ease, background .18s ease; }
+.fv-pw-label { font-size: 11px; color: var(--text-muted); }
+
+/* Toggle mostrar/ocultar en el login de la app (la landing tiene el suyo
+   en su <style> propio; estas clases replican su comportamiento aquí). */
+.fv-pw-wrap { position: relative; }
+.fv-pw-wrap .login-input { padding-right: 42px; }
+.fv-pw-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0; border: none; border-radius: var(--r-xs);
+  background: none; color: var(--text-muted); cursor: pointer;
+}
+.fv-pw-toggle:hover { color: var(--text-secondary); background: var(--bg-hover); }
+.fv-pw-toggle svg { width: 18px; height: 18px; }
+.fv-pw-toggle .fv-pw-eye-off { display: none; }
+.fv-pw-toggle.is-visible .fv-pw-eye { display: none; }
+.fv-pw-toggle.is-visible .fv-pw-eye-off { display: block; }
+
+/* Pantalla "Revisa tu correo" — reutiliza la tarjeta de login */
+.fv-verify-mail { font-weight: 600; color: var(--text-primary); word-break: break-all; }
+.fv-verify-note {
+  font-size: 12px; color: var(--text-muted); line-height: 1.55;
+  background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm); padding: 10px 12px; margin: 14px 0;
+}
+.fv-verify-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.fv-verify-links {
+  display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 14px;
+}
+.fv-verify-links button {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-size: 12px; color: var(--text-muted); text-decoration: underline;
+}
+.fv-verify-links button:hover { color: var(--accent); }

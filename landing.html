@@ -1138,6 +1138,16 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 .lp-pw-toggle .lp-pw-eye-off { display:none; }
 .lp-pw-toggle.is-visible .lp-pw-eye    { display:none; }
 .lp-pw-toggle.is-visible .lp-pw-eye-off { display:block; }
+
+/* Medidor de fortaleza de contraseña (auth-shared.js). Las mismas reglas
+   están en style.css para la app; la landing no carga ese archivo. */
+.fv-pw-meter { margin-top:6px; }
+.fv-pw-track {
+  height:3px; border-radius:2px; background:var(--border-subtle);
+  overflow:hidden; margin-bottom:4px;
+}
+.fv-pw-fill { height:100%; border-radius:2px; transition:width .18s ease, background .18s ease; }
+.fv-pw-label { font-size:11px; color:var(--text-muted); }
 .lp-form-error {
   padding:8px 11px; border-radius:var(--r-sm); font-size:12px;
   margin-bottom:12px; display:none;
@@ -2680,25 +2690,28 @@ async function lpJoinWaitlist(e) {
     </div>
     <div class="modal-body">
       <div class="lp-field" id="lpNameField" style="display:none">
-        <label class="lp-label">Tu nombre</label>
+        <label class="lp-label" for="lpNameInput">Tu nombre</label>
         <input type="text" id="lpNameInput" class="lp-input" placeholder="Nombre (opcional)" autocomplete="name" onkeydown="if(event.key==='Enter')lpSubmit()" />
       </div>
       <div class="lp-field">
-        <label class="lp-label">Correo electrónico</label>
+        <label class="lp-label" for="lpEmailInput">Correo electrónico</label>
         <input type="email" id="lpEmailInput" class="lp-input" placeholder="tu@correo.com" autocomplete="email" onkeydown="if(event.key==='Enter')lpSubmit()" />
       </div>
       <div class="lp-field">
-        <label class="lp-label">Contraseña</label>
+        <label class="lp-label" for="lpPasswordInput">Contraseña</label>
         <div class="lp-pw-wrap">
           <input type="password" id="lpPasswordInput" class="lp-input" placeholder="••••••••"
-            autocomplete="current-password" onkeydown="if(event.key==='Enter')lpSubmit()" />
+            autocomplete="current-password" aria-describedby="lpPwMeter"
+            oninput="lpPwInput(this.value)"
+            onkeydown="if(event.key==='Enter')lpSubmit()" />
           <button type="button" class="lp-pw-toggle" id="lpPasswordToggle" onclick="lpTogglePasswordVisibility()" aria-label="Mostrar contraseña" aria-pressed="false">
             <svg class="lp-pw-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.8-7 10-7 10 7 10 7-3.8 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
             <svg class="lp-pw-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c6.2 0 10 7 10 7a17.7 17.7 0 0 1-3.4 4.3M6.6 6.6C4 8.3 2 12 2 12s3.8 7 10 7a10.2 10.2 0 0 0 3.4-.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
           </button>
         </div>
       </div>
-      <div class="lp-form-error" id="lpFormError" role="alert"></div>
+      <div id="lpPwMeter" class="fv-pw-meter" aria-live="polite" style="display:none"></div>
+      <div class="lp-form-error" id="lpFormError" role="alert" aria-live="assertive"></div>
       <button class="lp-submit" id="lpSubmitBtn" onclick="lpSubmit()">Iniciar sesión</button>
       <div class="lp-forgot-row" id="lpForgotWrap">
         <button class="lp-forgot-btn" onclick="lpSendReset()">¿Olvidaste tu contraseña?</button>
@@ -2723,6 +2736,7 @@ async function lpJoinWaitlist(e) {
      cargaba así; aquí se habían quedado sin defer). -->
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script defer src="src/auth/auth-shared.js"></script>
 <script defer src="landing.js"></script>
 <!-- Hard fallback: reveal everything after 2 s regardless of what happened above -->
 <script>setTimeout(function(){document.querySelectorAll('.lp-ani,.lp-ani-left,.lp-ani-right').forEach(function(e){e.classList.add('in')})},2000)</script>

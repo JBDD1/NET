@@ -971,6 +971,12 @@ async function handleAIProxy(req, res) {
     }
   }
 
+  // Cada consulta a la IA tiene coste real: sin verificar el correo, crear
+  // cuentas desechables para consumirla es gratis. FUERA del if de arriba a
+  // propósito: una puerta de seguridad anidada dentro de otra condición
+  // desaparece en silencio cuando esa condición cambia.
+  if (!_requireVerifiedEmail(req, res, 'el Asesor IA')) return;
+
   // 2. IP-based token bucket (burst protection)
   if (!_checkRateLimit(req, res, 'ai')) return;
 
@@ -1039,7 +1045,15 @@ async function handleAIProxy(req, res) {
 // Verifies Firebase token and returns uid, or writes 401 and returns null.
 // Uses Admin SDK (with revocation check) when available; custom RS256 otherwise.
 async function _requireAuth(req, res) {
-  if (!_AUTH_ENABLED) { req.uid = 'dev-uid'; return 'dev-uid'; }
+  if (!_AUTH_ENABLED) {
+    req.uid = 'dev-uid';
+    // Solo tiene efecto con FINOVA_DISABLE_AUTH=true, es decir en local y sin
+    // ninguna autenticación: sirve para poder probar de verdad el bloqueo por
+    // correo sin verificar (no hay forma de falsificar un token de Firebase,
+    // porque la firma RS256 se comprueba contra las claves de Google).
+    req.emailVerified = process.env.FINOVA_DEV_EMAIL_VERIFIED !== 'false';
+    return 'dev-uid';
+  }
 
   // Antifuerza-bruta: _recordFailedAttempt/_isIPBlocked existían desde hacía
   // tiempo pero NO se invocaban desde ningún sitio. Como la autenticación
@@ -1062,13 +1076,17 @@ async function _requireAuth(req, res) {
       if (!authHeader.startsWith('Bearer ')) throw Object.assign(new Error('Token ausente'), { code: 'auth/no-token' });
       const decoded = await _adminSDK.auth().verifyIdToken(authHeader.slice(7).trim(), true);
       req.uid = decoded.uid;
+      req.emailVerified = decoded.email_verified === true;
       _clearFailedAttempts(ip);
       return decoded.uid;
     }
-    const uid = await _verifyFirebaseToken(authHeader, req);
-    req.uid = uid;
+    // full: true devuelve el payload entero en vez del uid a secas, que es lo
+    // que hace falta para leer email_verified sin verificar el token dos veces.
+    const payload = await _verifyFirebaseToken(authHeader, req, true);
+    req.uid = payload.sub;
+    req.emailVerified = payload.email_verified === true;
     _clearFailedAttempts(ip);   // sesión legítima: se borra el historial de la IP
-    return uid;
+    return payload.sub;
   } catch (e) {
     const code      = e.code || '';
     const isExpired = code === 'auth/id-token-expired' || e.message === 'Token expirado';
@@ -1347,6 +1365,39 @@ const _FIREBASE_PROJECT = process.env.FINOVA_FIREBASE_PROJECT || 'finova-92100';
 // magic string rather than requiring a deliberate, named opt-out.
 const _AUTH_ENABLED = process.env.FINOVA_DISABLE_AUTH !== 'true';
 
+// Exigir correo verificado en los endpoints que cuestan dinero (IA) o que
+// suben datos del usuario al servidor (user-data POST, sync-upload).
+// Por defecto SÍ: hay que poner REQUIRE_EMAIL_VERIFIED=false explícitamente
+// para desactivarlo. Se deja la puerta de salida porque durante una incidencia
+// de entregabilidad (los correos cayendo en spam en un proveedor concreto)
+// bloquear la sincronización de todo el mundo sería peor que el problema.
+const REQUIRE_EMAIL_VERIFIED = process.env.REQUIRE_EMAIL_VERIFIED !== 'false';
+
+/**
+ * Corta la petición si el correo del usuario no está verificado.
+ * Devuelve true si se puede seguir.
+ *
+ * Depende de que quien haya autenticado haya dejado req.emailVerified puesto
+ * (lo hacen _requireAuth y las llamadas directas a _verifyFirebaseToken). Si
+ * llegara sin definir se asume NO verificado: ante la duda, se corta, que es
+ * la dirección segura del fallo.
+ */
+function _requireVerifiedEmail(req, res, feature) {
+  if (!REQUIRE_EMAIL_VERIFIED) return true;
+  if (req.emailVerified === true) return true;
+  // Sin autenticación (local) no hay correo que verificar, así que pasa — salvo
+  // que se pida explícitamente simular lo contrario para poder probar este
+  // camino con curl. En producción _AUTH_ENABLED es true y esta rama no entra.
+  if (!_AUTH_ENABLED && process.env.FINOVA_DEV_EMAIL_VERIFIED !== 'false') return true;
+  res.writeHead(403, _apiHeaders(req));
+  res.end(JSON.stringify({
+    error: 'Verifica tu correo electrónico para usar ' + (feature || 'esta función') +
+           '. Te hemos enviado un enlace al registrarte; revisa también la carpeta de spam.',
+    code: 'EMAIL_NOT_VERIFIED',
+  }));
+  return false;
+}
+
 // Google JWKS cache (RSA public keys for RS256 Firebase tokens)
 let _jwksCache = { keys: null, expAt: 0 };
 
@@ -1504,7 +1555,9 @@ async function handleUserDataGet(req, res) {
   let uid;
   if (_AUTH_ENABLED) {
     try {
-      uid = await _verifyFirebaseToken(req.headers['authorization'], req);
+      const _pl = await _verifyFirebaseToken(req.headers['authorization'], req, true);
+      uid = _pl.sub;
+      req.emailVerified = _pl.email_verified === true;
     } catch (e) {
       res.writeHead(401, _apiHeaders(req));
       return res.end(JSON.stringify({ error: 'Token inválido.' }));
@@ -1552,13 +1605,21 @@ async function handleUserDataPost(req, res) {
   let verifiedUid = null;
   if (_AUTH_ENABLED) {
     try {
-      verifiedUid = await _verifyFirebaseToken(req.headers['authorization'], req);
+      const _pl = await _verifyFirebaseToken(req.headers['authorization'], req, true);
+      verifiedUid = _pl.sub;
       req.uid = verifiedUid;
+      req.emailVerified = _pl.email_verified === true;
     } catch (e) {
       res.writeHead(401, _apiHeaders(req));
       return res.end(JSON.stringify({ error: 'Token inválido.' }));
     }
   }
+
+  // Este endpoint es por donde sube el blob de datos del usuario
+  // (_debouncedServerSync en storage.js): es "exponer datos al servidor".
+  // La descarga (GET) se deja abierta a proposito, para que quien verifique
+  // en otro dispositivo pueda recuperar lo suyo.
+  if (!_requireVerifiedEmail(req, res, 'la sincronización entre dispositivos')) return;
 
   if (!_requireJson(req, res)) return;
   let body = '';
@@ -1763,6 +1824,10 @@ const _AI_MAX_BYTES   = 6_000_000;
 async function handleSyncUpload(req, res) {
   if (!_checkRateLimit(req, res, 'syncUpload')) return;
   if ((await _requireAuth(req, res)) === null) return;
+  // Subir un backup deja datos del usuario en nuestro servidor: sin correo
+  // verificado no sabemos de quién son ni podemos devolverle el acceso.
+  if (!_requireVerifiedEmail(req, res, 'la sincronización entre dispositivos')) return;
+
   if (!_requireJson(req, res)) return;
   let body = '';
   // Flag en vez de un centinela dentro de 'body': al marcarlo como cadena, el
@@ -1847,8 +1912,10 @@ async function handleUserMeta(req, res) {
   let verifiedUid = null;
   if (_AUTH_ENABLED) {
     try {
-      verifiedUid = await _verifyFirebaseToken(req.headers['authorization'], req);
+      const _pl = await _verifyFirebaseToken(req.headers['authorization'], req, true);
+      verifiedUid = _pl.sub;
       req.uid = verifiedUid;
+      req.emailVerified = _pl.email_verified === true;
     } catch (e) {
       res.writeHead(401, _apiHeaders(req));
       return res.end(JSON.stringify({ error: 'Token inválido.' }));
