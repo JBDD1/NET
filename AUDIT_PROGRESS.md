@@ -697,6 +697,66 @@ que evita que las dos versiones divergan. Efecto secundario: un buscador que
 no ejecute JS no indexa las respuestas. Se arregla con un paso de build que la
 pre-renderice.
 
+### Parte D completada después (lo que quedó pendiente)
+
+La Parte D del encargo quedó a medias. Lo que faltaba era lo que marqué
+«requiere navegador», pero una parte sí era verificable estáticamente, y ahí
+aparecieron **tres cosas reales**:
+
+1. **`.fv-pw-toggle` medía 30×30 px**, por debajo del mínimo táctil de 44.
+   Es el botón de mostrar/ocultar contraseña. Subido a 44×44: el icono sigue
+   siendo de 18 px y el botón no tiene fondo hasta el hover, así que no
+   cambia el aspecto — solo deja de ser un objetivo imposible de acertar con
+   el pulgar. El campo mide ~44 px de alto, así que encaja exacto.
+   **El de la landing (`.lp-pw-toggle`) tenía el mismo problema,
+   preexistente**, y se ha corregido igual.
+
+2. **El medidor de contraseñas usaba `var(--warn, #d08a2a)`, y `--warn` no
+   está definido en ningún tema.** Siempre caía al ámbar fijo, que desentona
+   en las paletas que no son cálidas (en `soft-mono`, negro y coral, canta).
+   Cambiado a `var(--accent)`, que sí existe en los 5 y encaja por
+   construcción.
+
+3. **La FAQ se había quedado desactualizada por el trabajo de
+   monitorización.** La respuesta de «¿dónde se guardan mis datos? ¿quién
+   puede verlos?» describía el modelo local-first y el blob cifrado, pero
+   **no mencionaba Sentry ni la analítica** — y la FAQ promete estar
+   verificada contra el código. Añadido un párrafo que lo dice y remite a
+   Ajustes → Privacidad.
+
+**Verificado estáticamente, sin navegador:**
+
+| Comprobación | Resultado |
+|---|---|
+| Los 14 tokens CSS que uso sin respaldo existen en los **5 temas** | ✅ (los radios están en el `:root` global, no por tema) |
+| Objetivos táctiles ≥ 44 px | ✅ tras corregir el toggle |
+| Sin anchos fijos > 340 px que desborden a 375 px | ✅ |
+| `prefers-reduced-motion` neutraliza mis 3 transiciones | ✅ en `style.css` y en `faq.html` |
+| Todos los enlaces internos resuelven | ✅ incluidas las anclas `privacidad.html#s8` y `#s9`, que sobrevivieron a **dos** renumeraciones |
+| `faq.html` define los 5 temas y su propio `min-height: 44px` | ✅ (no carga `style.css`) |
+
+**Probado con el fichero real en jsdom (13 tests nuevos):**
+
+- **Fallo de red:** el texto escrito **sigue en el formulario**, aparece el
+  botón de enviar por correo, y el `mailto` lleva asunto y mensaje pero
+  **no** el informe técnico (un JSON dentro de un `mailto` se rompe en medio
+  cliente de correo).
+- **Error 500:** mismo plan B.
+- **429:** se avisa del límite pero **no** se ofrece el `mailto` — reenviar
+  por correo cuando el problema es haber mandado demasiados mensajes solo
+  traslada el exceso a la bandeja.
+- El botón se rehabilita para poder reintentar; tras un éxito el borrador se
+  limpia.
+- `closeModal` devuelve el foco al elemento de origen, el modal atrapa el
+  foco con Tab y Shift+Tab, y cierra con Escape.
+- La FAQ usa `<details>`, que da el acordeón accesible y el teclado sin JS.
+
+**Lo que sigue necesitando navegador:** mirarlo con los ojos. La geometría,
+los contrastes y el comportamiento real del teclado están verificados por
+código, pero nadie ha visto el modal en los 5 temas ni lo ha pulsado a 375 px.
+
+Suite: **713 en verde**, 28 suites.
+
 Ver `FEEDBACK_SETUP.md` para la configuración manual.
 
 ---

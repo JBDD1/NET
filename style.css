@@ -8687,11 +8687,16 @@ tr[tabindex="0"]:focus {
 /* Toggle mostrar/ocultar en el login de la app (la landing tiene el suyo
    en su <style> propio; estas clases replican su comportamiento aquí). */
 .fv-pw-wrap { position: relative; }
-.fv-pw-wrap .login-input { padding-right: 42px; }
+.fv-pw-wrap .login-input { padding-right: 50px; }
 .fv-pw-toggle {
-  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
   display: flex; align-items: center; justify-content: center;
-  width: 30px; height: 30px; padding: 0; border: none; border-radius: var(--r-xs);
+  /* 44x44: el minimo tactil. El icono sigue siendo de 18px y el boton no
+     tiene fondo hasta el hover, asi que visualmente no cambia nada — solo
+     deja de ser un objetivo de 30px imposible de acertar con el pulgar.
+     El campo mide unos 44px de alto (12px de padding arriba y abajo), asi
+     que encaja exacto. */
+  width: 44px; height: 44px; padding: 0; border: none; border-radius: var(--r-xs);
   background: none; color: var(--text-muted); cursor: pointer;
 }
 .fv-pw-toggle:hover { color: var(--text-secondary); background: var(--bg-hover); }

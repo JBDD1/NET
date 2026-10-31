@@ -1126,10 +1126,13 @@ h1.lp-headline em { font-style:italic; color:var(--accent); }
 .lp-input:focus { border-color:var(--accent); }
 .lp-input::placeholder { color:var(--text-muted); }
 .lp-pw-wrap { position:relative; }
-.lp-pw-wrap .lp-input { padding-right:42px; }
+.lp-pw-wrap .lp-input { padding-right:50px; }
 .lp-pw-toggle {
-  position:absolute; right:6px; top:50%; transform:translateY(-50%);
-  width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+  /* 44x44 por el minimo tactil, igual que .fv-pw-toggle en style.css. Era de
+     30px: el icono no cambia de tamano y el boton no tiene fondo hasta el
+     hover, asi que no cambia el aspecto. */
+  position:absolute; right:2px; top:50%; transform:translateY(-50%);
+  width:44px; height:44px; display:flex; align-items:center; justify-content:center;
   background:none; border:none; border-radius:var(--r-xs);
   color:var(--text-muted); cursor:pointer; transition:color .15s,background .15s;
 }

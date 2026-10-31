@@ -203,7 +203,13 @@ function fvRenderStrength(containerId, pwd) {
   const { score, label, pct } = fvPasswordStrength(pwd);
   if (!pwd) { el.innerHTML = ''; el.style.display = 'none'; return; }
   el.style.display = 'block';
-  const COLORS = ['var(--down)', 'var(--down)', 'var(--warn, #d08a2a)', 'var(--up)', 'var(--up)'];
+  // Solo tokens que existen en los 5 temas (comprobado): --down, --accent y
+  // --up. La versión anterior usaba var(--warn, #d08a2a) para el nivel
+  // intermedio, pero --warn no está definido en ningún tema, así que siempre
+  // caía al ámbar fijo — que desentona en las paletas que no son cálidas,
+  // como soft-mono (negro y coral). El acento de cada tema sí encaja por
+  // construcción.
+  const COLORS = ['var(--down)', 'var(--down)', 'var(--accent)', 'var(--up)', 'var(--up)'];
   el.innerHTML =
     '<div class="fv-pw-track" aria-hidden="true">' +
       '<div class="fv-pw-fill" style="width:' + pct + '%;background:' + (COLORS[score] || COLORS[0]) + '"></div>' +
