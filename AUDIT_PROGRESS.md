@@ -1397,6 +1397,157 @@ Suite: **942 en verde** (jest, 31 suites) + **52 en verde** (seguridad).
 
 ---
 
+## FASE 16 — Build: scripts clásicos en dist, cache busting y guardia · ✅ COMPLETA
+
+### Lo primero: el build NO estaba roto
+
+El encargo partía de que `dist/` no contenía `src/` y que un despliegue
+dejaría la app en blanco con 404 en todos los scripts. **Medido, no era
+así.** Vite sí emite los 25 avisos «can't be bundled without type=module»,
+pero el plugin `copyStaticAssets` ya copiaba y minificaba `src/**/*.js` y
+`landing.js` con las opciones de producción de Terser.
+
+Verificado con un inventario cruzado de los 7 HTML de `dist/` contra el
+disco:
+
+| Comprobación | Resultado |
+|---|---|
+| Etiquetas `<script src>` locales que resuelven | **26 de 26** |
+| Ficheros distintos en `dist/src` | 42 |
+| Minificación aplicada | 1.444,6 kB → 884,2 kB (**38,8 % menos**) |
+| `console.log` en `dist/src` | **0** |
+| `sourceMappingURL` | **0** |
+| Ficheros `.map` en `dist/` | **0** |
+| `landing.js` | 33,6 kB → 21,3 kB (36,7 % menos) |
+
+Decirlo importa: el aviso de Vite es real pero no es el fallo que parecía.
+Lo que faltaba era otra cosa.
+
+### Lo que SÍ faltaba
+
+**1. Cero cache busting.** Las 26 etiquetas eran
+`<script src="src/core/script.js">` sin hash ni query. Como la URL no cambia
+nunca, tras un despliegue el navegador sirve su copia cacheada y la
+aplicación se queda en la versión anterior. Ahora el build añade
+`?v=<sha256 corto del contenido>`, que cambia solo cuando cambia el fichero.
+
+**2. El service worker servía el HTML de caché primero.** La línea era
+`return cached || network` para TODO, `index.html` incluido. Y `index.html`
+es precisamente lo que dice qué scripts cargar: una copia vieja hace que el
+navegador pida los scripts viejos y se ejecute la aplicación entera
+anterior. Ahora el HTML es **red primero** con la caché como respaldo, que
+es lo que mantiene el funcionamiento sin conexión sin quedarse atascado.
+
+**3. `CACHE_NAME` era una constante a mano (`finova-v27`).** Este es el peor
+de los tres. `activate` borra correctamente las cachés viejas, **pero solo
+si el nombre cambia**. Si un despliegue se olvidaba de subir el número,
+`sw.js` quedaba byte-idéntico, el navegador no detectaba ninguna
+actualización, no se borraba nada y el usuario se quedaba con la aplicación
+vieja **indefinidamente**. Ahora el build inyecta un nombre derivado del
+hash de los 80 ficheros de `dist/`, así que no puede no cambiar.
+
+**4. No había ninguna guardia.** El aviso de Vite no rompe el build, así que
+un build que sí dejara los scripts fuera terminaría en verde y desplegaría
+una página en blanco. Un aviso que no rompe nada es un aviso que nadie lee.
+
+### Un bug propio, encontrado probando
+
+**`closeBundle` es un hook PARALELO en Rollup.** Escribí el plugin nuevo
+dando por hecho que el orden del array de plugins garantizaba que se
+ejecutara después de `copyStaticAssets`. No lo garantiza: todos los plugins
+arrancan su `closeBundle` a la vez. El síntoma fue desconcertante — el
+plugin avisaba de que **ninguno** de los 26 scripts existía y añadía `?v=` a
+cero etiquetas, porque los buscaba antes de que el otro plugin los
+escribiera. Y el hash del service worker se calculaba sobre 36 ficheros en
+vez de 80. Se arregla con `sequential: true` en el hook, que es la forma
+documentada de que Rollup espere a los plugins anteriores.
+
+### La guardia: `scripts/verify-dist.cjs`
+
+Encadenada a `build` y a `build:gh`, **no** a `build:dev` (ahí los scripts
+van sin minificar a propósito y los `console.log` son legítimos).
+
+Comprueba ocho cosas, y las ocho se han probado rompiendo `dist/` a
+propósito:
+
+| Se rompe | exit |
+|---|---|
+| `dist/` intacto | 0 |
+| Falta `src/core/script.js` | 1 |
+| Hay un fichero `.map` | 1 |
+| `console.log(` en un `.js` | 1 |
+| `sourceMappingURL` | 1 |
+| Clave de Groq real | 1 |
+| Clave de Anthropic real | 1 |
+| **Marcadores** (`sk-ant-api03-...`, `gsk_tu_clave_aqui`) | **0** |
+| SW con versión a mano en vez de la del build | 1 |
+
+La fila de los marcadores es la que hace que la guardia sirva de algo a
+medio plazo: un detector que grita con los ejemplos del propio código se
+desactiva a la semana, y entonces no detecta nada.
+
+Respeta `VITE_BASE`, así que `build:gh` (base `/NET`) también pasa.
+
+### Prueba en un navegador de verdad
+
+`dist/` servido con `vite preview` y cargado en **Chromium real**
+(Playwright instalado con `--no-save`: no se ha añadido ninguna
+dependencia nueva a `package.json`).
+
+| Comprobación | index.html | landing.html |
+|---|---|---|
+| Respuestas ≥ 400 | 0 | 0 |
+| De ellas, de scripts | 0 | 0 |
+| Errores de página | 0 | 0 |
+| `ReferenceError` / `SyntaxError` / `TypeError` | 0 | 0 |
+| DOM clave | app presente, 206 botones | hero presente |
+| Funciones de `onclick` ausentes | 0 (de 0) | 0 (de 13) |
+
+**Y la comprobación que de verdad importaba.** El encargo pedía verificar
+las funciones de `onclick="..."` de `index.html` para detectar si la
+minificación rompió algo. Resulta que **`index.html` no tiene ningún
+`onclick`**: usa delegación con `data-action`. Solo `landing.html` los usa
+(13, todos presentes).
+
+Así que el riesgo se probó por donde de verdad vive: se extrajeron **las 598
+funciones de nivel superior** declaradas en los 22 scripts clásicos que
+carga `index.html`, y se comprobó `typeof window[nombre] === 'function'`
+para cada una en el navegador.
+
+**598 de 598 presentes.** Es la prueba de que `mangle.toplevel: false`
+funciona y de que el ámbito global compartido entre ficheros sigue intacto
+después de minificar — que es de lo que depende toda la arquitectura de
+scripts clásicos de este proyecto.
+
+Terser sigue sin `unsafe` ni `unsafe_math` (app financiera) y sin mangle de
+nombres de nivel superior ni de propiedades. No se ha convertido nada a
+módulos ES.
+
+Suite: **942 en verde** (31 suites), de los cuales los **33 de cálculos**
+siguen pasando. `build`, `build:gh` y `verify:dist` en verde.
+
+### Lo que no se pudo verificar
+
+**El despliegue real en Vercel, no.** Todo está medido en local con
+`vite preview`. Lo que hay que mirar en la URL de preview está en el informe
+de la conversación, pero en resumen: que los scripts cargan con `?v=`, que
+`sw.js` sirve un `CACHE_NAME` con hash y no `finova-v27`, y que una recarga
+tras un segundo despliegue trae la versión nueva.
+
+**El service worker no se ha probado ejecutándose.** Los cambios (red
+primero para el HTML, `ignoreSearch` en el resto) están verificados por
+sintaxis y por lectura, pero no se ha simulado un ciclo
+instalar → activar → desplegar → recargar con un SW vivo. Es la parte de
+esta fase con menos respaldo experimental.
+
+**Un detalle menor sin tocar:** las páginas llevan `X-Frame-Options` en una
+etiqueta `<meta>`, que el navegador ignora con un aviso en consola (solo
+vale como cabecera HTTP, y ahí ya se envía). Son los 2-3 «errores de
+consola» del cuadro de arriba; no afectan a nada y no se ha cambiado porque
+está fuera del encargo.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más

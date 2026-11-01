@@ -1,6 +1,14 @@
 'use strict';
 
-const CACHE_NAME = 'finova-v27';
+// El build lo sustituye por un nombre derivado del hash del contenido de
+// dist/ (ver el plugin finova-build-scripts en vite.config.js). Dejarlo como
+// una constante a mano era el fallo que más caro salía: si un despliegue se
+// olvidaba de subir el número, sw.js quedaba byte-idéntico, el navegador no
+// detectaba ninguna actualización, 'activate' no borraba nada y el usuario
+// seguía con la aplicación anterior indefinidamente.
+//
+// El valor literal de aquí es el que se usa en desarrollo, donde no hay build.
+const CACHE_NAME = 'finova-v27'; /* __FINOVA_CACHE_NAME__ */
 const API_CACHE  = 'finova-api-v1';
 const API_TTL    = 3_600_000; // 1 hour in ms
 const API_PATHS  = ['/api/yahoo', '/api/fx'];
@@ -174,14 +182,70 @@ const OFFLINE_PAGE = `<!DOCTYPE html>
 </body>
 </html>`;
 
+/**
+ * ¿Es una petición de documento HTML?
+ *
+ * Importa porque el HTML es el único recurso que NO puede servirse de caché
+ * primero. index.html es lo que dice qué scripts cargar: si se sirve una
+ * copia vieja, el navegador pide los scripts viejos y la aplicación entera
+ * se queda en la versión anterior, aunque el servidor ya tenga la nueva.
+ * Antes de esto, `cached || network` era caché primero para TODO.
+ */
+function _isHtmlRequest(request) {
+  if (request.mode === 'navigate') return true;
+  const accept = request.headers.get('accept') || '';
+  if (accept.includes('text/html')) return true;
+  const ruta = new URL(request.url).pathname;
+  return ruta.endsWith('/') || ruta.endsWith('.html');
+}
+
+/**
+ * HTML: red primero, caché como respaldo.
+ *
+ * Al revés que el resto. Si hay red se usa la versión del servidor y se
+ * actualiza la copia; si no hay, se sirve la copia y la aplicación sigue
+ * funcionando sin conexión, que es para lo que existe este service worker.
+ */
+async function _htmlNetworkFirst(request) {
+  try {
+    const response = await fetch(request);
+    if (response && response.ok) {
+      const clone = response.clone();
+      caches.open(CACHE_NAME).then(cache => cache.put(request, clone)).catch(() => {});
+    }
+    return response;
+  } catch (_) {
+    // ignoreSearch: la petición puede llevar ?v= o una query de campaña que
+    // la copia precacheada no tiene.
+    const cached = await caches.match(request, { ignoreSearch: true });
+    if (cached) return cached;
+    return new Response(OFFLINE_PAGE, {
+      status: 503,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
+  }
+}
+
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   if (_isApiRequest(event.request.url)) {
     event.respondWith(_networkThenCacheApi(event.request));
     return;
   }
+  if (_isHtmlRequest(event.request)) {
+    event.respondWith(_htmlNetworkFirst(event.request));
+    return;
+  }
   event.respondWith(
-    caches.match(event.request).then(cached => {
+    // ignoreSearch: el build añade ?v=<hash> a las etiquetas <script> para
+    // romper la caché del navegador, pero la lista de precache de arriba
+    // guarda las rutas sin query. Sin esto, cada script precacheado sería un
+    // fallo de caché y la primera carga sin conexión quedaría rota.
+    //
+    // No reintroduce el problema de servir algo viejo: cada build genera un
+    // CACHE_NAME distinto (lo inyecta vite.config.js), así que en cada
+    // despliegue la caché vieja se borra entera en 'activate'.
+    caches.match(event.request, { ignoreSearch: true }).then(cached => {
       // 'network' es una Promise, y una Promise siempre es truthy — un
       // "cached || network || fallback" nunca llegaría al fallback (queda
       // como código muerto) y, si el fetch falla, event.respondWith recibe

@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite';
 import { resolve } from 'path';
 import fs from 'fs';
 import { minify as terserMinify } from 'terser';
+import crypto from 'crypto';
 
 // Mismas opciones que build.terserOptions más abajo (ver ese comentario) —
 // se reutilizan aquí para minificar los scripts clásicos de src/** y
@@ -124,6 +125,143 @@ function copyStaticAssets(outDir = 'dist', mode = 'production') {
   };
 }
 
+/**
+ * Cache busting de los scripts clásicos + versión de caché del service worker.
+ *
+ * Tiene que ejecutarse DESPUÉS de copyStaticAssets, porque hashea ficheros
+ * que ese plugin acaba de escribir. Y eso NO lo garantiza el orden del array
+ * de plugins: closeBundle es un hook paralelo en Rollup, así que todos los
+ * plugins lo arrancan a la vez. Lo garantiza `sequential: true` en el hook,
+ * más abajo.
+ *
+ * ── Por qué hace falta el cache busting ──
+ * Las etiquetas son <script src="src/core/script.js"> sin hash en el nombre,
+ * porque Rollup no las toca (no son módulos) y renombrarlas obligaría a
+ * reescribir el HTML fuente. Al no cambiar nunca la URL, el navegador sirve
+ * su copia cacheada después de un despliegue y la aplicación se queda en la
+ * versión anterior. El ?v=<hash> cambia la URL solo cuando cambia el
+ * contenido, que es exactamente lo que se quiere.
+ *
+ * ── Por qué el nombre de caché del SW sale del build ──
+ * Era una constante a mano ('finova-v27'). Si un despliegue se olvidaba de
+ * subirla, sw.js quedaba byte-idéntico, el navegador no detectaba ninguna
+ * actualización, 'activate' no borraba nada y el usuario seguía con la
+ * aplicación vieja indefinidamente. Derivarla del contenido hace que eso no
+ * pueda pasar: si el build cambia, el nombre cambia.
+ */
+function buildScripts(outDir = 'dist', mode = 'production') {
+  const isProd = mode === 'production';
+
+  /** sha256 corto y estable del contenido de un fichero. */
+  const hashFichero = (p) =>
+    crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex').slice(0, 8);
+
+  const esExterna = (u) =>
+    /^(https?:)?\/\//i.test(u) || u.startsWith('data:') || u.startsWith('#')
+    || u.startsWith('mailto:') || u.startsWith('blob:');
+
+  return {
+    name: 'finova-build-scripts',
+    apply: 'build',
+    // sequential: closeBundle es un hook PARALELO en Rollup, así que por
+    // defecto este plugin arranca al mismo tiempo que copyStaticAssets en vez
+    // de después. El síntoma era desconcertante: el plugin avisaba de que no
+    // existía ninguno de los 26 scripts y añadía ?v= a cero etiquetas, porque
+    // los estaba buscando antes de que el otro plugin los escribiera. Con
+    // sequential, Rollup espera a los hooks de los plugins anteriores.
+    closeBundle: {
+      sequential: true,
+      async handler() {
+      if (!fs.existsSync(outDir)) return;
+
+      const htmls = fs.readdirSync(outDir).filter(f => f.endsWith('.html'));
+      const hashes = new Map();   // ruta relativa -> hash
+      let etiquetas = 0;
+
+      for (const nombre of htmls) {
+        const rutaHtml = resolve(outDir, nombre);
+        let html = fs.readFileSync(rutaHtml, 'utf8');
+
+        // Solo <script src> LOCAL y NO módulo. Los módulos ya llevan hash en
+        // el nombre de fichero (los pone Rollup) y las librerías externas no
+        // se tocan.
+        html = html.replace(
+          /<script\b([^>]*?)\bsrc\s*=\s*(["'])([^"']+)\2([^>]*)>/gi,
+          (completo, antes, q, src, despues) => {
+            const attrs = antes + despues;
+            if (/\btype\s*=\s*["']module["']/i.test(attrs)) return completo;
+            if (esExterna(src)) return completo;
+            if (src.includes('?')) return completo;   // ya versionado
+
+            // La base (VITE_BASE para GitHub Pages) va delante de la ruta en
+            // el HTML pero no forma parte de la ruta dentro de dist/.
+            const sinBase = src.replace(/^\.?\//, '');
+            const destino = resolve(outDir, sinBase);
+            if (!fs.existsSync(destino)) {
+              // No se inventa un hash de algo que no está: el fallo lo
+              // reporta verify-dist con un mensaje mucho más claro.
+              this.warn(`[finova-build-scripts] ${nombre} referencia ${src}, que no existe en ${outDir}/`);
+              return completo;
+            }
+            if (!hashes.has(sinBase)) hashes.set(sinBase, hashFichero(destino));
+            etiquetas++;
+            return `<script${antes}src=${q}${src}?v=${hashes.get(sinBase)}${q}${despues}>`;
+          },
+        );
+
+        fs.writeFileSync(rutaHtml, html, 'utf8');
+      }
+
+      console.log(`[finova-build-scripts] ?v= añadido a ${etiquetas} etiquetas de script en ${htmls.length} HTML`);
+
+      /* ── Versión de caché del service worker ── */
+      const rutaSw = resolve(outDir, 'sw.js');
+      if (fs.existsSync(rutaSw)) {
+        // El hash se calcula sobre TODO lo que el SW puede servir, no solo
+        // sobre los scripts: si cambia el CSS o un icono, la caché vieja
+        // también tiene que morir.
+        const acumulado = crypto.createHash('sha256');
+        const ficheros = [];
+        (function recorre(d) {
+          for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+            const p = resolve(d, e.name);
+            if (e.isDirectory()) { recorre(p); continue; }
+            // sw.js se excluye a propósito: su propio contenido depende del
+            // hash, y meterlo dentro sería una dependencia circular.
+            if (p === rutaSw) continue;
+            ficheros.push(p);
+          }
+        })(resolve(outDir));
+        for (const p of ficheros) {
+          acumulado.update(p.replace(/\\/g, '/').split('/dist/').pop());
+          acumulado.update(fs.readFileSync(p));
+        }
+        const versionBuild = acumulado.digest('hex').slice(0, 12);
+
+        let sw = fs.readFileSync(rutaSw, 'utf8');
+        const marcador = /const CACHE_NAME = '[^']*';\s*\/\* __FINOVA_CACHE_NAME__ \*\//;
+        if (!marcador.test(sw)) {
+          // Fallar y no seguir: un SW sin versión de build es justo el
+          // problema que esto viene a arreglar, y pasaría desapercibido.
+          throw new Error(
+            '[finova-build-scripts] No se encontró el marcador __FINOVA_CACHE_NAME__ en sw.js. '
+            + 'Sin él, la versión de caché no se inyecta y un despliegue puede dejar a los '
+            + 'usuarios con la aplicación anterior. Revisa sw.js.',
+          );
+        }
+        sw = sw.replace(marcador, `const CACHE_NAME = 'finova-${versionBuild}';`);
+        fs.writeFileSync(rutaSw, sw, 'utf8');
+        console.log(`[finova-build-scripts] sw.js: CACHE_NAME = finova-${versionBuild} (${ficheros.length} ficheros hasheados)`);
+      }
+
+      if (!isProd) {
+        console.log('[finova-build-scripts] build de desarrollo: los scripts clásicos van sin minificar');
+      }
+      },
+    },
+  };
+}
+
 // Sirve src/**/*.js con import.meta.env ya resuelto cuando `vite` (servidor de
 // desarrollo) los sirve como <script src> clásico — sin esto, Vite devuelve el
 // archivo tal cual (con "import.meta.env.VITE_X" literal en el texto), que el
@@ -239,7 +377,9 @@ export default defineConfig(({ mode }) => {
       reportCompressedSize:  true,
     },
 
-    plugins: [copyStaticAssets('dist', mode), devHostRedirect(), devClassicScripts(mode)],
+    // El orden importa: buildScripts hashea ficheros que copyStaticAssets acaba
+    // de escribir, y closeBundle se ejecuta en orden de registro.
+    plugins: [copyStaticAssets('dist', mode), buildScripts('dist', mode), devHostRedirect(), devClassicScripts(mode)],
 
     // Solo exponer al frontend variables con prefijo VITE_
     envPrefix: 'VITE_',
