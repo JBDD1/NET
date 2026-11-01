@@ -1676,6 +1676,116 @@ Suite: **942 en verde** (31 suites). Build y `verify:dist` correctos.
 
 ---
 
+## FASE 18 — Repaso del build: verificación corregida y bloques en línea · ✅ COMPLETA
+
+Segunda pasada sobre el mismo encargo de la Fase 16 (commit `7b642ef`). El
+trabajo de los pasos 0 a 4 ya estaba hecho y sigue en pie tras un `npm ci`
+limpio. Esta fase aporta dos cosas, y la primera **corrige un método de
+verificación mío que era frágil**.
+
+### La corrección: `window[nombre]` daba falsos negativos
+
+En la Fase 16 comprobé que la minificación no rompía el ámbito global
+compartido con `typeof window[nombre] === 'function'`, y salió 598/598.
+El resultado era correcto, pero **el método no**: una `function` de nivel
+superior en un script clásico sí se convierte en propiedad de `window`,
+pero una `const` o una `let` **no** — viven en el ámbito global léxico, que
+no es el objeto global. `window['APP']` da `undefined` para una
+`const APP` aunque la variable exista y funcione.
+
+Mi comprobación solo acertó porque extraje **únicamente** declaraciones
+`function`. En cuanto se incluyen `const` y `let`, el método anterior
+miente. Medido:
+
+| Página | `const`/`let` que existen pero NO están en `window` |
+|---|---|
+| `index.html` | **169** |
+| `landing.html` | **20** |
+
+Ejemplos reales de los que `window[nombre]` habría declarado ausentes:
+`DEFAULT_CATEGORIES`, `Store`, `FINOVA_VERSION`, `_isDemoMode`,
+`_reducedMotionMQ`, `DEFAULT_BUDGET_TYPE`.
+
+El método correcto es **eval indirecto**: `(0, eval)(nombre)` se evalúa en
+el ámbito global y no en el local de la función que lo llama, así que ve las
+`const` y `let` de nivel superior. Dentro de un `try`, porque un nombre
+inexistente lanza `ReferenceError`.
+
+### El recuento real, con el método bueno
+
+| | index.html | landing.html |
+|---|---|---|
+| `function` de nivel superior | **598 / 598** | **57 / 57** |
+| `const` globales | **100 / 100** | **17 / 17** |
+| `let` globales | **69 / 69** | **3 / 3** |
+| Handlers `on*` del HTML | 0 / 0 (no hay) | **13 / 13** |
+| **Total de globales intactos** | **767 / 767** | **90 / 90** |
+
+Más: 0 respuestas ≥ 400, 0 errores de página, 0 errores graves de consola,
+DOM de la app presente (206 botones) y hero de la landing presente.
+
+### Lo segundo: el código en línea que no pasa por Terser
+
+Inventariado, porque el encargo lo pedía:
+
+| HTML | bloques | bytes | % del fichero |
+|---|---|---|---|
+| `faq.html` | 2 | 3.058 | 11,0 % |
+| `landing.html` | 3 | 1.507 | 0,9 % |
+| `index.html` | 1 | 627 | 0,4 % |
+| `privacidad.html` / `terminos.html` | 1 cada uno | 408 | ~1 % |
+
+**Total: 8 bloques, 5,9 kB** — el **0,7 %** del JS desplegado, frente a los
+884,2 kB de scripts clásicos que sí pasan por Terser. Ni Rollup ni el plugin
+de scripts clásicos los tocan: el primero solo procesa módulos, el segundo
+solo ficheros.
+
+### Y el hueco que ese inventario destapó
+
+`verify-dist.cjs` revisaba `console.log` y `sourceMappingURL` **solo en los
+ficheros `.js`**. Los bloques en línea no los veía: un `console.log` movido
+de un `.js` a un bloque embebido habría pasado la guardia sin más.
+
+Corregido: ahora también los revisa, con el número de línea donde empieza el
+bloque para poder encontrarlo. Probado inyectando un `console.log` en un
+bloque en línea de `dist/index.html` → **exit 1** con el mensaje
+«bloque <script> en línea que empieza en la línea 2762 contiene
+console.log(». Hoy los 8 bloques están limpios: cero `console.log`, cero
+`debugger`.
+
+### Verificación completa, repetida de cero
+
+```
+npm ci && npm run build
+[finova-build-scripts] ?v= añadido a 26 etiquetas de script en 7 HTML
+[finova-build-scripts] sw.js: CACHE_NAME = finova-02157f348fdf (80 ficheros)
+[verify-dist] 81 ficheros · 7 HTML · 56 referencias · 45 .js revisados
+[verify-dist] 8 bloque(s) <script> en línea · 5.9 kB que NO pasan por Terser
+[verify-dist] dist/ es desplegable.
+
+src/**/*.js  42 ficheros: 1444,6 kB -> 884,2 kB  (38,8 % menos)
+landing.js            :    33,6 kB ->  21,3 kB  (36,7 % menos)
+ficheros con console.log en dist/src: 0
+
+calc.test.js: 33 passed · suite completa: 942 passed, 31 suites
+build:gh con base «/NET»: dist/ es desplegable
+```
+
+### Lo que no se pudo verificar
+
+Lo mismo que en la Fase 16: **el despliegue real en Vercel, no.** Todo está
+medido en local con `vite preview`. Y el service worker sigue sin probarse
+ejecutándose: los cambios (red primero para el HTML, `ignoreSearch`,
+`CACHE_NAME` del build) están verificados por sintaxis, por lectura y por la
+guardia, pero no se ha simulado un ciclo
+instalar → activar → desplegar → recargar con un SW vivo.
+
+Playwright se instaló con `--no-save` otra vez: **no hay ninguna dependencia
+nueva en `package.json`**. Eso significa que esta verificación no se puede
+repetir en CI tal cual — haría falta añadirlo como devDependency.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más

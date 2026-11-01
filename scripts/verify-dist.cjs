@@ -130,6 +130,45 @@ for (const f of jsDist) {
   }
 }
 
+/* ─── 3b. Lo mismo en los <script> EN LÍNEA de los HTML ────────── */
+
+/*
+ * Los bloques en línea no pasan por Terser: Rollup solo toca los módulos y
+ * el plugin de scripts clásicos solo toca ficheros. Son poco código (unos
+ * 6 kB, el 0,7 % del JS desplegado), pero «poco» no es «nada», y un
+ * console.log ahí sale igual en la consola del usuario.
+ *
+ * Esta comprobación existe porque el repaso de ficheros .js de arriba NO
+ * los veía: un console.log movido de un .js a un bloque en línea habría
+ * pasado la guardia sin más.
+ */
+let nInline = 0, bytesInline = 0;
+for (const h of htmls) {
+  const html = fs.readFileSync(path.join(DIST, h), 'utf8');
+  const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    if (/\bsrc\s*=/i.test(m[1])) continue;                    // tiene src: no es en línea
+    const tipo = (m[1].match(/\btype\s*=\s*["']([^"']+)/i) || [])[1] || '';
+    if (tipo && !/javascript|module/i.test(tipo)) continue;    // ld+json y demás no son código
+    const cuerpo = m[2];
+    if (!cuerpo.trim()) continue;
+    nInline++;
+    bytesInline += Buffer.byteLength(cuerpo);
+    // Número de línea donde empieza el bloque, para poder encontrarlo.
+    const linea = html.slice(0, m.index).split('\n').length;
+    if (ES_PROD && /console\s*\.\s*log\s*\(/.test(cuerpo)) {
+      errores.push(`dist/${h}: bloque <script> en línea que empieza en la línea ${linea} contiene console.log(`);
+    }
+    if (ES_PROD && /\bdebugger\b/.test(cuerpo)) {
+      errores.push(`dist/${h}: bloque <script> en línea que empieza en la línea ${linea} contiene debugger`);
+    }
+    if (/\/\/[#@]\s*sourceMappingURL/.test(cuerpo)) {
+      errores.push(`dist/${h}: bloque <script> en línea que empieza en la línea ${linea} contiene sourceMappingURL`);
+    }
+  }
+}
+
 /* ─── 4. Claves de API reales ──────────────────────────────────── */
 
 /*
@@ -185,6 +224,7 @@ if (EXISTE.has('sw.js')) {
 /* ─── Informe ──────────────────────────────────────────────────── */
 
 console.log(`[verify-dist] ${FICHEROS.length} ficheros en dist/ · ${htmls.length} HTML · ${nRefs} referencias locales comprobadas · ${jsDist.length} .js revisados`);
+console.log(`[verify-dist] ${nInline} bloque(s) <script> en línea · ${(bytesInline/1024).toFixed(1)} kB que NO pasan por Terser (se revisan igual)`);
 if (BASE) console.log(`[verify-dist] base del despliegue: «${BASE}»`);
 console.log(`[verify-dist] modo: ${ES_PROD ? 'producción (se exige drop_console)' : 'desarrollo (console.log permitido)'}`);
 
