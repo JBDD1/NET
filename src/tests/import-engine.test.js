@@ -18,7 +18,7 @@ beforeAll(() => {
     console, JSON, Math, Number, String, Array, Map, Set, Object,
     parseFloat, parseInt, isNaN, isFinite, RegExp, Date,
   });
-  for (const f of ['src/utils/import-formats.js', 'src/utils/import-semantic.js']) {
+  for (const f of ['src/utils/import-formats.js', 'src/utils/import-semantic.js', 'src/utils/import-doctype.js']) {
     vm.runInContext(fs.readFileSync(path.join(process.cwd(), f), 'utf8'), ctx);
   }
 });
@@ -712,5 +712,239 @@ describe('Lo que NO se interpreta', () => {
     const r = detect(filas);
     expect(campo(r, 'importe')).toBe('Importe (EUR)');
     expect(campo(r, 'valorMercado')).toBe('Market Value USD');
+  });
+});
+
+/* ═══ 16. Tipo de documento ════════════════════════════════════ */
+
+const SNAPSHOT = [
+  ['Producto', 'ISIN', 'Participaciones', 'Precio medio de compra', 'Precio actual', 'Valor de mercado', 'Rentabilidad %'],
+  ['Vanguard FTSE All-World', 'IE00B3RBWM25', '42', '98,20', '112,34', '4.718,28', '14,40'],
+  ['Apple Inc', 'US0378331005', '25', '142,10', '198,50', '4.962,50', '39,69'],
+  ['Santander', 'ES0113900J37', '500', '3,80', '4,21', '2.105,00', '10,79'],
+  ['iShares Core', 'IE00B4L5Y983', '10', '82,00', '89,10', '891,00', '8,66'],
+];
+const HISTORICO = [
+  ['Trade Date', 'Settlement Date', 'Tipo', 'Producto', 'ISIN', 'Cantidad', 'Precio', 'Importe', 'Comisión'],
+  ['2026-01-15', '2026-01-17', 'Compra', 'Apple Inc', 'US0378331005', '10', '140,00', '-1400,00', '1,00'],
+  ['2026-03-10', '2026-03-12', 'Compra', 'Apple Inc', 'US0378331005', '15', '143,50', '-2152,50', '1,00'],
+  ['2026-05-20', '2026-05-22', 'Venta', 'Apple Inc', 'US0378331005', '5', '160,00', '800,00', '1,00'],
+  ['2026-06-01', '2026-06-03', 'Compra', 'Vanguard FTSE', 'IE00B3RBWM25', '42', '98,20', '-4124,40', '2,00'],
+];
+/** Clasifica una tabla pasándola antes por la capa semántica. */
+const clasificar = (filas, c) => g('idtClassifyTable')(detect(filas), c || {});
+
+describe('Fotografía de posiciones frente a histórico de operaciones', () => {
+  // Es el error más caro del encargo: un informe de cartera con 30
+  // posiciones, leído como histórico, mete 30 compras inventadas y duplica
+  // la cartera entera.
+
+  test('una cartera se reconoce como posiciones, no como compras nuevas', () => {
+    const r = clasificar(SNAPSHOT, { nombreArchivo: 'Posiciones_30092026.xls' });
+    expect(r.tipo).toBe('posiciones');
+    expect(r.confianza).toBe('alta');
+    expect(r.requiereConfirmacion).toBe(false);
+    expect(r.motivos.join(' ')).toMatch(/una fila por activo/);
+    expect(r.motivos.join(' ')).toMatch(/no hay fecha ni tipo de operación/);
+  });
+
+  test('y se reconoce igual sin la pista del nombre del archivo', () => {
+    // El nombre es la señal más débil, y la que más miente.
+    expect(clasificar(SNAPSHOT, {}).tipo).toBe('posiciones');
+  });
+
+  test('un histórico se reconoce por la repetición del activo y el tipo', () => {
+    const r = clasificar(HISTORICO, { nombreArchivo: 'Transactions.csv' });
+    expect(r.tipo).toBe('operaciones');
+    expect(r.confianza).toBe('alta');
+    expect(r.motivos.join(' ')).toMatch(/compra o venta/);
+    expect(r.motivos.join(' ')).toMatch(/varias filas/);
+  });
+
+  test('un histórico sin columna de tipo ni nombre revelador también', () => {
+    // Quedan la fecha de liquidación y el activo repetido, que bastan.
+    const sinTipo = HISTORICO.map(f => [f[0], f[1], f[3], f[4], f[5], f[6], f[7]]);
+    expect(clasificar(sinTipo, {}).tipo).toBe('operaciones');
+  });
+});
+
+describe('Tipo de documento — los demás tipos', () => {
+  test('extracto bancario, por el saldo y la forma de los movimientos', () => {
+    const r = clasificar([
+      ['Fecha', 'Fecha valor', 'Concepto', 'Importe', 'Saldo'],
+      ['05/09/2026', '06/09/2026', 'COMPRA TARJ. MERCADONA', '-48,20', '1.234,56'],
+      ['01/09/2026', '01/09/2026', 'TRANSFERENCIA NOMINA SEPTIEMBRE', '1.850,00', '3.084,56'],
+      ['07/09/2026', '07/09/2026', 'COMISION MANTENIMIENTO', '-3,00', '3.081,56'],
+      ['10/09/2026', '10/09/2026', 'RECIBO IBERDROLA', '-62,40', '3.019,16'],
+    ], {});
+    expect(r.tipo).toBe('extracto-banco');
+    expect(r.confianza).toBe('alta');
+    expect(r.motivos.join(' ')).toMatch(/saldo/);
+  });
+
+  test('«COMPRA MERCADONA» no convierte un extracto en operaciones', () => {
+    // El tipo de operación manda sobre la descripción, que es texto libre
+    // donde «compra» aparece por casualidad constantemente.
+    const r = clasificar([
+      ['Fecha', 'Concepto', 'Importe', 'Saldo'],
+      ['05/09/2026', 'COMPRA MERCADONA GRAN VIA', '-48,20', '1234,56'],
+      ['06/09/2026', 'COMPRA ZARA CALLAO', '-79,95', '1154,61'],
+      ['07/09/2026', 'COMPRA CARREFOUR', '-55,00', '1099,61'],
+    ], {});
+    expect(r.tipo).toBe('extracto-banco');
+  });
+
+  test('informe de dividendos', () => {
+    const r = clasificar([
+      ['Valor', 'ISIN', 'Fecha de pago', 'Dividendo por acción', 'Acciones', 'Importe bruto', 'Retención'],
+      ['Apple Inc', 'US0378331005', '15/08/2026', '0,24', '25', '6,00', '0,90'],
+      ['Santander', 'ES0113900J37', '02/05/2026', '0,10', '500', '50,00', '9,50'],
+      ['Iberdrola', 'ES0144580Y14', '10/07/2026', '0,18', '300', '54,00', '10,26'],
+    ], { nombreArchivo: 'Dividendos_2026.csv' });
+    expect(r.tipo).toBe('dividendos');
+    expect(r.confianza).toBe('alta');
+  });
+
+  test('el guion bajo de un nombre de archivo no esconde la pista', () => {
+    // `_` es carácter de palabra, así que un \b detrás de «Dividendos» NO
+    // casa en «Dividendos_2026.csv». Media pista perdida en silencio.
+    const filas = [
+      ['Valor', 'ISIN', 'Fecha de pago', 'Dividendo por acción', 'Acciones'],
+      ['Apple Inc', 'US0378331005', '15/08/2026', '0,24', '25'],
+      ['Santander', 'ES0113900J37', '02/05/2026', '0,10', '500'],
+      ['Iberdrola', 'ES0144580Y14', '10/07/2026', '0,18', '300'],
+    ];
+    const conGuion = clasificar(filas, { nombreArchivo: 'Dividendos_2026.csv' });
+    const conEspacio = clasificar(filas, { nombreArchivo: 'Dividendos 2026.csv' });
+    expect(conGuion.confianza).toBe(conEspacio.confianza);
+  });
+
+  test('movimientos de cripto, por los activos', () => {
+    const r = clasificar([
+      ['txid', 'time', 'pair', 'side', 'volume', 'price', 'fee'],
+      ['TX-1', '2026-09-05T10:00:00Z', 'BTC/EUR', 'buy', '0.015', '58200.50', '1.20'],
+      ['TX-2', '2026-09-07T11:30:00Z', 'ETH/EUR', 'sell', '1.4', '2410.00', '0.90'],
+      ['TX-3', '2026-09-09T14:00:00Z', 'SOL/EUR', 'buy', '12.5', '142.30', '0.50'],
+      ['TX-4', '2026-09-11T09:00:00Z', 'ADA/EUR', 'buy', '800', '0.52', '0.30'],
+    ], { nombreArchivo: 'kraken_trades.csv' });
+    // Una compra de bitcoin es una operación igual que una de acciones, pero
+    // su destino en Finova es otro: gana el tipo de cripto.
+    expect(r.tipo).toBe('cripto-movimientos');
+    expect(r.motivos.join(' ')).toMatch(/criptomonedas conocidas/);
+  });
+
+  test('un ISIN válido descarta cripto, aunque el archivo se llame «wallet»', () => {
+    const r = clasificar(SNAPSHOT, { nombreArchivo: 'wallet_export.csv' });
+    expect(r.tipo).toBe('posiciones');
+    const cripto = r.candidatos.find(c => c.tipo === 'cripto-movimientos');
+    if (cripto) expect(cripto.motivos.join(' ')).toMatch(/no tienen ISIN/);
+  });
+
+  test('staking', () => {
+    const r = clasificar([
+      ['Fecha', 'Moneda', 'Tipo', 'Cantidad', 'Importe'],
+      ['2026-09-01', 'ETH', 'Staking reward', '0.012', '28,90'],
+      ['2026-09-08', 'ETH', 'Staking reward', '0.011', '26,50'],
+      ['2026-09-15', 'SOL', 'Stake', '10', '1423,00'],
+      ['2026-09-22', 'ETH', 'Staking reward', '0.013', '31,20'],
+    ], {});
+    expect(r.tipo).toBe('cripto-movimientos');
+    expect(r.motivos.join(' ')).toMatch(/staking o recompensas/);
+  });
+
+  test('saldos de cuentas, sin movimientos', () => {
+    const r = clasificar([
+      ['Cuenta', 'Divisa', 'Saldo'],
+      ['ES5900491500051234567892', 'EUR', '3.081,56'],
+      ['ES7621000418401234567891', 'EUR', '12.450,00'],
+      ['GB29NWBK60161331926819', 'GBP', '820,15'],
+    ], {});
+    expect(r.tipo).toBe('saldos');
+    expect(r.motivos.join(' ')).toMatch(/sin movimientos/);
+  });
+
+  test('préstamos y deudas', () => {
+    const r = clasificar([
+      ['Concepto', 'Importe inicial', 'Capital pendiente', 'Cuota'],
+      ['Hipoteca vivienda habitual', '180000,00', '142350,00', '620,45'],
+      ['Prestamo coche', '18000,00', '7210,00', '310,00'],
+    ], { nombreArchivo: 'prestamos.csv' });
+    expect(r.tipo).toBe('pasivos');
+  });
+});
+
+describe('Tipo de documento — cuándo NO se afirma', () => {
+  test('una tabla sin señales queda en «desconocido»', () => {
+    // Es un resultado legítimo: el encargo pedía que lo que no se pueda
+    // identificar se le presente al usuario en vez de colocarlo a ciegas.
+    const r = clasificar([['A', 'B', 'C'], ['1', '2', '3'], ['4', '5', '6']], {});
+    expect(r.tipo).toBe('desconocido');
+    expect(r.confianza).toBe('baja');
+  });
+
+  test('una tabla vacía lo dice, no revienta', () => {
+    const r = g('idtClassifyTable')({ campos: {}, filasDatos: [] }, {});
+    expect(r.tipo).toBe('desconocido');
+    expect(r.motivos[0]).toMatch(/no tiene filas/);
+  });
+
+  test('los candidatos descartados se conservan con sus motivos', () => {
+    // Para que la interfaz pueda enseñar por qué se eligió un tipo y no otro.
+    // Se usa una tabla de verdad ambigua: una cartera con fecha de compra,
+    // que puntúa a la vez como posiciones y como operaciones. Un snapshot
+    // limpio tiene un solo candidato, y eso también es correcto.
+    const ambigua = [
+      ['Producto', 'ISIN', 'Cantidad', 'Fecha compra', 'Precio medio de compra', 'Valor de mercado'],
+      ['Apple Inc', 'US0378331005', '25', '2026-01-15', '142,10', '4.962,50'],
+      ['Vanguard FTSE', 'IE00B3RBWM25', '42', '2026-06-01', '98,20', '4.718,28'],
+      ['Santander', 'ES0113900J37', '500', '2026-03-20', '3,80', '2.105,00'],
+    ];
+    const r = clasificar(ambigua, {});
+    expect(r.tipo).toBe('posiciones');
+    expect(r.candidatos.length).toBeGreaterThanOrEqual(2);
+    expect(Array.isArray(r.candidatos[0].motivos)).toBe(true);
+  });
+
+  test('un snapshot inequívoco tiene un solo candidato', () => {
+    expect(clasificar(SNAPSHOT, {}).candidatos).toHaveLength(1);
+  });
+});
+
+describe('Un archivo con varias cosas dentro', () => {
+  test('cada hoja se clasifica por separado', () => {
+    // Clasificar el archivo entero con un solo veredicto obligaría a tirar
+    // la mitad: un informe trae una hoja de posiciones y otra de operaciones.
+    const ir = {
+      format: 'excel', kind: 'tablas', cuentas: [], avisos: [],
+      tablas: [
+        { nombre: 'Posiciones', filas: SNAPSHOT, meta: {} },
+        { nombre: 'Operaciones', filas: HISTORICO, meta: {} },
+      ],
+    };
+    const res = g('idtClassifyIR')(ir, detect, { nombreArchivo: 'informe.xlsx' });
+    expect(res.partes.map(p => p.tipo)).toEqual(['posiciones', 'operaciones']);
+  });
+
+  test('un formato estandarizado no se deduce: ya lo declara', () => {
+    const ofx = 'OFXHEADER:100\n<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><CURDEF>EUR\n'
+      + '<BANKACCTFROM><ACCTID>ES5900491500051234567892</BANKACCTFROM>\n'
+      + '<BANKTRANLIST><STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20260905<TRNAMT>-48.20<FITID>F1<NAME>MERCADONA</STMTTRN>\n'
+      + '</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>';
+    const res = g('idtClassifyIR')(parse(ofx, 'x.ofx'), detect, {});
+    expect(res.partes).toHaveLength(1);
+    expect(res.partes[0].tipo).toBe('extracto-banco');
+    expect(res.partes[0].confianza).toBe('alta');
+    expect(res.partes[0].requiereConfirmacion).toBe(false);
+    expect(res.cuentas).toHaveLength(1);
+  });
+
+  test('un OFX de inversión separa la compra del movimiento de efectivo', () => {
+    const ofx = 'OFXHEADER:100\n<OFX><INVSTMTMSGSRSV1><INVSTMTRS><CURDEF>USD\n<INVTRANLIST>\n'
+      + '<BUYSTOCK><INVBUY><INVTRAN><FITID>B1<DTTRADE>20260610<MEMO>C</INVTRAN>\n'
+      + '<SECID><UNIQUEID>US0378331005<UNIQUEIDTYPE>ISIN</SECID><UNITS>25<UNITPRICE>142.10<TOTAL>-3553.50</INVBUY></BUYSTOCK>\n'
+      + '<INVBANKTRAN><STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20260601<TRNAMT>5000.00<FITID>C1<NAME>Transferencia</STMTTRN></INVBANKTRAN>\n'
+      + '</INVTRANLIST></INVSTMTRS></INVSTMTMSGSRSV1></OFX>';
+    const res = g('idtClassifyIR')(parse(ofx, 'ib.ofx'), detect, {});
+    expect(res.partes.map(p => p.tipo).sort()).toEqual(['extracto-banco', 'operaciones']);
   });
 });

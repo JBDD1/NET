@@ -1,12 +1,13 @@
 # Motor universal de importación financiera
 
-Estado: **capas 1 y 2 construidas y probadas. Capas 3 a 5 y la interfaz, no.**
-Este documento dice exactamente qué funciona hoy, qué no, y por qué está
-partido así.
+Estado: **capas 1, 2 y 3 construidas y probadas. Capas 4 y 5 y la interfaz,
+no.** Este documento dice exactamente qué funciona hoy, qué no, y por qué
+está partido así.
 
 - Capa 1 — formatos: [src/utils/import-formats.js](src/utils/import-formats.js)
 - Capa 2 — semántica: [src/utils/import-semantic.js](src/utils/import-semantic.js)
-- Tests: [src/tests/import-engine.test.js](src/tests/import-engine.test.js) — 81 casos
+- Capa 3 — tipo de documento: [src/utils/import-doctype.js](src/utils/import-doctype.js)
+- Tests: [src/tests/import-engine.test.js](src/tests/import-engine.test.js) — 101 casos
 
 ---
 
@@ -203,24 +204,90 @@ como cabecera y **perderla**.
 
 ---
 
+## Capa 3 — Tipo de documento
+
+Decide qué **es** un archivo a partir de los campos que reconoció la capa 2 y
+de lo que contienen sus filas. Sin esto el usuario tiene que elegir el botón
+correcto, y elegir mal mete los datos en el sitio equivocado.
+
+Ocho tipos: `extracto-banco`, `posiciones`, `operaciones`, `dividendos`,
+`cripto-movimientos`, `saldos`, `pasivos` y `desconocido`.
+
+### La distinción que más importa
+
+> «Un archivo de posiciones actuales no debe interpretarse como si todas las
+> posiciones fueran compras nuevas.»
+
+Es el error más caro de todo el encargo. Un informe de cartera con 30
+posiciones, leído como histórico, mete **30 compras inventadas** y duplica la
+cartera entera.
+
+La señal que los separa no es el nombre del archivo. Un snapshot describe un
+**estado** y un histórico describe **sucesos**:
+
+| Señal | Posiciones | Operaciones |
+|---|---|---|
+| Columnas de valoración (valor de mercado, precio actual, rentabilidad) | Sí | No |
+| Fecha y tipo de operación | No | Sí |
+| Fecha de liquidación | No | Sí, a menudo |
+| Filas por activo | **Una** | **Varias** |
+
+La última es la más fiable de las cuatro, y la que el motor pesa más alto:
+se mide la razón filas/activos distintos. Hay test de que una cartera de 4
+activos en 4 filas sale `posiciones` y un histórico con Apple repetido 3
+veces sale `operaciones`, **las dos cosas sin la pista del nombre del
+archivo**.
+
+### Otras decisiones que merecen explicación
+
+**El tipo de operación manda sobre la descripción.** La columna «Tipo» es un
+campo cerrado; la descripción es texto libre donde «compra» aparece por
+casualidad constantemente. Hay test de que un extracto lleno de «COMPRA
+MERCADONA», «COMPRA ZARA» y «COMPRA CARREFOUR» sigue siendo
+`extracto-banco` y no `operaciones`.
+
+**Una operación de cripto es una operación, pero su destino es otro.** Una
+compra de bitcoin puntúa alto como `operaciones` (tiene fecha, tipo y
+precio), y sin corregirlo acabaría en la cartera de valores. Cuando los
+activos son criptomonedas conocidas en un 60 % o más, `operaciones` recibe
+una penalización explícita y gana `cripto-movimientos`.
+
+**Un ISIN válido descarta cripto**, aunque el archivo se llame
+`wallet_export.csv`: las criptomonedas no tienen ISIN. Y el motivo del
+descarte se conserva, para poder enseñarlo.
+
+**Los formatos estandarizados no se deducen: ya lo declaran.** Un OFX entra
+con confianza alta y sin preguntar. Y un OFX de inversión se parte en dos:
+la compra va a `operaciones` y el movimiento de efectivo a
+`extracto-banco`, en vez de forzar un veredicto único.
+
+**Cada hoja se clasifica por separado.** Un informe trae una hoja de
+posiciones y otra de operaciones; un veredicto único por archivo obligaría a
+tirar la mitad.
+
+**`desconocido` es un resultado legítimo, no un fallo.** Si la evidencia más
+fuerte no llega a 0,45 se devuelve `desconocido` con los candidatos y sus
+motivos. Y si el segundo candidato pisa al primero (menos de 0,15 de
+margen), la confianza baja y se marca `requiereConfirmacion`: solo se
+pregunta al usuario cuando de verdad hay duda.
+
+### Un bug propio, encontrado probando
+
+**El guion bajo es carácter de palabra.** Las pistas del nombre del archivo
+se buscaban con `\b`, y `/\bdividendos\b/` **no casa** con
+`Dividendos_2026.csv` — ni `/\bkraken\b/` con `kraken_trades.csv`. Como los
+nombres de archivo usan guion bajo constantemente, se perdía media señal en
+silencio: el informe de dividendos salía con confianza baja en vez de alta.
+Ahora el título se normaliza a espacios antes de buscar. Hay test de que el
+veredicto es el mismo con guion bajo y con espacio.
+
+---
+
 ## Lo que NO está construido
 
 Esto es la mitad del encargo. Lo digo con precisión porque la parte hecha es
 la base de la que dependen todas las demás, y es fácil confundir «la base
 está» con «está hecho».
-
-### Capa 3 — Tipo de documento (secciones 2 y 9 del encargo)
-
-Decidir qué **es** un archivo: extracto bancario, fotografía de posiciones,
-histórico de operaciones, informe de dividendos, movimientos de cripto,
-informe fiscal, pasivos. Hoy el usuario tiene que elegir el botón correcto.
-
-Incluye la distinción que el encargo subraya: **una fotografía de posiciones
-actuales no es un histórico de compras.** Interpretar un archivo de
-posiciones como si cada línea fuera una compra nueva duplicaría la cartera
-entera. La señal está disponible (presencia de `valorMercado` y
-`precioActual` sin `fechaOperacion` ni `tipoOperacion` → es un snapshot),
-pero la lógica no está escrita.
 
 ### Capa 4 — Enrutado a secciones (sección 4)
 
@@ -248,9 +315,9 @@ movimientos del bróker. Eso necesita una firma que cruce colecciones.
 
 ### Secciones 5, 6, 7 y 8 aplicadas
 
-La capa 2 **reconoce los campos** de carteras, extractos y cripto, y hay
-tests de los tres. Lo que falta es construir los objetos de destino con
-ellos, más:
+La capa 2 **reconoce los campos** de carteras, extractos y cripto, y la capa
+3 **reconoce el tipo de documento** de los tres, con tests. Lo que falta es
+construir los objetos de destino, más:
 
 - **Cripto (sección 7):** detectar transferencias entre wallets propias para
   no contabilizarlas como ingreso o gasto. Requiere saber qué direcciones son
