@@ -15,6 +15,25 @@ firebase-service-account.json
 *.p12
 *.key
 *.cert
+*.pfx
+google-credentials*.json
+gcloud-*.json
+.env.staging
+
+# Las plantillas y la configuracion PUBLICA de Firebase si van versionadas:
+# .env.example, .env.server.example, .env.development y .env.production solo
+# contienen variables VITE_*, que acaban en el bundle del navegador de todas
+# formas. Se declaran como excepcion explicita para que un patron futuro mas
+# amplio (p.ej. ".env*") no las saque del repositorio sin que nadie lo note.
+!.env.example
+!.env.server.example
+!.env.development
+!.env.production
+
+# ── Bases de datos locales ────────────────────────────────────
+*.sqlite
+*.sqlite3
+*.db
 
 # ── Dependencias ──────────────────────────────────────────────
 node_modules/

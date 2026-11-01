@@ -1,0 +1,17 @@
+#!/bin/sh
+# ══════════════════════════════════════════════════════════════
+# FINOVA — Pre-commit sin husky
+#
+# Alternativa para un clon donde husky no esté instalado (o donde no se
+# quiera instalar nada). Activar con:
+#
+#     npm run hooks:install
+#
+# que ejecuta `git config core.hooksPath .githooks`. El hook es el mismo
+# que el de .husky/pre-commit: la lógica entera vive en el script de Node,
+# así que los dos caminos se comportan igual y no hay dos verdades.
+# ══════════════════════════════════════════════════════════════
+
+node scripts/check-secrets.cjs || exit 1
+
+exit 0

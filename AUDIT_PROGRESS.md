@@ -1548,6 +1548,134 @@ está fuera del encargo.
 
 ---
 
+## FASE 17 — Blindaje contra secretos y auditoría del historial · ✅ COMPLETA
+
+Detalle en [SECRETS_AUDIT.md](SECRETS_AUDIT.md) y
+[ROTATE_SECRETS.md](ROTATE_SECRETS.md). **Ningún valor aparece en ninguno de
+los dos documentos.**
+
+### Veredicto: no hay ningún secreto real, ni ahora ni en el historial
+
+120 commits, 7 referencias, 158 ficheros versionados. Cinco coincidencias de
+patrón, las cinco descartadas con razón:
+
+| Qué apareció | Veredicto |
+|---|---|
+| Una cadena de Google de 39 caracteres en 5 sitios | **Pública por diseño.** Una sola huella SHA-256 (`98f36bee…`), declarada como `VITE_FIREBASE_API_KEY`: es la clave CLIENTE de Firebase, va en el bundle de cualquier web |
+| `BEGIN PRIVATE KEY` en `.env.server.example` | **Plantilla vacía.** Tiene `BEGIN` y `END`, pero ningún base64 de 40+ caracteres en todo el fichero |
+| Prefijos de Groq y Anthropic en `Iniciar Finova.bat` | **Placeholders.** Líneas `REM` comentadas, relleno de `x`, y solo 4 caracteres distintos en el valor |
+
+Ficheros sensibles que hayan existido **alguna vez**: ninguno. Los únicos
+paths `.env` de toda la historia son los 4 esperados. Nunca ha habido un
+`data/`, un `backups/`, un `.pem` ni una cuenta de servicio.
+
+### El barrido que de verdad cerraba el hueco
+
+Buscar prefijos de proveedores conocidos no basta: un secreto propio (una
+clave de cifrado, una contraseña, un webhook) no casa con ninguno. Se hizo un
+segundo barrido sobre **toda asignación a una variable cuyo nombre acabe en
+`KEY`, `SECRET`, `TOKEN`, `PASSWORD`, `CREDENTIAL`, `WEBHOOK`, `SALT` o
+`SEED` con un valor de 16+ caracteres**, en cualquier commit.
+
+5 commits, 10 ficheros, todos clasificados: líneas comentadas del `.bat`,
+referencias `process.env.X` (no literales) y nombres de claves de
+`localStorage`. **Ninguna asignación con un valor literal de aspecto real** —
+todo el consumo de secretos del servidor va por el entorno, que es como debe
+ser.
+
+### Tres fallos del escáner de pre-commit que ya existía
+
+Había un hook de husky con un escáner en shell. Los tres problemas no eran
+teóricos: los dos primeros los sufrí durante esta misma sesión.
+
+**1. Imprimía el secreto encontrado.** `echo "$MATCHES" | head -3` escribía
+la clave en la terminal, y de ahí al scrollback, a una captura o a un log de
+CI. Un detector de secretos que imprime el secreto es un detector que los
+filtra.
+
+**2. `--diff-filter=A`: solo miraba ficheros NUEVOS.** Un secreto pegado en
+un `.env` o un `server.cjs` que ya existía **no se escaneaba**. Es el caso
+más probable en la práctica, porque las claves se añaden a ficheros que ya
+están ahí. Ahora es `ACM`.
+
+**3. Sin longitud mínima.** El prefijo de Anthropic a secas bastaba para
+bloquear, así que saltaba con los EJEMPLOS escritos en comentarios. Me
+bloqueó dos commits legítimos en esta sesión (el detector de Sentry
+detectándose a sí mismo, y los ejemplos de `verify-dist.cjs`). Eso no es una
+molestia estética: un detector que grita con los ejemplos se desactiva con
+`--no-verify`, y desde ese momento no detecta nada.
+
+El nuevo `scripts/check-secrets.cjs` (Node, sin dependencias) corrige los
+tres: nunca imprime el valor, escanea `ACM` sobre la versión **en staging**
+(no la del disco), y cada patrón tiene longitud mínima más una lista de
+formas de ejemplo que se descartan.
+
+Y hay una omisión deliberada: **la clave cliente de Firebase NO está entre
+los patrones.** Está en 3 ficheros desde el primer commit; incluirla haría
+que cada commit que los toque se bloqueara, y la guardia duraría una semana.
+
+### Pruebas de la guardia, en una rama temporal
+
+| Caso | Esperado | Resultado |
+|---|---|---|
+| `firebase-service-account.json` con `git add -f` | bloqueado | exit 1 ✅ |
+| Clave Groq falsa en un fichero **modificado** | bloqueado | exit 1 ✅ |
+| `FINOVA_ENC_KEY` con 64 hex | bloqueado | exit 1 ✅ |
+| Commit normal | pasa | exit 0 ✅ |
+| Los 5 formatos de ejemplo (puntos suspensivos, `<>`, relleno de x, `REM`, «aqui») | pasan | exit 0 ✅ |
+
+La segunda fila es la que importa: es el agujero que el escáner anterior
+tenía. Rama temporal y ficheros de prueba borrados.
+
+### `.gitignore`
+
+Añadidos sin borrar ni reordenar nada: `*.pfx`, `google-credentials*.json`,
+`gcloud-*.json`, `.env.staging`, `*.sqlite`, `*.sqlite3`, `*.db`. Los demás
+patrones del encargo ya estaban.
+
+**Y cuatro negaciones explícitas** (`!.env.example`, `!.env.server.example`,
+`!.env.development`, `!.env.production`), para que un patrón futuro más
+amplio no saque del repositorio la configuración pública sin que nadie lo
+note.
+
+Verificado con 21 ficheros de prueba reales: los 21 ignorados por el patrón
+correcto, ninguno aparece en `git status`, las 4 plantillas siguen
+versionadas, y `git ls-files` da **158 antes y 158 después, sin una sola
+diferencia**.
+
+### El riesgo que sí conviene conocer: `FINOVA_ENC_KEY`
+
+El sobre de cifrado es `enc1:<iv+tag+datos>`. **`enc1` es la versión del
+FORMATO, no un identificador de clave**, así que no hay forma de saber con
+qué clave se cifró cada fichero.
+
+Cambiar `FINOVA_ENC_KEY` sin migrar deja **todos** los ficheros de
+`data/users/` ilegibles para siempre, y no de forma suave: AES-GCM verifica
+la etiqueta, así que `_decryptUserData` lanza una excepción. En
+`ROTATE_SECRETS.md` está el procedimiento de migración y la mejora
+recomendada (`enc2:<kid>:…`), que **no está implementada**.
+
+### Lo que no se pudo verificar
+
+**Solo se ha auditado esta copia local.** No se han barrido commits
+colgantes (`git reflog`, objetos sin referencia): un `git commit` con un
+secreto seguido de `git reset --hard` deja el objeto accesible por su hash,
+y si llegó a GitHub sigue ahí aunque no esté en ninguna rama. Tampoco se
+cubren forks, clones ajenos ni commits de pull requests cerrados.
+
+**No se ha consultado la API de GitHub.** El estado de secret scanning, push
+protection, Dependabot y la protección de `main` no se puede comprobar desde
+aquí: queda como guía manual, y con una advertencia explícita de que **no
+afirmo** si el plan actual permite push protection en un repositorio privado
+— eso ha cambiado varias veces y hay que mirarlo.
+
+**No se ha reescrito el historial** ni se ha hecho force push. No hace falta:
+no hay nada que limpiar.
+
+Suite: **942 en verde** (31 suites). Build y `verify:dist` correctos.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más

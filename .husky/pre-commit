@@ -1,43 +1,24 @@
 #!/bin/sh
 # ══════════════════════════════════════════════════════════════
-# FINOVA — Pre-commit hook: detectar secretos antes del commit
-# Activar: npx husky init  (instala husky que usa este archivo)
+# FINOVA — Pre-commit: detectar secretos antes del commit
+#
+# La lógica vive en scripts/check-secrets.cjs (Node, sin dependencias).
+# Antes estaba aquí en shell, y tenía tres problemas que importaban:
+#
+#   1. Imprimía las líneas coincidentes — es decir, escribía el secreto
+#      encontrado en la terminal, y de ahí al scrollback o a un log.
+#   2. Usaba `git diff --cached --diff-filter=A`, que solo mira ficheros
+#      NUEVOS: un secreto pegado en un .env o un server.cjs que ya existía
+#      no se escaneaba. Es el caso más probable en la práctica.
+#   3. No exigía longitud mínima, así que bloqueaba por los EJEMPLOS
+#      escritos en comentarios. Un detector que grita con los ejemplos se
+#      desactiva con --no-verify, y desde ese momento no detecta nada.
+#
+# Se mantiene en .husky porque husky ya está instalado y configurado
+# (core.hooksPath = .husky/_). Para el caso de un clon sin husky hay
+# .githooks/pre-commit y `npm run hooks:install`.
 # ══════════════════════════════════════════════════════════════
-echo "[FINOVA] Verificando secretos antes del commit..."
 
-FOUND=0
+node scripts/check-secrets.cjs || exit 1
 
-check_pattern() {
-  LABEL="$1"; PATTERN="$2"
-  MATCHES=$(git diff --cached --diff-filter=A -U0 | grep "^+" | grep -E "$PATTERN" 2>/dev/null || true)
-  if [ -n "$MATCHES" ]; then
-    echo "[FINOVA] POSIBLE SECRETO: $LABEL"
-    echo "$MATCHES" | head -3
-    FOUND=1
-  fi
-}
-
-check_pattern "Claude API Key"       "sk-ant-api"
-check_pattern "OpenAI API Key"       "sk-proj-"
-check_pattern "Groq API Key"         "gsk_[A-Za-z0-9]"
-check_pattern "Google API Key"       "AIzaSy[A-Za-z0-9_-]"
-check_pattern "Firebase Private Key" "BEGIN PRIVATE KEY"
-check_pattern "Railway URL expuesta" "railway\.app"
-
-FORBIDDEN=$(git diff --cached --name-only | grep -E \
-  "\.env\.local$|\.env\.[^.]+\.local$|service.account|serviceAccount" 2>/dev/null || true)
-
-if [ -n "$FORBIDDEN" ]; then
-  echo "[FINOVA] ERROR: Archivo de secretos en staging:"
-  echo "$FORBIDDEN"
-  FOUND=1
-fi
-
-if [ "$FOUND" = "1" ]; then
-  echo ""
-  echo "[FINOVA] Commit bloqueado. Falso positivo? usa: git commit --no-verify"
-  exit 1
-fi
-
-echo "[FINOVA] Sin secretos detectados."
 exit 0
