@@ -145,6 +145,7 @@ function renderTransactions() {
     'view-photo': id => viewTransactionPhoto(id),
     'view-trip':  id => openTripDetail(id),
   });
+  _txWireRowOpen();
   updateTransactionSummary();   // renderBudgets() is called inside here
   renderTransactionTable();
   populateCategoryFilter();
@@ -152,6 +153,45 @@ function renderTransactions() {
   ric(() => {
     renderTransactionCharts();
     document.querySelectorAll('#section-transactions .chart-wrapper.loading').forEach(el => el.classList.remove('loading'));
+  });
+}
+
+/*
+ * Pulsar una fila abre su ficha de historial.
+ *
+ * Va con delegación en el <tbody> y no con un listener por fila a propósito:
+ * la tabla usa scroll virtual (_renderVirtualRow reescribe el innerHTML a
+ * cada scroll), así que cualquier listener puesto en una fila se perdería en
+ * el primer desplazamiento.
+ */
+function _txWireRowOpen() {
+  const tbody = document.getElementById('transactions-tbody');
+  if (!tbody || tbody._rowOpenWired) return;
+  tbody._rowOpenWired = true;
+
+  const abrir = (target) => {
+    // Un clic en los botones de la fila (favorito, editar, borrar) o en una
+    // insignia navegable no debe abrir la ficha: ya hacen otra cosa.
+    if (target.closest('[data-action]')) return;
+    // Y tampoco si el usuario está seleccionando texto.
+    const sel = window.getSelection && window.getSelection();
+    if (sel && String(sel).length > 2) return;
+    const tr = target.closest('tr[data-id]');
+    if (!tr || !tr.dataset.id) return;
+    if (typeof _withTxHistory === 'function') _withTxHistory(tr.dataset.id);
+  };
+
+  tbody.addEventListener('click', e => abrir(e.target));
+
+  // Las filas ya tienen tabindex="0", así que son alcanzables con Tab pero
+  // hasta ahora Enter no hacía nada: sin esto, la ficha quedaría fuera del
+  // alcance de alguien que navegue solo con teclado (WCAG 2.1.1).
+  tbody.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const tr = e.target.closest && e.target.closest('tr[data-id]');
+    if (!tr || e.target !== tr) return;   // solo con el foco en la fila
+    e.preventDefault();
+    abrir(tr);
   });
 }
 
@@ -271,8 +311,14 @@ function expCatScaleLabel(scale) {
 function _expCatScaleCutoff(scale) {
   if (scale === 'all') return null;
   const monthsBack = { '1m': 0, '3m': 2, '6m': 5, '1y': 11 }[scale] ?? 0;
-  const now = new Date();
-  const d   = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+  // El mes de referencia sale de getCurrentMonth(), no de un new Date() propio.
+  // Antes había DOS fuentes de "qué mes es" a dos líneas de distancia: esta
+  // usaba new Date() y _expCatInScale, justo debajo, usaba getCurrentMonth().
+  // En producción dan lo mismo (getCurrentMonth lee la fecha real), pero la
+  // divergencia hacía que la escala no se pudiera fijar en una prueba: el
+  // reparto por categorías de octubre se quedó en blanco al cambiar el mes.
+  const [y, m] = getCurrentMonth().split('-').map(Number);
+  const d = new Date(y, (m - 1) - monthsBack, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 

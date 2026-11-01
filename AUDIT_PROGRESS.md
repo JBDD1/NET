@@ -929,6 +929,158 @@ Ver `MONITORING_SETUP.md` (configuración manual) y `MONITORING_CHECKLIST.md`
 
 ---
 
+## FASE 13 — Ficha de historial de una transacción · ✅ COMPLETA
+
+Al pulsar una transacción se abre una ficha que cruza esa compra con todas
+las anteriores: establecimiento, categoría, productos y tickets.
+
+### Lo que había de verdad en los datos (se comprobó antes de escribir)
+
+| Dato | ¿Existe? |
+|---|---|
+| Importe, fecha, descripción, categoría | Sí |
+| `receipt.merchant` (nombre limpio del establecimiento) | Sí, **solo** si vino del escáner |
+| `receipt.items[]` con `{name, qty, unitPrice, total}` | Sí — los productos son reales |
+| `receipt.taxBase / taxAmount / taxRate` | Sí — el IVA es real |
+| `receipt.receiptNumber`, `taxId`, `paymentMethod`, `time` | Sí |
+| Foto del justificante (IndexedDB vía `loadPhoto`) | Sí |
+| **Subcategorías** | **NO existen** |
+
+**Las subcategorías no existen en ninguna parte:** ni en el modelo de datos,
+ni en la interfaz, ni en el escáner (su propio prompt dice «no uses
+subcategorías»). El encargo pedía estadísticas de subcategoría; la ficha dice
+explícitamente que Finova no las usa en vez de inventar un nivel que no hay.
+
+### El problema central: identificar el establecimiento
+
+Ya existía `txPatternKey` en `script.js`, y la tentación era reutilizarla.
+**No sirve**, y comprobarlo fue el trabajo que evitó el peor fallo posible:
+esa función está hecha para CATEGORIZAR, donde sobre-agrupar es inofensivo
+(dos farmacias distintas son las dos «Salud»). Para IDENTIDAD sobre-agrupar
+es una mentira que enseña al usuario estadísticas de un negocio en el que no
+ha estado.
+
+Medido contra 9 pares reales: **5 mal agrupados**.
+
+```
+FARMACIA LOPEZ      / FARMACIA RUIZ       → farmacia   / farmacia    ✗
+RESTAURANTE EL FARO / RESTAURANTE LA MINA → restaurante/ restaurante ✗
+PANADERIA SOL       / PANADERIA LUNA      → panaderia  / panaderia   ✗
+GASOLINERA REPSOL   / GASOLINERA CEPSA    → gasolinera / gasolinera  ✗
+CLINICA DENTAL NORTE/ CLINICA DENTAL SUR  → clinica    / clinica     ✗
+```
+
+La clave propia (`mhMerchantKey`) usa **tres listas de datos** en vez de
+heurística pura:
+
+- **Genéricos** (`farmacia`, `bar`, `restaurante`, `hotel`, `clinica`… 70
+  términos): no identifican a nadie, exigen la palabra siguiente.
+- **Marcas cortas** (`dia`, `zara`, `ikea`, `lidl`, `bp`… ): sí identifican
+  solas. Sin esta lista, una regla de «5 letras o más» habría partido
+  «ZARA GRAN VIA» de «ZARA CALLAO», que son la misma tienda.
+- **Ruido de extracto** (`compra`, `tpv`, `redsys`, `tarj`…).
+
+**Sin coincidencia difusa, a propósito.** Solo igualdad exacta de la clave
+normalizada. El encargo pedía no agrupar sin confianza suficiente, y es la
+única regla que no inventa relaciones. El coste es quedarse corto alguna vez
+(dos grafías muy distintas del mismo sitio no se juntan), que es el error
+barato: el usuario ve dos fichas en vez de una mentira.
+
+### Dos bugs propios encontrados probando
+
+1. **«HOTEL 4» y «HOTEL 55» daban la misma clave.** Los números puros se
+   descartaban siempre (en un extracto suelen ser el número de terminal), así
+   que en un nombre genérico desaparecía lo único que distinguía. «BAR 100» y
+   «BAR 200» igual. «PARKING 24H» se salvaba de casualidad, porque «24h» es
+   alfanumérico. Ahora, si el genérico no tiene otra palabra detrás, el número
+   vale como discriminador.
+
+2. **El prefijo `TARJ`/`TARJETA` impedía agrupar.** «COMPRA TARJ. 1234
+   MERCADONA» no se juntaba con «MERCADONA», y es una de las formas más
+   habituales en los extractos españoles.
+
+Los dos tienen test de regresión.
+
+### Decisiones que merecen explicación
+
+**Las devoluciones no se suman al total gastado.** Una devolución de Mercadona
+es un ingreso; meterla en «total gastado» daría un total menor que el real y
+una media falseada. Se cuentan aparte y la ficha lo dice.
+
+**La frecuencia se divide entre los INTERVALOS, no entre las compras.** Del 4
+de julio al 30 de octubre con 6 compras son 118 días y 5 intervalos → 24 días.
+Dividir entre 6 daría 20, que es el error clásico. Con una sola compra la
+frecuencia es `null`, no 0.
+
+**La comparación devuelve `null` cuando no hay con qué comparar**, en vez de
+un 0 % que parecería un dato.
+
+**El índice se memoiza y se invalida por importe, no solo por longitud.**
+Editar un importe sin añadir transacciones también tiene que recalcular.
+
+**Los gráficos se pintan al abrir su bloque**, no al abrir la ficha: montar
+dos Chart.js que nadie va a mirar es tiempo regalado, y el canvas de un
+`<details>` cerrado tiene altura 0, así que se dibujaría mal.
+
+**La fila se cablea con delegación en el `<tbody>`**, no con un listener por
+fila: la tabla usa scroll virtual y reescribe el HTML en cada desplazamiento.
+Y las filas, que ya tenían `tabindex="0"`, ahora responden a Enter — antes
+eran alcanzables con Tab pero no hacían nada.
+
+### Pruebas
+
+**48 tests nuevos** (`src/tests/tx-history.test.js`), con los valores
+esperados calculados a mano, no copiados de la salida. Más una prueba de
+render que monta la ficha completa con un historial realista y comprueba **24
+cosas** en el HTML resultante.
+
+Las cuentas, verificadas de forma independiente:
+
+| Dato | A mano | En pantalla |
+|---|---|---|
+| Total de 6 compras | 292,45 € | 292,45 € ✅ |
+| Media | 48,74 € | 48,74 € ✅ |
+| Frente a la media de las otras (45,41 €) | +44,0 % | «un 44 % más» ✅ |
+| Frente a la anterior (18,40 €) | +255,4 % | +255.43% ✅ |
+| Frecuencia (118 d / 5 intervalos) | 23,6 d | «cada 24 d» ✅ |
+| Precio medio de la leche (0,95/0,99/1,05) | 0,9967 € | 1,00 € ✅ |
+
+Rendimiento: el índice de **5.000 transacciones** se construye en menos de
+1,5 s y se memoiza.
+
+### Tres cosas corregidas de paso
+
+1. **«Este mes: 0,00 €» desconcertaba.** Al abrir una transacción del 30 de
+   octubre un 1 de noviembre, el dato es correcto pero parece roto. Ahora la
+   fila se llama «Noviembre (este mes)».
+
+2. **Dos fuentes distintas de «qué mes es».** `_expCatScaleCutoff` usaba su
+   propio `new Date()` mientras `_expCatInScale`, dos líneas más abajo, usaba
+   `getCurrentMonth()`. En producción dan lo mismo, pero la divergencia hacía
+   la escala imposible de fijar en una prueba: al cruzar a noviembre, tres
+   tests del reparto por categorías se pusieron rojos. Ahora hay una sola
+   fuente. **No lo causó esta fase** — es la misma clase de bug que el
+   `_monthsAgoYM` de la Fase 11.
+
+3. **Incoherencia de formato que NO se ha tocado:** el proyecto formatea el
+   dinero con coma decimal y los porcentajes con punto (`formatPct` da
+   «+44.00%»). La ficha reutiliza `formatPct` para no inventar una tercera
+   convención, pero **conviene resolverlo de una vez en toda la app**: afecta
+   al dashboard, la cartera y el patrimonio, y cambiarlo solo aquí habría
+   dejado dos estilos conviviendo. Queda en los pendientes.
+
+### Lo que no se pudo verificar
+
+No hay navegador en este entorno. La ficha se ha renderizado de verdad y se
+ha leído su HTML y su texto, pero **nadie la ha visto**: quedan por comprobar
+a ojo los dos gráficos de Chart.js (el render se probó con `Chart`
+indefinido, así que la rama de dibujo no se ha ejecutado), la imagen del
+justificante desde IndexedDB, los 5 temas y el comportamiento a 375 px.
+
+Suite: **761 en verde**, 29 suites. Build correcto.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más
@@ -987,6 +1139,18 @@ Ver `MONITORING_SETUP.md` (configuración manual) y `MONITORING_CHECKLIST.md`
     autenticados (`syncCard` se esconde en `_injectAuthUI`), así que el
     impacto es mínimo.
 
+12. **Porcentajes con punto, dinero con coma.** `formatPct` (utils.js) da
+    «+44.00%» y `formatCurrency` da «1.234,56 €». En español los decimales
+    van con coma en los dos casos. Afecta al dashboard, la cartera, el
+    patrimonio y la ficha de historial. Es un cambio de una línea en
+    `formatPct` más revisar que nadie dependa del formato antiguo, pero toca
+    muchas pantallas a la vez: dime si lo hago.
+
+13. **Ver la ficha de historial en un navegador.** Está probada por código
+    (48 tests + un render completo verificado), pero los dos gráficos de
+    Chart.js no se han dibujado nunca de verdad (el render se probó con
+    `Chart` indefinido). Al abrirla, comprobar los gráficos, la imagen del
+    justificante, los 5 temas y 375 px.
 11. **Dos políticas de privacidad.** `privacidad.html` (la que enlazan la
     landing y `terminos.html`) y `privacy.html` (que enlaza `terms.html`) son
     documentos distintos, los dos en español, con estructura y contenido

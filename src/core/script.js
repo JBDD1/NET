@@ -1181,6 +1181,29 @@ function _renderFeedbackBanner() {
   host.insertBefore(el, host.firstChild);
 }
 
+// Ficha de historial de una transacción. Como los demás _with*: el
+// identificador se resuelve DENTRO del closure, porque tx-history.js no está
+// cargado cuando se cablea el evento.
+async function _withTxHistory(txId) {
+  try {
+    if (typeof openTxHistory !== 'function') {
+      await _lazyLoad(_LAZY_SCRIPTS.txHistory);
+    }
+    if (typeof openTxHistory === 'function') {
+      openTxHistory(txId);
+      // Los dos Chart.js de la ficha hay que destruirlos al cerrar, o se
+      // quedan vivos sobre un canvas que ya no existe y el siguiente render
+      // falla con "Canvas is already in use".
+      if (typeof mhCleanup === 'function') _modalOnClose = mhCleanup;
+    } else {
+      showToast('No se pudo cargar el historial', 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('No se pudo cargar el historial', 'error');
+  }
+}
+
 async function _withFeedback(btn, mode) {
   const original = btn ? btn.innerHTML : null;
   if (btn) { btn.disabled = true; btn.textContent = 'Abriendo…'; }

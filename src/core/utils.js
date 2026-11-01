@@ -153,6 +153,9 @@ const _LAZY_SCRIPTS = {
   // la FAQ enlaza al formulario; separarlos obligaría a cargar los dos de
   // todas formas.
   feedback: 'src/utils/feedback.js',
+  // Ficha de historial de una transacción: se trae al pulsar una fila. Lleva
+  // dos gráficos, así que no tiene sentido descargarlo en cada visita.
+  txHistory: 'src/utils/tx-history.js',
 };
 
 /* ── _ensureScript (cache-aware dynamic loader) ── */
