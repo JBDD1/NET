@@ -1239,6 +1239,164 @@ Suite: **841 en verde**, 30 suites, 23 omitidos. Build correcto.
 
 ---
 
+## FASE 15 — Auditoría de exposición de ficheros estáticos · ✅ COMPLETA
+
+Documentado en [SECURITY.md](SECURITY.md), sección «Ficheros estáticos».
+
+### Lo primero: el fallo descrito NO estaba abierto
+
+El encargo partía de que `server.cjs` servía estáticos con
+`path.join(ROOT, url)` sin validar. **No era así.** Ya había un allowlist
+explícito (`_PUBLIC_ROOT_FILES`) y una comprobación de confinamiento. Se
+reprodujo antes de tocar nada, con `curl --path-as-is` y la cabecera `Host`
+puesta a mano, y las 31 rutas sensibles del guion ya devolvían 404:
+`data/users/*.json`, `server.cjs`, `.git/config`, `.env.*`, `package.json`,
+`node_modules/`, y todas las variantes de salida de directorio (`../`,
+`%2e%2e`, `..%2f`, `%252e%252e`, `..%5c`, `C:/`, `::$DATA`, `%00`).
+
+Decirlo importa porque el resto del trabajo no es «cerrar una brecha
+crítica», es endurecer algo que ya estaba razonablemente bien. La diferencia
+entre esas dos cosas cambia qué hay que rotar y qué hay que contarle a
+quien dependa de esto.
+
+### Lo que SÍ estaba mal, y se ha corregido
+
+**1. `/src/tests/*.js` se servía con 200.** La regla era
+`startsWith('src/') && endsWith('.js')`, así que la suite de tests entera
+era descargable: `/src/tests/calc.test.js` devolvía 11.983 bytes. No
+contiene secretos, pero sí la lógica de cálculo y los casos límite — un mapa
+de dónde apretar. **Es el único cambio de código 200 → 404 de toda la
+auditoría.**
+
+**2. Cualquier método HTTP servía el fichero.** `POST`, `PUT`, `DELETE` y
+`PATCH` sobre `/index.html` devolvían los 170.716 bytes de la página con un
+200. Inofensivo de por sí, pero confunde a las cachés intermedias y no tiene
+ningún motivo para existir. Ahora solo `GET` y `HEAD`.
+
+**3. `HEAD` devolvía el cuerpo completo.** Que es exactamente lo que `HEAD`
+existe para evitar. Ahora responde las mismas cabeceras con `Content-Length`
+y sin cuerpo.
+
+**4. No había forma de apagar los estáticos.** En producción el frontend lo
+sirve Vercel, pero este proceso seguía exponiendo el allowlist desde la raíz
+del proyecto. Ahora `SERVE_STATIC` es `false` por defecto cuando
+`NODE_ENV=production`: todo lo que no sea `/api/*` responde el mismo 404
+genérico, y la API sigue igual.
+
+**5. No se resolvían los enlaces simbólicos.** Un enlace dentro de la raíz
+que apunte fuera pasaba la comprobación de confinamiento, porque se hacía
+solo sobre la ruta construida. Ahora se repite después de `fs.realpathSync`.
+
+**6. Los intentos denegados no dejaban rastro.** Ahora se registran con la
+ruta truncada a 120 caracteres, sin cabeceras y con la IP recortada
+(`127.0.x.x`), y pasan por un cubo de 30 por IP: un 404 suelto no ensucia el
+log y un escaneo deja de escribir en cuanto lo agota. Lo que entra en el log
+acaba en Sentry, y un escaneo mete ahí lo que le dé la gana.
+
+**7. `PORT` era la cadena cruda del entorno.** `process.env.PORT || 3000` da
+un string cuando la variable está puesta, y se colaba en la cabecera
+`Location` de la redirección y en la lista de orígenes permitidos. Funcionaba
+por coincidencia.
+
+**8. Cada arranque abría una pestaña del navegador.** Encontrado al escribir
+las pruebas, que arrancan el servidor una vez por escenario: la suite abría
+tres pestañas en la máquina de quien la ejecutara. Ahora no se abre con
+`NODE_ENV=test` ni con `FINOVA_NO_OPEN=1`.
+
+### Las cinco capas
+
+Una petición tiene que pasarlas todas: método (solo GET/HEAD), forma de la
+URL (ni byte nulo, ni `\`, ni `:`, ni `//`, ni segmentos `..` o que empiecen
+por `.`), lista blanca, extensión + lista negra, y confinamiento con
+`path.resolve` **y otra vez** tras `realpathSync`.
+
+La lista blanca es la que de verdad protege, y es a propósito una lista de lo
+**permitido**: una lista negra falla en silencio cada vez que alguien añade
+un fichero al proyecto. Las otras cuatro están para que un fallo en ella no
+sea explotable.
+
+**Una decisión que conviene conocer:** el guion pedía sustituir el allowlist
+por una lista de extensiones más una denylist. Eso habría sido *más*
+permisivo que lo que ya había — `faq.html`, `docs/`, `ejemplos/` y
+`branding/` habrían pasado a ser servibles. Se ha hecho al contrario: el
+allowlist se mantiene como puerta principal y la denylist se añade encima,
+de modo que hay que pasar las dos.
+
+### Entradas de usuario en rutas de fichero (paso 2)
+
+Auditados todos los `path.join` / `readFileSync` / `writeFileSync` /
+`existsSync` que tocan datos del cliente. **La validación en el borde ya
+estaba bien:** `_UID_RE` (`/^[a-zA-Z0-9]{20,128}$/`) y `_SYNC_CODE_RE`
+(`/^[a-f0-9]{8,16}$/`) se aplican antes de construir cualquier ruta, también
+al `targetUid` de los dos endpoints de admin, y ninguna admite `.`, `/` ni
+`\`.
+
+Lo que se ha añadido es `_safeJoin(base, nombre)` **en el punto de uso**:
+`_metaPath`, `_blockedPath`, el fichero de datos de usuario y los dos
+extremos de sync. Así la garantía deja de depender de que cada llamante se
+acuerde de validar; un endpoint nuevo que lo olvide se topa con esto igual.
+
+### Pruebas
+
+`tests/static-guard.test.cjs`, con `node:test` y **sin dependencias nuevas**.
+**52 comprobaciones** en tres escenarios: desarrollo, producción y
+`SERVE_STATIC=false` forzado.
+
+Tres cosas las hacen valer algo:
+
+1. **Arrancan el servidor de verdad**, como proceso aparte, y le hablan por
+   HTTP. Llamar a `_resolveStatic` directamente probaría la función, no el
+   camino completo donde vive el fallo.
+2. **La ruta se envía tal cual**, sin normalizar. Usar `new URL()` probaría
+   justamente la versión ya saneada de lo que se quiere rechazar.
+3. **Se mira el CUERPO, no solo el código.** Se busca el contenido concreto
+   que no debe salir: el cebo de datos de usuario, `createServer`,
+   `repositoryformatversion`, `root:x:`, `devDependencies`.
+
+Hay un test que compara cuerpo y código de un fichero **denegado** con uno
+**inexistente** y exige que sean idénticos: un 403 o un mensaje distinto le
+confirmarían a quien escanea que el fichero existe.
+
+Los datos falsos (`data/users/zz-test-uid.json`, `data/sync/zzzztest.json`)
+se crean y se borran en `after`, más un `process.on('exit')` por si un test
+revienta o alguien corta la ejecución.
+
+`npm test` sigue siendo solo jest: `jest.config.js` limita `testMatch` a
+`src/tests/**`, así que `tests/*.test.cjs` no lo recoge. El nuevo script es
+`npm run test:security`.
+
+### Higiene
+
+`.gitignore` ya cubría `firebase-service-account.json` y
+`*service-account*.json`. Se han añadido `backups/`, `*.tar.gz`, `*.tgz`,
+`*.zip`, `*.enc`, `*.dump` y `*.sql`: un volcado del dataset dentro del
+repositorio es el mismo problema que esta auditoría venía a cerrar, pero
+publicado en GitHub, que es peor porque no se puede retirar.
+
+### Lo que no se pudo verificar
+
+**No se ha probado contra un despliegue real de Railway.** Todo está medido
+en local, con `NODE_ENV=production` simulado. Si el proxy de Railway
+normaliza o reescribe rutas antes de llegar al proceso, el comportamiento
+ante una URL rara puede diferir.
+
+**No se ha auditado si el servidor estuvo accesible públicamente con la
+versión anterior.** No tengo acceso a los logs de Railway ni a su
+configuración de red, así que no puedo decir si alguien pidió alguna de
+estas rutas ni desde dónde. Lo que sí se puede afirmar es que las rutas
+sensibles **ya devolvían 404 antes** de este trabajo: lo único que estuvo
+servible de más es `src/tests/*.js`, que no contiene secretos.
+
+**Sin navegador.** La app se ha probado por HTTP (códigos, cabeceras,
+cuerpos), pero nadie ha cargado la página para comprobar que no falta ningún
+recurso. El riesgo concreto es que el frontend pida en desarrollo algún
+fichero que no esté en el allowlist y que antes se colara por la regla de
+`src/**/*.js`; los siete recursos principales se han verificado con 200.
+
+Suite: **942 en verde** (jest, 31 suites) + **52 en verde** (seguridad).
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más

@@ -34,7 +34,11 @@ try {
   console.warn('[FINOVA] Firebase Admin SDK no disponible:', e.message);
 }
 
-const PORT = process.env.PORT || 3000;
+// Number(...) y no la cadena cruda: con PORT en el entorno, `process.env.PORT`
+// es un string, y se cuela en la cabecera Location de la redirección y en la
+// lista de orígenes permitidos. Funciona por coincidencia, pero una
+// comparación estricta contra un número no.
+const PORT = Number(process.env.PORT) || 3000;
 const ROOT = __dirname;
 const SYNC_DIR       = path.join(ROOT, 'data', 'sync');
 const USERS_DIR      = path.join(ROOT, 'data', 'users');
@@ -80,12 +84,15 @@ function _isAdminUid(uid) {
   const email = (meta.email || '').toLowerCase();
   return ADMIN_EMAILS.includes(email) || _extraAdmins().includes(email);
 }
-function _metaPath(uid) { return path.join(USERS_DIR, `${uid}.meta.json`); }
+function _metaPath(uid) { return _safeJoinUsers(`${uid}.meta.json`); }
 function _readMeta(uid) {
   try { return JSON.parse(fs.readFileSync(_metaPath(uid), 'utf8')); } catch { return null; }
 }
-function _blockedPath(uid) { return path.join(USERS_DIR, `${uid}.blocked`); }
-function _isBlocked(uid)   { return fs.existsSync(_blockedPath(uid)); }
+function _blockedPath(uid) { return _safeJoinUsers(`${uid}.blocked`); }
+function _isBlocked(uid) {
+  const p = _blockedPath(uid);
+  return p ? fs.existsSync(p) : false;
+}
 
 // ─── Roles RBAC ──────────────────────────────────────────────
 // Roles: 'free' (default), 'premium', 'admin'
@@ -173,6 +180,198 @@ const _PUBLIC_ROOT_FILES = new Set([
   'icon-180.png', 'icon-192.png', 'icon-256.png', 'icon-512.png',
   'icon-1024.png',
 ]);
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SEGURIDAD — Resolución de ficheros estáticos
+
+   ROOT es el directorio del proyecto ENTERO: contiene server.cjs, .env.*,
+   data/users/*.json (datos de usuario), data/sync/*, .git/, node_modules/ y
+   las claves de servicio si alguna se deja caer ahí. Resolver una ruta
+   arbitraria dentro de ROOT es, por tanto, equivalente a publicar el
+   repositorio y la base de datos.
+
+   Por eso aquí hay CUATRO capas, y una petición tiene que pasarlas todas:
+
+     1. Método: solo GET y HEAD.
+     2. Forma de la URL: se rechazan byte nulo, "\", ":", "//" y cualquier
+        segmento ".." o que empiece por ".".
+     3. Allowlist: la ruta tiene que estar en la lista de ficheros públicos
+        (o ser un .js de la aplicación bajo src/, que es lo que el HTML
+        carga en desarrollo).
+     4. Confinamiento: path.resolve dentro de la raíz, y otra vez después de
+        fs.realpathSync, por si hay un enlace simbólico.
+
+   La capa 3 es la que de verdad protege, y es deliberadamente una lista de
+   lo PERMITIDO y no de lo prohibido: una denylist falla en silencio cada vez
+   que alguien añade un fichero nuevo al proyecto. Las capas 2 y 4 están para
+   que un fallo en la 3 no sea explotable, y la lista de extensiones y la
+   denylist de abajo son una quinta red por si la allowlist crece sin cuidado.
+═══════════════════════════════════════════════════════════════ */
+
+// En producción el frontend lo sirve Vercel; este proceso solo expone /api/*.
+// Servir estáticos ahí es superficie de ataque que no hace falta para nada.
+const _NODE_ENV = process.env.NODE_ENV || '';
+const SERVE_STATIC = process.env.SERVE_STATIC != null
+  ? /^(1|true|yes|on|si|sí)$/i.test(String(process.env.SERVE_STATIC).trim())
+  : _NODE_ENV !== 'production';
+
+// Raíz de estáticos: STATIC_DIR si se indica; dist/ en producción; y la raíz
+// del proyecto SOLO en desarrollo, que es el caso que exige las cuatro capas.
+const STATIC_DIR = path.resolve(
+  process.env.STATIC_DIR
+    ? process.env.STATIC_DIR
+    : (_NODE_ENV === 'production' ? path.join(ROOT, 'dist') : ROOT),
+);
+const _STATIC_ES_RAIZ_PROYECTO = STATIC_DIR === path.resolve(ROOT);
+
+// Extensiones servibles. Nada sin extensión y nada fuera de esta lista: un
+// fichero sin extensión en la raíz (Procfile, Dockerfile, un volcado) no es
+// contenido público.
+const _STATIC_EXT_OK = new Set([
+  '.html', '.css', '.js', '.json', '.png', '.jpg', '.jpeg', '.svg', '.ico',
+  '.webp', '.woff', '.woff2', '.txt', '.xml', '.map',
+]);
+
+// Denylist explícita, sin distinguir mayúsculas. Redundante con la allowlist
+// a propósito: si alguien añade un fichero a _PUBLIC_ROOT_FILES sin pensarlo,
+// esto sigue tapando lo que nunca debe salir.
+const _STATIC_DENY = [
+  /^data\//, /^node_modules\//, /^scripts\//, /^src\/tests\//, /^tests\//,
+  /^\.git/, /^\.husky/, /^\.claude/, /^\.github/, /^\.vscode/,
+  /^server\.cjs$/, /^package\.json$/, /^package-lock\.json$/,
+  /^vite\.config\.js$/, /^jest\.config\.js$/, /^vercel\.json$/,
+  /^eol\.cjs$/, /\.bat$/, /\.md$/, /^\.env/, /service-account/,
+  /^api\//, /^branding\//, /^docs\//, /^ejemplos\//,
+];
+
+/**
+ * Une `nombre` a `base` garantizando que el resultado queda DENTRO de base.
+ *
+ * Existe para que la garantía no dependa de que cada llamante se acuerde de
+ * validar su entrada antes. Las entradas de la API ya se validan con una
+ * expresión regular estricta (_UID_RE, _SYNC_CODE_RE), pero eso es una
+ * comprobación en el borde: si mañana se añade un endpoint que construya una
+ * ruta sin pasar por ella, esto la detiene igual.
+ *
+ * Devuelve la ruta absoluta, o null si se sale de base.
+ */
+function _safeJoin(base, nombre) {
+  const raiz = path.resolve(base);
+  const n = String(nombre == null ? '' : nombre);
+  if (!n || n.includes('\0')) return null;
+  const destino = path.resolve(raiz, n);
+  if (destino !== raiz && !destino.startsWith(raiz + path.sep)) return null;
+  return destino;
+}
+
+/** Atajo para el caso más repetido: un fichero dentro de data/users/. */
+function _safeJoinUsers(nombre) {
+  return _safeJoin(USERS_DIR, nombre);
+}
+
+/**
+ * Convierte una ruta de URL en una ruta de fichero segura, o null.
+ *
+ * Nunca lanza y nunca distingue entre «denegado» y «no existe»: quien llama
+ * responde el mismo 404 en los dos casos.
+ */
+function _resolveStatic(urlPath, metodo) {
+  // 1. Solo lectura. Antes se servía el fichero con cualquier método, así que
+  //    un POST a /index.html devolvía la página con 200 — inofensivo de por
+  //    sí, pero confunde a las cachés y no tiene ningún motivo para existir.
+  if (metodo !== 'GET' && metodo !== 'HEAD') return null;
+
+  // 2. Fuera query y fragmento. El fragmento no llega al servidor en un
+  //    navegador, pero sí con un cliente hecho a mano.
+  let ruta = String(urlPath || '').split('?')[0].split('#')[0];
+  if (!ruta.startsWith('/')) return null;
+
+  // 3. Se decodifica UNA sola vez. Una ruta doblemente codificada (%252e)
+  //    queda como «%2e» literal, que no es «..», no existe en disco y no está
+  //    en la allowlist: denegada. Decodificar en bucle hasta que no cambie es
+  //    el error clásico que convierte %252e en una salida de directorio.
+  try { ruta = decodeURIComponent(ruta); } catch { return null; }
+
+  if (ruta.includes('\0')) return null;
+  // La barra invertida es separador en Windows: sin esto, «..\..\server.cjs»
+  // sale del directorio en esta máquina y no en Linux.
+  if (ruta.includes('\\')) return null;
+  // Los dos puntos cubren letras de unidad («/C:/Windows/win.ini») y los
+  // flujos alternativos de NTFS («/index.html::$DATA»), que sirven el mismo
+  // fichero esquivando la comprobación de extensión.
+  if (ruta.includes(':')) return null;
+  // «//» se rechaza en vez de colapsarse: en algunos servidores «//etc/passwd»
+  // se interpreta como ruta absoluta.
+  if (ruta.includes('//')) return null;
+
+  const segmentos = ruta.split('/').filter(s => s !== '');
+  for (const s of segmentos) {
+    if (s === '..' || s === '.') return null;
+    // Los dotfiles son exactamente lo que no debe salir: .git, .env,
+    // .claude, .husky. Se bloquean por forma, no por nombre, para que un
+    // fichero oculto nuevo quede tapado sin tocar ninguna lista.
+    if (s.startsWith('.')) return null;
+  }
+
+  // 4. «/» sirve la portada y nada más. Nunca se lista un directorio.
+  //    Se mantiene landing.html, que es lo que este servidor ha servido
+  //    siempre en la raíz: cambiarlo a index.html rompería el flujo local.
+  const rel = segmentos.length === 0 ? 'landing.html' : segmentos.join('/');
+  if (rel.endsWith('/')) return null;
+
+  // 5. Extensión servible.
+  const ext = path.extname(rel).toLowerCase();
+  if (!_STATIC_EXT_OK.has(ext)) return null;
+
+  // 6. Allowlist y denylist. En la raíz del proyecto hacen falta las dos; con
+  //    STATIC_DIR apuntando a dist/ el directorio ya es solo contenido
+  //    público y la allowlist estricta no aplica.
+  const relLower = rel.toLowerCase();
+  if (_STATIC_ES_RAIZ_PROYECTO) {
+    for (const re of _STATIC_DENY) if (re.test(relLower)) return null;
+    const esFicheroPublico = _PUBLIC_ROOT_FILES.has(rel);
+    // Los .js de la aplicación bajo src/ los carga el HTML en desarrollo.
+    // src/tests/ queda fuera: antes esta regla servía la suite de tests
+    // entera, que no es contenido público aunque no contenga secretos.
+    const esFuenteApp = rel.startsWith('src/') && ext === '.js' && !relLower.startsWith('src/tests/');
+    if (!esFicheroPublico && !esFuenteApp) return null;
+  } else {
+    for (const re of _STATIC_DENY) if (re.test(relLower)) return null;
+  }
+
+  // 7. Confinamiento real, dos veces: una sobre la ruta construida y otra
+  //    sobre la ruta resuelta por el sistema de ficheros, porque un enlace
+  //    simbólico dentro de la raíz puede apuntar fuera.
+  const destino = _safeJoin(STATIC_DIR, rel);
+  if (!destino) return null;
+  let real;
+  try { real = fs.realpathSync(destino); } catch { return null; }
+  if (real !== STATIC_DIR && !real.startsWith(STATIC_DIR + path.sep)) return null;
+  try { if (!fs.statSync(real).isFile()) return null; } catch { return null; }
+
+  return { file: real, rel, ext };
+}
+
+/**
+ * Anota un intento denegado y frena los escaneos.
+ *
+ * La ruta se trunca a 120 caracteres y NO se registra ninguna cabecera ni la
+ * IP completa: un escaneo automatizado mete en el log lo que le dé la gana, y
+ * lo que entra en el log acaba en Sentry.
+ */
+function _logStaticDeny(req) {
+  const ip = _clientIp(req);
+  // 30 intentos, reposición lenta: un 404 suelto no ensucia el log, un
+  // escaneo deja de escribir en cuanto agota el cubo.
+  const cubo = _tokenBucket(`static-deny:${ip}`, 30, 0.1);
+  if (!cubo.ok) return;
+  const ruta = String(req.url || '').slice(0, 120);
+  const ipCorta = ip.includes(':')
+    ? ip.split(':').slice(0, 2).join(':') + ':…'
+    : ip.split('.').slice(0, 2).join('.') + '.x.x';
+  console.error(`[FINOVA/Static] Denegado ${req.method} ${JSON.stringify(ruta)} desde ${ipCorta}`);
+}
 
 // ─── import.meta.env en desarrollo local sin Vite ──────────────
 // server.cjs sirve src/**/*.js en crudo (sin pasar por Vite, igual que en
@@ -1812,8 +2011,8 @@ async function handleUserDataGet(req, res) {
     res.writeHead(403, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'Cuenta suspendida' }));
   }
-  const file = path.join(USERS_DIR, `${uid}.json`);
-  if (!_auditResponse(uid, file, req)) {
+  const file = _safeJoinUsers(`${uid}.json`);
+  if (!file || !_auditResponse(uid, file, req)) {
     res.writeHead(500, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'Error de integridad de datos' }));
   }
@@ -1887,7 +2086,11 @@ async function handleUserDataPost(req, res) {
         res.writeHead(400, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'Payload inválido' }));
       }
-      const targetFile = path.join(USERS_DIR, `${uid}.json`);
+      const targetFile = _safeJoinUsers(`${uid}.json`);
+      if (!targetFile) {
+        res.writeHead(400, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'UID inválido' }));
+      }
       if (!_auditResponse(uid, targetFile, req)) {
         res.writeHead(500, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'Error de integridad de datos' }));
@@ -2099,7 +2302,12 @@ async function handleSyncUpload(req, res) {
         res.writeHead(403, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'Ese código ya está en uso por otra cuenta. Genera uno nuevo.' }));
       }
-      fs.writeFileSync(path.join(SYNC_DIR, `${code}.json`), data, 'utf8');
+      const destinoSync = _safeJoin(SYNC_DIR, `${code}.json`);
+      if (!destinoSync) {
+        res.writeHead(400, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'Código inválido' }));
+      }
+      fs.writeFileSync(destinoSync, data, 'utf8');
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true, saved: new Date().toISOString() }));
     } catch (e) {
@@ -2129,8 +2337,8 @@ async function handleSyncDownload(req, res) {
     res.writeHead(403, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'Ese código no pertenece a tu cuenta.' }));
   }
-  const file = path.join(SYNC_DIR, `${code}.json`);
-  if (!fs.existsSync(file)) {
+  const file = _safeJoin(SYNC_DIR, `${code}.json`);
+  if (!file || !fs.existsSync(file)) {
     res.writeHead(404, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'No se encontró backup para ese código' }));
   }
@@ -2177,7 +2385,12 @@ async function handleUserMeta(req, res) {
         lastAccess:  new Date().toISOString(),
         createdAt:   existing.createdAt || new Date().toISOString(),
       };
-      fs.writeFileSync(_metaPath(uid), JSON.stringify(meta), 'utf8');
+      const destinoMeta = _metaPath(uid);
+      if (!destinoMeta) {
+        res.writeHead(400, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'UID inválido' }));
+      }
+      fs.writeFileSync(destinoMeta, JSON.stringify(meta), 'utf8');
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true }));
     } catch (e) {
@@ -3072,9 +3285,15 @@ async function handleAdminBlock(req, res) {
         res.writeHead(400, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'UID inválido' }));
       }
       if (blocked) {
-        fs.writeFileSync(_blockedPath(targetUid), '', 'utf8');
+        const destinoBloqueo = _blockedPath(targetUid);
+        if (!destinoBloqueo) {
+          res.writeHead(400, _apiHeaders(req));
+          return res.end(JSON.stringify({ error: 'UID inválido' }));
+        }
+        fs.writeFileSync(destinoBloqueo, '', 'utf8');
       } else {
-        if (fs.existsSync(_blockedPath(targetUid))) fs.unlinkSync(_blockedPath(targetUid));
+        const rutaBloqueo = _blockedPath(targetUid);
+        if (rutaBloqueo && fs.existsSync(rutaBloqueo)) fs.unlinkSync(rutaBloqueo);
       }
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true, blocked }));
@@ -3504,42 +3723,44 @@ const _finovaServer = http.createServer((req, res) => {
     return res.end(JSON.stringify({ error: 'Not found' }));
   }
 
-  // Static files — allowlist explícito, no se sirve nada fuera de esta lista.
-  // ROOT es el directorio del proyecto entero (incluye server.cjs, .env*, data/,
-  // .git/, node_modules/...), así que NUNCA se debe resolver un path arbitrario
-  // dentro de él: solo los archivos públicos del frontend que el propio HTML referencia.
-  const rawUrl = req.url.split('?')[0];
-  let decodedUrl;
-  try { decodedUrl = decodeURIComponent(rawUrl); } catch { decodedUrl = null; }
-
+  // Static files — ver el bloque «Resolución de ficheros estáticos» arriba.
+  // Todo lo denegado responde el MISMO 404 que un fichero inexistente: un 403
+  // o un mensaje distinto confirmarían al que escanea que el fichero existe.
   const notFound = () => {
     res.writeHead(404, { 'Content-Type': 'application/json', ..._SEC });
     res.end(JSON.stringify({ error: 'Not found' }));
   };
 
-  if (decodedUrl === null || decodedUrl.includes('\0')) return notFound();
+  // En producción el frontend lo sirve Vercel. Aquí no se sirve nada que no
+  // sea /api/*, y la respuesta es el mismo JSON genérico de siempre.
+  if (!SERVE_STATIC) {
+    _logStaticDeny(req);
+    return notFound();
+  }
 
-  const relPath = decodedUrl === '/' ? 'landing.html' : decodedUrl.replace(/^\/+/, '');
-  const normRel = path.posix.normalize(relPath.replace(/\\/g, '/'));
+  const destino = _resolveStatic(req.url, req.method);
+  if (!destino) {
+    _logStaticDeny(req);
+    return notFound();
+  }
 
-  const isAllowed =
-    _PUBLIC_ROOT_FILES.has(normRel) ||
-    (normRel.startsWith('src/') && normRel.endsWith('.js') && !normRel.includes('..'));
-  if (!isAllowed) return notFound();
+  const mime = MIME[destino.ext] || 'application/octet-stream';
 
-  // Defensa en profundidad: confirma que el path resuelto sigue dentro de ROOT.
-  const filePath = path.resolve(ROOT, normRel);
-  if (filePath !== ROOT && !filePath.startsWith(ROOT + path.sep)) return notFound();
-
-  const ext  = path.extname(filePath).toLowerCase();
-  const mime = MIME[ext] || 'text/plain';
-
-  fs.readFile(filePath, (err, data) => {
+  fs.readFile(destino.file, (err, data) => {
     if (err) return notFound();
     const headers = { 'Content-Type': mime, ..._SEC };
-    if (ext === '.html') headers['Content-Security-Policy'] = _CSP;
+    if (destino.ext === '.html') headers['Content-Security-Policy'] = _CSP;
+    // HEAD: las mismas cabeceras, sin cuerpo. Antes se devolvía el fichero
+    // completo, que es lo que HEAD existe precisamente para evitar.
+    if (req.method === 'HEAD') {
+      headers['Content-Length'] = String(data.length);
+      res.writeHead(200, headers);
+      return res.end();
+    }
     res.writeHead(200, headers);
-    res.end(ext === '.js' && normRel.startsWith('src/') ? _stripImportMeta(data.toString('utf8')) : data);
+    res.end(destino.ext === '.js' && destino.rel.startsWith('src/')
+      ? _stripImportMeta(data.toString('utf8'))
+      : data);
   });
 
 // '0.0.0.0' (no '127.0.0.1'): en Railway el proxy que enruta el tráfico
@@ -3572,7 +3793,11 @@ const _httpServer = _finovaServer.listen(PORT, '0.0.0.0', () => {
 
   // Abrir el navegador solo tiene sentido en desarrollo local; en Railway
   // 'start' no es un comando válido (Linux) y no hay pantalla que abrir.
-  if (!_IS_CLOUD_DEPLOY) {
+  //
+  // Y tampoco en una prueba: la suite de seguridad arranca el servidor una
+  // vez por escenario, y sin esta condición cada ejecución abría una pestaña
+  // nueva en la máquina de quien ejecuta los tests.
+  if (!_IS_CLOUD_DEPLOY && process.env.NODE_ENV !== 'test' && process.env.FINOVA_NO_OPEN !== '1') {
     const { exec } = require('child_process');
     exec(`start http://localhost:${PORT}`);
   }

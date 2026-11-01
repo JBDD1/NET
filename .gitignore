@@ -66,3 +66,16 @@ desktop.ini
 # ── Tests ─────────────────────────────────────────────────────
 coverage/
 .nyc_output/
+
+# ── Copias de seguridad y volcados ────────────────────────────
+# Un backups/ con el dataset exportado, o un .tar.gz del proyecto, es el
+# mismo problema que cerrar la exposición de ficheros estáticos: datos
+# reales fuera de su sitio. Aquí publicados en GitHub en vez de servidos
+# por HTTP, que es peor porque no se puede retirar.
+backups/
+*.tar.gz
+*.tgz
+*.zip
+*.enc
+*.dump
+*.sql
