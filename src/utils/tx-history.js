@@ -516,6 +516,7 @@ function mhPatrones(stats, tx) {
 
 let _mhChartImporte = null;
 let _mhChartCat     = null;
+let _mhChartPrecio  = null;
 let _mhCurrent      = null;   // { tx, mk, stats, catStats }
 
 const _MH_PERIODOS = [
@@ -964,6 +965,378 @@ function _mhSeccionPatrones(st, tx) {
   </div>`;
 }
 
+/* ─── Sección: comparador de precios ─────────────────────────── */
+
+/*
+ * Toda esta sección se apoya en price-compare.js, que se carga junto con la
+ * ficha. Si no estuviera, la sección lo dice y no se rompe nada: es un bloque
+ * añadido, no un requisito de la ficha.
+ */
+
+/**
+ * Precio por unidad canónica. Hacen falta tres decimales por debajo de 1 €:
+ * con dos, 0,049 €/ud y 0,054 €/ud se verían idénticos y una diferencia del
+ * 10 % parecería un empate.
+ */
+function _mhPrecioU(v, metrica, dec) {
+  if (v == null || !isFinite(v)) return '—';
+  if (dec == null) dec = Math.abs(v) < 1 ? 3 : 2;
+  const s = Math.abs(v).toFixed(dec).replace('.', ',');
+  const sufijo = metrica ? metrica.replace('€', '') : '';
+  return (v < 0 ? '-' : '') + s + ' €' + sufijo;
+}
+
+/**
+ * Decimales de TODA una comparación, decididos por el valor más pequeño del
+ * conjunto. Si una columna mezcla «0,890 €/l» y «1,05 €/l», el ojo no puede
+ * comparar de un vistazo lo único que la tabla existe para comparar.
+ */
+function _mhDec(valores) {
+  return valores.some(v => v != null && isFinite(v) && Math.abs(v) > 0 && Math.abs(v) < 1) ? 3 : 2;
+}
+
+/** Métrica solo cuando aporta: «749,00 €/ud» es ruido, «0,89 €/l» es el dato. */
+function _mhSufijo(magnitud, metrica) {
+  return magnitud === 'unidad' ? null : metrica;
+}
+
+/** De dónde sale un precio. Viaja con el dato para no afirmar nunca que un
+ *  precio histórico es el de hoy. */
+function _mhProcedencia(fuente) {
+  if (fuente === 'linea-ticket') return 'leídos en líneas de tickets escaneados';
+  if (fuente === 'importe-total') return 'tomados del importe total de cada operación, sin desglose';
+  if (fuente === 'externa') return 'verificados en una fuente externa';
+  if (fuente === 'estimada') return 'estimados';
+  return 'de origen desconocido';
+}
+
+/** Cuántos precios sostienen una cifra. Un solo registro no es una media. */
+function _mhFiabilidad(n) {
+  if (n <= 1) return '<span class="mh-pc-ojo">1 solo precio</span>';
+  return `${n} precios`;
+}
+
+/** Tabla de comercios de una comparación (de producto o de servicio). */
+function _mhPcTabla(cmp, sufijo, actualKey, campo) {
+  const n = cmp.alternativas.length;
+  const valor = a => (campo === 'medio' ? a.medio : (a.ultimo != null ? a.ultimo : a.medio));
+  const dec = _mhDec(cmp.alternativas.map(valor));
+  return `<div class="mh-pc-tabla">
+    ${cmp.alternativas.map((a, i) => {
+      const marcas = [];
+      if (n >= 2 && i === 0) marcas.push('<span class="mh-pc-badge is-barato">más barato</span>');
+      if (n >= 2 && i === n - 1) marcas.push('<span class="mh-pc-badge is-caro">más caro</span>');
+      if (actualKey && a.merchantKey === actualKey) marcas.push('<span class="mh-pc-badge is-aqui">aquí</span>');
+      if (a.soloIdenticos === false) marcas.push('<span class="mh-pc-badge">equivalente</span>');
+      const precio = valor(a);
+      return `<div class="mh-pc-fila${actualKey && a.merchantKey === actualKey ? ' is-actual' : ''}">
+        <div class="mh-pc-com">
+          ${a.ultimoTxId
+            ? `<button type="button" class="mh-pc-link" data-action="mh-goto" data-id="${_mhEsc(a.ultimoTxId)}">${_mhEsc(a.merchantLabel)}</button>`
+            : _mhEsc(a.merchantLabel)}
+          <span class="mh-pc-marcas">${marcas.join('')}</span>
+        </div>
+        <div class="mh-pc-precio">${_mhPrecioU(precio, sufijo, dec)}</div>
+        <div class="mh-pc-meta">
+          ${campo === 'medio' ? 'media de ' : ''}${_mhFiabilidad(a.registros)}${a.ultimaFecha ? ' · último el ' + _mhEsc(formatDate(a.ultimaFecha)) : ''}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+/** Productos parecidos que NO se comparan, y por qué. */
+function _mhPcSimilares(cmp) {
+  const sim = (cmp && cmp.similaresPorProducto) || [];
+  if (!sim.length) return '';
+  const dec = _mhDec(sim.map(s => s.ultimo));
+  return `<details class="mh-sub">
+    <summary>${sim.length} ${sim.length === 1 ? 'producto parecido' : 'productos parecidos'} que no se comparan</summary>
+    <p class="mh-nota">
+      Se parecen, pero difieren en algo que cambia el precio: modelo, capacidad,
+      variedad. Compararlos daría una cifra de ahorro falsa, así que solo se
+      enseñan.
+    </p>
+    <div class="mh-pc-tabla">
+      ${sim.slice(0, 8).map(s => `<div class="mh-pc-fila">
+        <div class="mh-pc-com">${_mhEsc(s.nombre)}</div>
+        <div class="mh-pc-precio">${_mhPrecioU(s.ultimo, s.metrica === '€/ud' ? null : s.metrica, dec)}</div>
+        <div class="mh-pc-meta">${_mhFiabilidad(s.registros)} · ${_mhEsc(s.comercios.join(', '))}</div>
+      </div>`).join('')}
+    </div>
+  </details>`;
+}
+
+/** Una línea del ticket con su comparación. */
+function _mhPcLinea(l, actualKey, indice) {
+  const d = l.desc, cmp = l.cmp;
+  const sufijo = _mhSufijo(d.magnitud, d.metrica);
+  const tamano = d.size ? ` · ${d.size.value} ${_mhEsc(d.size.unit)}` : '';
+  const marca = d.brand ? ` · ${_mhEsc(d.brand)}` : '';
+
+  // Un solo criterio de decimales para la cabecera, el ahorro, la tabla y el
+  // pie de esta línea: son el mismo precio contado de cuatro formas.
+  const dec = _mhDec([
+    d.precioCanonico,
+    ...(cmp ? cmp.alternativas.map(a => a.ultimo) : []),
+  ]);
+  const decDif = _mhDec([cmp ? cmp.difUnidad : null, l.ahorro ? l.ahorro.porUnidad : null]);
+
+  const cabecera = `<div class="mh-pc-cab">
+    <div class="mh-pc-nombre">${_mhEsc(d.nombre)}</div>
+    <div class="mh-pc-sub">
+      ${d.comparable ? _mhPrecioU(d.precioCanonico, sufijo, dec) + ' aquí' : 'sin precio'}${marca}${tamano}
+      ${d.qty ? ` · ${d.qty} ${d.qty === 1 ? 'unidad' : 'unidades'}` : ''}
+    </div>
+  </div>`;
+
+  if (!d.comparable) {
+    return `<div class="mh-pc-item">${cabecera}
+      ${_mhVacio('Esta línea no trae precio en el ticket, así que no se puede comparar.')}</div>`;
+  }
+
+  if (!cmp || !cmp.comparacionValida) {
+    const unico = cmp && cmp.nComercios === 1;
+    return `<div class="mh-pc-item">${cabecera}
+      ${_mhVacio(unico
+        ? 'Solo lo has comprado aquí, así que no hay con qué comparar. En cuanto lo compres en otro sitio aparecerá la comparación.'
+        : 'Todavía no hay otro precio de este producto en tu historial.')}
+      ${_mhPcSimilares(cmp)}
+    </div>`;
+  }
+
+  // Que el más barato sea este comercio no basta: la línea que se está mirando
+  // tiene que ser además la de ese precio. Si compró aquí barato en enero y
+  // caro hoy, lo honesto es enseñar la diferencia, no felicitarle.
+  const esElBarato = cmp.barato.merchantKey === actualKey
+    && Math.abs(cmp.barato.ultimo - d.precioCanonico) < 1e-9;
+
+  const ahorro = l.ahorro;
+  const bloqueAhorro = ahorro
+    ? `<div class="mh-pc-ahorro">
+        <strong>${formatCurrency(ahorro.enEstaCompra)}</strong> de diferencia en esta compra
+        si la hubieras hecho en <strong>${_mhEsc(ahorro.donde)}</strong>:
+        ${_mhPrecioU(ahorro.porUnidad, sufijo, decDif)} menos${sufijo ? '' : ' por unidad'}.
+        <span class="mh-pc-ojo">Es el precio que tú pagaste allí el ${_mhEsc(formatDate(cmp.barato.ultimaFecha))}, no una oferta de hoy.</span>
+      </div>`
+    : esElBarato
+      ? `<div class="mh-pc-ahorro is-ok">Aquí lo compraste al precio más bajo de tu historial.</div>`
+      : '';
+
+  const hist = l.historial;
+  const botonGrafico = hist && hist.suficiente
+    ? `<button type="button" class="mh-pc-ver" data-action="mh-pc-prod" data-i="${indice}">
+         Ver evolución del precio (${hist.puntos.length} precios)
+       </button>`
+    : '';
+
+  return `<div class="mh-pc-item">
+    ${cabecera}
+    ${bloqueAhorro}
+    ${_mhPcTabla(cmp, sufijo, actualKey, 'ultimo')}
+    <div class="mh-pc-pie">
+      Del más barato al más caro hay
+      <strong>${_mhPrecioU(cmp.difUnidad, sufijo, decDif)}</strong>
+      ${cmp.pctDif != null ? `(${formatPct(cmp.pctDif, false)})` : ''}
+      · ${cmp.nComercios} comercios · precios ${_mhProcedencia(cmp.fuente)}
+    </div>
+    ${botonGrafico}
+    ${_mhPcSimilares(cmp)}
+  </div>`;
+}
+
+/** Comparación de un servicio (una operación sin líneas de ticket). */
+function _mhPcServicio(srv, tx, actualKey) {
+  if (!srv) {
+    return _mhVacio(
+      'Esta operación no tiene líneas de ticket, así que solo se puede comparar por su '
+      + 'importe total con otros proveedores de la misma categoría, y ahora mismo no hay '
+      + 'otro en «' + _mhEsc(tx.category || UNCLASSIFIED_CATEGORY) + '». '
+      + 'Si escaneas el ticket se podrá comparar producto a producto.'
+    );
+  }
+  const mismaCadencia = srv.metrica !== '€/operación';
+  return `
+    <p class="mh-nota">
+      Comparación por <strong>${_mhEsc(srv.metrica)}</strong> entre los
+      ${srv.alternativas.length} proveedores que tienes en «${_mhEsc(srv.category)}».
+      ${mismaCadencia
+        ? 'Todos se repiten con la misma periodicidad, medida con las fechas de tus propias operaciones.'
+        : 'No todos se repiten con la misma periodicidad, así que se compara el importe de cada operación y no un coste mensual.'}
+    </p>
+    ${_mhPcTabla(srv, null, actualKey, 'medio')}
+    <div class="mh-pc-pie">
+      ${srv.barato && srv.caro && srv.barato.merchantKey !== srv.caro.merchantKey
+        ? `Entre el más barato y el más caro hay
+           <strong>${formatCurrency(srv.caro.medio - srv.barato.medio)}</strong>
+           de media por operación. `
+        : ''}
+      Precios ${_mhProcedencia(srv.fuente)}.
+    </div>
+    <div class="mh-pc-aviso">${_mhEsc(srv.advertencia)}</div>
+    ${srv.alternativas.some(a => a.cadencia) ? `<details class="mh-sub">
+      <summary>Periodicidad medida de cada proveedor</summary>
+      <div class="mh-pc-tabla">
+        ${srv.alternativas.map(a => `<div class="mh-pc-fila">
+          <div class="mh-pc-com">${_mhEsc(a.merchantLabel)}</div>
+          <div class="mh-pc-precio">${a.cadencia ? _mhEsc(a.cadencia.label) : 'sin patrón'}</div>
+          <div class="mh-pc-meta">${a.cadencia
+            ? `cada ${a.cadencia.mediaDias.toFixed(0)} días · ${a.registros} operaciones`
+            : `${a.registros} ${a.registros === 1 ? 'operación' : 'operaciones'}, sin regularidad`}</div>
+        </div>`).join('')}
+      </div>
+    </details>` : ''}
+  `;
+}
+
+/** Las mayores diferencias de todo el historial. */
+function _mhPcTop() {
+  if (typeof pcTopAhorros !== 'function') return '';
+  const top = pcTopAhorros(6);
+  if (!top.length) return '';
+  return `<details class="mh-sub">
+    <summary>Dónde hay más diferencia en todo tu historial</summary>
+    <p class="mh-nota">
+      Productos que has comprado en más de un sitio, ordenados por la diferencia
+      entre el comercio más barato y el más caro. Todos son precios que ya pagaste.
+    </p>
+    <div class="mh-pc-tabla">
+      ${top.map(t => {
+        const suf = _mhSufijo(t.ref.magnitud, t.metrica);
+        const dec = _mhDec([t.barato.ultimo, t.caro.ultimo]);
+        return `<div class="mh-pc-fila">
+          <div class="mh-pc-com">${_mhEsc(t.ref.nombre)}</div>
+          <div class="mh-pc-precio">${formatPct(t.pctDif, false)}</div>
+          <div class="mh-pc-meta">
+            ${_mhEsc(t.barato.merchantLabel)} ${_mhPrecioU(t.barato.ultimo, suf, dec)}
+            · ${_mhEsc(t.caro.merchantLabel)} ${_mhPrecioU(t.caro.ultimo, suf, dec)}
+            · ${_mhFiabilidad(t.registros)}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </details>`;
+}
+
+function _mhSeccionComparador(tx, mk) {
+  if (typeof pcSummaryForTx !== 'function') {
+    return _mhVacio('El comparador de precios no se ha podido cargar. Cierra la ficha y vuelve a abrirla.');
+  }
+  const sum = pcSummaryForTx(tx);
+  if (_mhCurrent) { _mhCurrent.pc = sum; _mhCurrent.pcProd = null; }
+  if (!sum) return _mhVacio('No hay nada que comparar en esta operación.');
+
+  const actualKey = mk && mk.key;
+
+  if (sum.tipo === 'servicio') return _mhPcServicio(sum.servicio, tx, actualKey) + _mhPcTop();
+  if (!sum.lineas.length) return _mhVacio('El ticket de esta compra no tiene líneas legibles.') + _mhPcTop();
+
+  const resumen = `<p class="mh-nota">
+      ${sum.lineas.length} ${sum.lineas.length === 1 ? 'línea' : 'líneas'} en el ticket ·
+      ${sum.conComparacion === 0
+        ? 'ninguna se puede comparar todavía con otro comercio'
+        : `${sum.conComparacion} con precio en más de un comercio`}
+    </p>
+    ${sum.ahorroTotal ? `<div class="mh-pc-total">
+      Comprando cada producto donde más barato te salió, esta compra habría costado
+      <strong>${formatCurrency(sum.ahorroTotal)}</strong> menos.
+      <span class="mh-pc-ojo">
+        Es la suma de precios que ya pagaste en otros comercios y en otras fechas.
+        No es una oferta disponible hoy, y no cuenta el desplazamiento.
+      </span>
+    </div>` : ''}`;
+
+  // Un solo canvas, que se rellena al pulsar «ver evolución» de una línea:
+  // montar un Chart.js por producto sería media docena de gráficos que nadie
+  // va a mirar, y el canvas de un bloque cerrado tiene altura 0.
+  const grafico = sum.lineas.some(l => l.historial && l.historial.suficiente)
+    ? `<div class="mh-chart-wrap" id="mh-pc-grafico" hidden>
+         <div class="mh-chart-titulo" id="mh-pc-grafico-tit"></div>
+         <div class="mh-chart-box"><canvas id="mh-chart-precio"></canvas></div>
+         <div id="mh-chart-precio-vacio"></div>
+       </div>`
+    : '';
+
+  return resumen + grafico
+    + `<div class="mh-pc-lista">${sum.lineas.map((l, i) => _mhPcLinea(l, actualKey, i)).join('')}</div>`
+    + _mhPcTop();
+}
+
+/** Dibuja la evolución del precio de una línea concreta. */
+function _mhPintaPrecio(indice) {
+  const caja  = document.getElementById('mh-pc-grafico');
+  const tit   = document.getElementById('mh-pc-grafico-tit');
+  const vacio = document.getElementById('mh-chart-precio-vacio');
+  if (!caja || !_mhCurrent || !_mhCurrent.pc || !_mhCurrent.pc.lineas) return;
+  const l = _mhCurrent.pc.lineas[indice];
+  if (!l || !l.historial || !l.historial.suficiente) return;
+
+  caja.hidden = false;
+  _mhCurrent.pcProd = indice;
+  const h = l.historial;
+  const sufijo = _mhSufijo(l.desc.magnitud, h.metrica);
+  const dec = _mhDec(h.puntos.map(p => p.precio));
+  if (tit) tit.textContent = 'Precio de ' + l.desc.nombre;
+
+  // Sin Chart.js el dato no se pierde: se enseña en texto. Es el mismo
+  // criterio que el resto de la ficha, que nunca depende de la librería para
+  // decir la verdad.
+  if (typeof Chart === 'undefined') {
+    if (vacio) {
+      vacio.innerHTML = `<div class="mh-pc-tabla">
+        ${h.puntos.map(p => `<div class="mh-pc-fila">
+          <div class="mh-pc-com">${_mhEsc(formatDate(p.date))}</div>
+          <div class="mh-pc-precio">${_mhPrecioU(p.precio, sufijo, dec)}</div>
+          <div class="mh-pc-meta">${_mhEsc(p.merchantLabel || '')}</div>
+        </div>`).join('')}
+      </div>`;
+    }
+    return;
+  }
+  if (vacio) vacio.innerHTML = '';
+
+  const d = getChartDefiniciones();
+  _mhChartPrecio = safeDestroyChart(_mhChartPrecio, 'mh-chart-precio');
+  _mhChartPrecio = new Chart(document.getElementById('mh-chart-precio'), {
+    type: 'line',
+    data: {
+      labels: h.puntos.map(p => formatDate(p.date)),
+      datasets: [{
+        data: h.puntos.map(p => p.precio),
+        borderColor: d.accent, backgroundColor: d.accentFill,
+        borderWidth: 2, pointRadius: 4, pointHoverRadius: 6,
+        fill: true, tension: 0.2,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => _mhPrecioU(c.parsed.y, sufijo, dec),
+            // El comercio es la mitad del dato: un precio sin saber dónde no
+            // responde a la pregunta del comparador.
+            afterBody: items => {
+              const p = h.puntos[items[0].dataIndex];
+              return p ? p.merchantLabel : '';
+            },
+          },
+        },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: d.textColor, font: { size: 10, family: d.fontFamily }, maxRotation: 0, autoSkipPadding: 12 } },
+        y: {
+          grid: { color: d.gridColor, drawBorder: false },
+          ticks: { color: d.textColor, font: { size: 10, family: d.fontFamily }, callback: v => _mhPrecioU(v, sufijo, dec) },
+        },
+      },
+    },
+  });
+}
+
 /* ─── La ficha ────────────────────────────────────────────────── */
 
 function _mhBloque(titulo, contenido, abierto) {
@@ -1014,6 +1387,7 @@ function openTxHistory(txId) {
     ${_mhBloque('Estadísticas de ' + (tx.category || UNCLASSIFIED_CATEGORY), _mhSeccionCategoria(tx, catStats), false)}
     ${_mhBloque('Gráficos históricos', _mhSeccionGraficos(), false)}
     ${_mhBloque('Ticket y justificantes', _mhSeccionTickets(tx, stats), false)}
+    ${_mhBloque('Comparador de precios', _mhSeccionComparador(tx, mk), false)}
     ${_mhBloque('Productos habituales', _mhSeccionProductos(mk || { key: '' }), false)}
     ${_mhBloque('Hábitos y patrones', _mhSeccionPatrones(stats, tx), false)}
 
@@ -1087,6 +1461,11 @@ function _mhWire() {
       _mhPintaGraficos();
       return;
     }
+    if (a === 'mh-pc-prod') {
+      const i = parseInt(btn.dataset.i, 10);
+      if (!isNaN(i)) _mhPintaPrecio(i);
+      return;
+    }
     if (a === 'mh-editar') {
       const id = btn.dataset.id;
       const t = (APP.transactions || []).find(x => x.id === id);
@@ -1100,5 +1479,6 @@ function _mhWire() {
 function mhCleanup() {
   _mhChartImporte = safeDestroyChart(_mhChartImporte, 'mh-chart-importe');
   _mhChartCat     = safeDestroyChart(_mhChartCat, 'mh-chart-cat');
+  _mhChartPrecio  = safeDestroyChart(_mhChartPrecio, 'mh-chart-precio');
   _mhCurrent = null;
 }

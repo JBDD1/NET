@@ -1081,6 +1081,164 @@ Suite: **761 en verde**, 29 suites. Build correcto.
 
 ---
 
+## FASE 14 — Comparador universal de precios · ✅ COMPLETA
+
+Un único motor que responde a «¿dónde he pagado menos por lo mismo?» para
+cualquier sector. Documentado aparte en [PRICE_COMPARE.md](PRICE_COMPARE.md).
+
+- Motor: `src/utils/price-compare.js` (sin interfaz, sin dependencias)
+- Interfaz: bloque «Comparador de precios» de la ficha de una transacción
+- Tests: `src/tests/price-compare.test.js` — **80 casos**
+
+### La regla que gobierna el diseño
+
+Antes de comparar dos precios hay que **poder afirmar** que son comparables.
+Cada par se clasifica en `identico` / `equivalente` / `similar` /
+`no-comparable`, y **solo los dos primeros se comparan en precio**. El cuarto
+nivel es lo que lo mantiene honesto: una comparación de menos es una
+molestia, una comparación falsa es un número inventado que el usuario se cree.
+
+### Lo que había de verdad en los datos
+
+| Dato | ¿Existe? |
+|---|---|
+| `receipt.items[].name`, `qty`, `unitPrice`, `total` | Sí |
+| `receipt.items[].brand`, `size`, `sizeUnit` | **Añadidos** al escáner con esta fase |
+| Importe, fecha, categoría, comercio | Sí |
+| Código de barras, referencia, modelo, SKU | **NO** |
+| Especificaciones, duración, condiciones de un servicio | **NO** |
+| Noches de hotel, coberturas de seguro, kilómetros | **NO** |
+| Importador de facturas aparte del escáner | **NO existe** |
+
+El encargo mencionaba casi todo lo de la mitad inferior. No se ha inventado
+ninguno: donde falta el dato, el motor **no compara, dice que no puede**. Por
+eso un hotel se compara por importe por operación y con la advertencia a la
+vista, y no por €/noche, que es lo que haría falta y no se puede calcular.
+
+### Los tres campos nuevos del escáner
+
+`brand`, `size` y `sizeUnit`, con instrucciones explícitas de **preferir
+`null` a inventar**: un tamaño inventado produce una comparación falsa, que es
+peor que no tener comparación. Las unidades se validan contra una lista
+cerrada (`kg g l ml cl ud m cm`) y cualquier otra se descarta. `size` es el
+contenido de UNA unidad, no del lote.
+
+**Los tickets escaneados antes de esta versión no los llevan**, y el motor
+funciona igual con menos precisión: cae al tamaño escrito en el nombre
+(«LECHE SEMI 1 L») y, si tampoco está, trata el producto por unidad.
+
+### Cuatro bugs de precisión encontrados probando
+
+1. **«iPhone 15 128GB» y «iPhone 16 128GB» salían IDÉNTICOS.** Los tokens de
+   menos de 3 caracteres se descartaban, así que los números de modelo
+   desaparecían y los dos núcleos quedaban en `iphone 128gb`. Igual «Nike Air
+   90» y «Nike Air 95». Ahora los números se conservan siempre: son
+   discriminadores de modelo, versión o año.
+
+2. **El núcleo recortado a las primeras palabras fundía configuraciones.**
+   «IdeaPad 15 16GB» y «IdeaPad 15 8GB» daban el mismo núcleo, perdiendo justo
+   lo que explica los 30 € de diferencia. El núcleo usa ahora todas las
+   palabras.
+
+3. **La lista de «productos parecidos» estaba SIEMPRE vacía.** La comparación
+   solo miraba dentro del grupo del propio núcleo, donde por definición todo
+   comparte núcleo, así que el nivel `similar` era inalcanzable entre
+   productos distintos. Era un campo que mentía por omisión. Se arregló con un
+   segundo índice por familia (magnitud + primera palabra del núcleo).
+
+4. **Una `qty` de 0 con un total positivo producía un precio.** El salto a «el
+   total es el precio de una unidad» está pensado para una `qty` DESCONOCIDA
+   (`null`); un 0 explícito contradice un total positivo, y de un dato
+   contradictorio no sale un precio, sale un invento. Lo encontró un test.
+
+Los cuatro tienen test de regresión.
+
+### Dos fallos de presentación corregidos tras leer el render
+
+**Decimales incoherentes en la misma columna.** «0,890 €/l» junto a
+«1,05 €/l» hacía ilegible justo lo que la tabla existe para comparar. Ahora
+los decimales se deciden **una vez por columna**. Y los precios y las
+diferencias son **dos** columnas con decisiones separadas: con una sola, una
+diferencia de 0,85 € forzaba tres decimales sobre precios de 9,80 €.
+
+**La tabla pintaba un valor y ordenaba por otro.** Los productos se ordenan
+por su último precio y los servicios por su importe medio; la tabla pintaba
+siempre el último. En un servicio eso podía poner la etiqueta «más barato»
+sobre el número más alto de la columna.
+
+### Lo que nunca se afirma
+
+**Ningún precio se presenta como actual.** La procedencia viaja con el dato
+(`linea-ticket`, `importe-total`, y `externa`/`estimada` reservadas), y cada
+cifra de ahorro lleva la fecha y el comercio del precio con el que compara:
+«es el precio que tú pagaste allí el 05/08/2026, no una oferta de hoy».
+
+**La periodicidad se mide, no se deduce de la categoría.** Una suscripción se
+reconoce porque se repite cada ~30 días con desviación menor del 25 %. Si las
+cadencias están mezcladas (uno mensual de 12 € y otro anual de 120 €), no se
+presenta un coste mensual: cae a `€/operación`.
+
+**El combustible se deduce del NOMBRE, no de la categoría.** «Transporte»
+incluye gasolina (litros) y abonos de metro (viajes): tratar la categoría
+entera como litros daría un €/l inventado.
+
+**Cada cifra dice cuántos precios la sostienen.** Con uno solo pone «1 solo
+precio», resaltado: una media de un dato no es una media.
+
+**Las comparaciones de servicio llevan advertencia visible:** el importe es
+real, pero Finova no guarda las condiciones de lo contratado, así que la
+equivalencia no está verificada.
+
+### Pruebas
+
+80 tests con los valores calculados a mano, cubriendo los once sectores que
+pedía el encargo: supermercados, restaurantes, gasolineras, tecnología, ropa,
+hoteles, transporte, seguros, gimnasios, suscripciones y servicios
+profesionales. Más un render real del bloque con un historial de seis
+sectores, leído entero.
+
+Aritmética verificada de forma independiente:
+
+| Dato | A mano | Obtenido |
+|---|---|---|
+| Lidl 500 ml a 0,49 € → €/l | 0,49 / 0,5 = 0,98 | 0,980 ✅ |
+| Ahorro de la leche por litro | 1,05 − 0,89 = 0,16 | 0,160 ✅ |
+| Ahorro en esa compra (6 × 1 L) | 6 × 0,16 = 0,96 | 0,960 ✅ |
+| Variación del precio de la leche | 0,16 / 0,89 = 17,98 % | 17,98 ✅ |
+| Ahorro de 42 l de gasolina | 42 × 0,20 = 8,40 | 8,400 ✅ |
+| Cadencia (08/05→08/10, 5 intervalos) | 153 / 5 = 30,6 d | 30,6 ✅ |
+| Aceite Lidl 750 ml a 6,99 € → €/l | 6,99 / 0,75 = 9,32 | 9,32 ✅ |
+| Ahorro total de la compra | 0,96 + 0,85 = 1,81 | 1,81 ✅ |
+
+Rendimiento: 5.000 transacciones (10.000 líneas) se indexan en menos de
+200 ms, y se memoiza.
+
+### La limitación de fondo, dicha claramente
+
+**Todo lo que dice el comparador es histórico.** «Pagaste menos allí», no
+«hoy cuesta menos allí». Quitar esa limitación necesita un proveedor externo
+de precios de mercado, que no está contratado ni activado. La arquitectura
+está preparada (la fuente `externa` ya existe con `verificado: true,
+actual: true` y la interfaz distingue las fuentes al pintar), pero la
+integración no se ha hecho.
+
+En `PRICE_COMPARE.md` están las cuatro integraciones que lo ampliarían, con
+lo que resolvería cada una y su coste real. La de mejor relación
+coste/beneficio **no necesita ningún servicio externo**: leer el €/kg o €/l
+que muchos tickets españoles ya imprimen en la línea.
+
+### Lo que no se pudo verificar
+
+No hay navegador. El bloque se ha renderizado de verdad y se ha leído su HTML
+y su texto, pero **nadie lo ha visto**: quedan por comprobar a ojo el gráfico
+de evolución con Chart.js cargado (el render se probó con `Chart` indefinido,
+así que se ejecutó la rama de texto), los 5 temas, el comportamiento a 375 px
+y los destinos táctiles de 44 px en un dispositivo real.
+
+Suite: **841 en verde**, 30 suites, 23 omitidos. Build correcto.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más
@@ -1151,6 +1309,26 @@ Suite: **761 en verde**, 29 suites. Build correcto.
     Chart.js no se han dibujado nunca de verdad (el render se probó con
     `Chart` indefinido). Al abrirla, comprobar los gráficos, la imagen del
     justificante, los 5 temas y 375 px.
+14. **Ver el comparador de precios en un navegador** (Fase 14). Está probado
+    por código (80 tests + un render de seis sectores leído entero), pero el
+    gráfico de evolución del precio no se ha dibujado nunca de verdad: el
+    render se probó con `Chart` indefinido, así que se ejecutó la rama de
+    texto. Comprobar también los 5 temas, 375 px y que los destinos táctiles
+    lleguen a 44 px.
+15. **Escanear tickets nuevos para que el comparador gane precisión**
+    (Fase 14). Los campos `brand`, `size` y `sizeUnit` se han añadido al
+    escáner con esta fase: **los tickets escaneados antes no los llevan**. El
+    comparador funciona igual sin ellos, pero con menos precisión (cae al
+    tamaño escrito en el nombre y, si no está, trata el producto por unidad).
+    Al probar el escáner de verdad, mirar si la IA rellena bien los tres
+    campos nuevos o si hay que afinar el prompt.
+16. **Decidir si se quiere una fuente externa de precios actuales**
+    (Fase 14). Es la única limitación de fondo del comparador: todo lo que
+    dice es histórico («pagaste menos allí», no «hoy cuesta menos allí»). La
+    arquitectura ya está preparada y `PRICE_COMPARE.md` lista las cuatro
+    integraciones posibles con su coste. **Ninguna está contratada ni
+    activada.** La de mejor relación coste/beneficio no necesita servicio
+    externo: leer el €/kg o €/l que muchos tickets españoles ya imprimen.
 11. **Dos políticas de privacidad.** `privacidad.html` (la que enlazan la
     landing y `terminos.html`) y `privacy.html` (que enlaza `terms.html`) son
     documentos distintos, los dos en español, con estructura y contenido

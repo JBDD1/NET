@@ -70,7 +70,7 @@ Formato exacto:
   "receiptNumber": string|null,
   "paymentMethod": "efectivo"|"tarjeta"|"bizum"|"transferencia"|null,
   "taxId": string|null,
-  "items": [{"name": string, "qty": number|null, "unitPrice": number|null, "total": number|null}],
+  "items": [{"name": string, "brand": string|null, "size": number|null, "sizeUnit": "kg"|"g"|"l"|"ml"|"cl"|"ud"|"m"|"cm"|null, "qty": number|null, "unitPrice": number|null, "total": number|null}],
   "taxBase": number|null,
   "taxAmount": number|null,
   "taxRate": number|null,
@@ -87,7 +87,15 @@ REGLAS INNEGOCIABLES:
 - Para "category" elige SOLO de la lista dada. No inventes categorías nuevas ni uses subcategorías.
 - Clasifica por los PRODUCTOS cuando se vean, no solo por el nombre del comercio: una compra en Amazon o El Corte Inglés puede ser de cualquier categoría según lo comprado.
 - "confidence" refleja lo seguro que estás de CADA campo, de 0 a 1. Sé honesto: si la foto está borrosa, baja la confianza.
-- "isReceipt" es false si la imagen no es un ticket, factura ni recibo.`;
+- "isReceipt" es false si la imagen no es un ticket, factura ni recibo.
+
+SOBRE LAS LÍNEAS DE "items" (sirven para comparar precios entre comercios):
+- "name": el producto o servicio tal como aparece, SIN la marca y SIN el tamaño, que van en sus propios campos. De "LECHE ASTURIANA SEMI 1L" saldría name "leche semidesnatada", brand "Asturiana", size 1, sizeUnit "l".
+- "brand": la marca comercial si se distingue. Si el ticket solo pone el producto genérico, null.
+- "size" y "sizeUnit": el contenido de UNA unidad, no el del lote. En un pack de 6 botellas de 33 cl, size es 33 y sizeUnit "cl"; las 6 van en "qty".
+- "qty": cuántas unidades se compraron de esa línea.
+- "unitPrice": precio de UNA unidad. En combustible, "qty" son los litros y "unitPrice" el precio por litro.
+- Si no distingues la marca o el tamaño, null. Un null se gestiona bien; un tamaño inventado estropea la comparación de precios.`;
 }
 
 /* ── Validación de la respuesta ───────────────────────────────────
@@ -137,13 +145,26 @@ function _rsValidate(raw) {
   const validCats = APP.categories?.expense || [];
   const category = validCats.includes(str(o.category)) ? str(o.category) : null;
 
+  // Unidades admitidas. Cualquier otra cosa se descarta: una unidad
+  // inventada daría una comparación de precios falsa, que es peor que no
+  // tener comparación.
+  const UNIDADES_OK = ['kg', 'g', 'l', 'ml', 'cl', 'ud', 'm', 'cm'];
   const items = Array.isArray(o.items)
-    ? o.items.slice(0, 50).map(it => ({
-        name: str(it?.name) || '(sin nombre)',
-        qty: num(it?.qty),
-        unitPrice: num(it?.unitPrice),
-        total: num(it?.total),
-      })).filter(it => it.name !== '(sin nombre)' || it.total !== null)
+    ? o.items.slice(0, 50).map(it => {
+        const size = num(it?.size);
+        const su = String(it?.sizeUnit ?? '').toLowerCase().trim();
+        return {
+          name: str(it?.name) || '(sin nombre)',
+          // brand y size son NUEVOS: los tickets escaneados antes de esta
+          // versión no los llevan, y el comparador lo tiene en cuenta.
+          brand: str(it?.brand),
+          size: size != null && size > 0 ? size : null,
+          sizeUnit: UNIDADES_OK.includes(su) ? su : null,
+          qty: num(it?.qty),
+          unitPrice: num(it?.unitPrice),
+          total: num(it?.total),
+        };
+      }).filter(it => it.name !== '(sin nombre)' || it.total !== null)
     : [];
 
   const conf = o.confidence && typeof o.confidence === 'object' ? o.confidence : {};

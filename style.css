@@ -9078,6 +9078,132 @@ tr[tabindex="0"]:focus {
 }
 .mh-nota { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: var(--text-muted); }
 
+/* Comparador de precios
+   Reutiliza los tokens de la ficha: ni colores propios ni medidas nuevas, para
+   que los 5 temas sigan funcionando sin tocar nada aquí. */
+.mh-pc-total, .mh-pc-ahorro, .mh-pc-aviso {
+  border-radius: var(--r-xs); padding: 11px 12px;
+  font-size: 12.5px; line-height: 1.55;
+}
+.mh-pc-total {
+  margin-top: 10px; color: var(--text-secondary);
+  background: color-mix(in srgb, var(--accent) 9%, var(--bg-base));
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+}
+.mh-pc-total strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+/* El aviso de «esto es un precio histórico» va dentro del propio dato, no en
+   una nota al pie que nadie lee. */
+.mh-pc-ojo {
+  display: block; margin-top: 5px;
+  font-size: 11px; line-height: 1.45; color: var(--text-muted);
+}
+
+.mh-pc-lista { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.mh-pc-item {
+  padding: 11px 12px; border-radius: var(--r-sm);
+  background: var(--bg-base); border: 1px solid var(--border-subtle);
+}
+.mh-pc-cab { margin-bottom: 9px; }
+.mh-pc-nombre { font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.35; }
+.mh-pc-sub {
+  margin-top: 3px; font-size: 11.5px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mh-pc-ahorro {
+  margin-bottom: 9px; color: var(--text-secondary);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.mh-pc-ahorro strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.mh-pc-ahorro.is-ok {
+  background: color-mix(in srgb, var(--positive) 8%, transparent);
+  border-color: color-mix(in srgb, var(--positive) 24%, transparent);
+}
+
+.mh-pc-aviso {
+  margin-top: 10px; color: var(--text-muted);
+  background: var(--bg-base); border: 1px dashed var(--border-default);
+  font-size: 11.5px;
+}
+
+/* Una fila por comercio. Rejilla y no tabla: con tres datos de longitud muy
+   distinta, el apilado en móvil sale solo. */
+.mh-pc-tabla { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.mh-pc-fila {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "com precio" "meta meta";
+  align-items: center; gap: 2px 10px;
+  padding: 8px 9px; border-radius: var(--r-xs);
+  border: 1px solid transparent;
+}
+.mh-pc-fila:nth-child(odd) { background: color-mix(in srgb, var(--text-primary) 3%, transparent); }
+.mh-pc-fila.is-actual {
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.mh-pc-com {
+  grid-area: com; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 7px;
+  font-size: 12.5px; color: var(--text-primary); min-width: 0;
+}
+.mh-pc-precio {
+  grid-area: precio; font-size: 13px; font-weight: 600;
+  color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.mh-pc-meta { grid-area: meta; font-size: 11px; color: var(--text-muted); line-height: 1.45; }
+.mh-pc-meta .mh-pc-ojo { display: inline; margin: 0; }
+
+/* El nombre del comercio lleva al movimiento de donde sale ese precio: el
+   usuario tiene que poder ir a comprobarlo. */
+.mh-pc-link {
+  padding: 0; border: 0; background: none; font: inherit;
+  color: var(--text-primary); text-align: left; cursor: pointer;
+  text-decoration: underline; text-decoration-color: var(--border-default);
+  text-underline-offset: 3px;
+}
+.mh-pc-link:hover { color: var(--accent); text-decoration-color: var(--accent); }
+.mh-pc-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+.mh-pc-marcas { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.mh-pc-badge {
+  padding: 2px 7px; border-radius: 99px;
+  font-size: 10px; font-weight: 600; letter-spacing: .02em; white-space: nowrap;
+  background: var(--bg-elevated, var(--bg-base));
+  border: 1px solid var(--border-subtle); color: var(--text-muted);
+}
+.mh-pc-badge.is-barato {
+  color: var(--positive);
+  background: color-mix(in srgb, var(--positive) 11%, transparent);
+  border-color: color-mix(in srgb, var(--positive) 30%, transparent);
+}
+.mh-pc-badge.is-caro {
+  color: var(--negative);
+  background: color-mix(in srgb, var(--negative) 11%, transparent);
+  border-color: color-mix(in srgb, var(--negative) 30%, transparent);
+}
+.mh-pc-badge.is-aqui {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+.mh-pc-pie {
+  margin-top: 9px; font-size: 11px; line-height: 1.5; color: var(--text-muted);
+}
+.mh-pc-pie strong { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+.mh-pc-ver {
+  margin-top: 10px; min-height: 44px; width: 100%;
+  padding: 10px 12px; border-radius: var(--r-xs);
+  border: 1px solid var(--border-subtle); background: transparent;
+  color: var(--accent); font: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer; text-align: center;
+}
+.mh-pc-ver:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.mh-pc-ver:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+
 @media (max-width: 480px) {
   .mh-cab-importe { font-size: 22px; }
   .mh-kpi-grid { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; }
@@ -9086,6 +9212,8 @@ tr[tabindex="0"]:focus {
   .mh-barra-pista { width: 100%; }
   .mh-chart-box { height: 155px; }
   .mh-ticket-img img { max-height: 260px; }
+  .mh-pc-fila { grid-template-columns: 1fr; grid-template-areas: "com" "precio" "meta"; gap: 3px; }
+  .mh-pc-precio { font-size: 14px; }
   .mh-fila { flex-direction: column; gap: 1px; align-items: flex-start; }
   .mh-fila > span:last-child { text-align: left; }
 }

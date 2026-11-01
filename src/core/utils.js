@@ -156,6 +156,11 @@ const _LAZY_SCRIPTS = {
   // Ficha de historial de una transacción: se trae al pulsar una fila. Lleva
   // dos gráficos, así que no tiene sentido descargarlo en cada visita.
   txHistory: 'src/utils/tx-history.js',
+  // Comparador de precios: motor puro, sin interfaz. Lo usa la ficha de
+  // historial, y se carga con ella (ver _withTxHistory). Va aparte porque no
+  // depende de nada de la ficha y sirve igual a cualquier otra pantalla que
+  // quiera comparar precios más adelante.
+  priceCompare: 'src/utils/price-compare.js',
 };
 
 /* ── _ensureScript (cache-aware dynamic loader) ── */

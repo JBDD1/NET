@@ -1186,9 +1186,12 @@ function _renderFeedbackBanner() {
 // cargado cuando se cablea el evento.
 async function _withTxHistory(txId) {
   try {
-    if (typeof openTxHistory !== 'function') {
-      await _lazyLoad(_LAZY_SCRIPTS.txHistory);
-    }
+    // Los dos en paralelo: ni la ficha necesita al comparador ni el
+    // comparador a la ficha en tiempo de parseo, solo al pintar.
+    await Promise.all([
+      typeof openTxHistory !== 'function' ? _lazyLoad(_LAZY_SCRIPTS.txHistory) : null,
+      typeof pcSummaryForTx !== 'function' ? _lazyLoad(_LAZY_SCRIPTS.priceCompare) : null,
+    ].filter(Boolean));
     if (typeof openTxHistory === 'function') {
       openTxHistory(txId);
       // Los dos Chart.js de la ficha hay que destruirlos al cerrar, o se
