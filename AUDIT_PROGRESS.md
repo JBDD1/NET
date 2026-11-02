@@ -1786,6 +1786,84 @@ repetir en CI tal cual — haría falta añadirlo como devDependency.
 
 ---
 
+## FASE 19 — Re-verificación de la guardia de estáticos · ✅ SIN CAMBIOS
+
+Segunda pasada sobre el encargo de la Fase 15 (commit `14bee65`). **No ha
+hecho falta cambiar nada**: `server.cjs` está byte-idéntico desde entonces
+(`git diff 14bee65..HEAD -- server.cjs` vacío) y las nueve piezas del diseño
+siguen en su sitio: `SERVE_STATIC`, `STATIC_DIR`, `_resolveStatic`,
+`_safeJoin`, `_safeJoinUsers`, `_logStaticDeny`, `_STATIC_DENY`,
+`_STATIC_EXT_OK` y las cinco capas.
+
+Única diferencia en el encargo: esta versión dice explícitamente **no tocar
+`.gitignore`** (lo amplió la Fase 17, commit `e5a6c28`). No se ha tocado —
+`git diff --stat .gitignore` vacío.
+
+### Lo que se volvió a medir, con servidor real
+
+Las 28 rutas del encargo, con `curl --path-as-is` y la cabecera `Host`
+puesta a mano: **las 28 en 404, con el mismo cuerpo de 21 bytes
+(`{"error":"Not found"}`) y cero fugas** — ninguna contiene el cebo
+`SECRETO-DE-PRUEBA`, ni `createServer`, ni `repositoryformatversion`, ni
+`root:x:`, ni `devDependencies`.
+
+Los 7 recursos de desarrollo siguen en 200 (`/`, `/index.html`,
+`/style.css`, `/src/core/state.js`, `/manifest.json`, `/sw.js`,
+`/icon-192.png`) y `/api/ai-status` también.
+
+| Comprobación | Resultado |
+|---|---|
+| `POST`/`PUT`/`DELETE`/`PATCH` sobre `/index.html` | 404 (solo GET y HEAD) |
+| `HEAD /index.html` | 200 con cabeceras y sin cuerpo |
+| Redirección `127.0.0.1` → `localhost` | 301 → `http://localhost:3471/` |
+| `NODE_ENV=production` sin `SERVE_STATIC` | los 5 estáticos en 404, la API en 200 |
+| `SERVE_STATIC=false` fuera de producción | `/index.html` 404, la API 200 |
+| Cuerpo denegado vs cuerpo inexistente | **idénticos** |
+| Registro de intentos | 34 anotados, con la IP truncada a `127.0.x.x` |
+
+### Una comprobación empírica nueva
+
+El encargo pide que «de los `.json` de la raíz solo se permita
+`manifest.json`». Estaba implementado, pero no lo había probado con un
+fichero que **no esté en ninguna de las dos listas**. Creados
+`zz-config.json` y `zz-notas.txt` con el cebo dentro:
+
+```
+/manifest.json       200
+/zz-config.json      404
+/zz-notas.txt        404      <- y .txt SÍ está en la lista de extensiones
+/package.json        404
+/vercel.json         404
+```
+
+El `.txt` es el caso interesante: su extensión está permitida, pero la lista
+blanca de ficheros no lo incluye, así que se deniega. Es la prueba de que lo
+que protege es la **lista de lo permitido** y no la de lo prohibido: un
+fichero nuevo en la raíz queda fuera por defecto, sin tocar ninguna lista.
+Los dos cebos borrados.
+
+### Tests
+
+```
+npm run test:security  ->  tests 52 · pass 52 · fail 0
+npm test (calc)        ->  Tests: 33 passed, 33 total
+npm test (completa)    ->  Tests: 23 skipped, 942 passed, 965 total
+node --check server.cjs -> OK
+```
+
+Datos falsos borrados (`data/users/zz-test-uid.json`,
+`data/sync/zzzztest.json`, y los dos de la raíz). `data/users/` queda con 0
+ficheros, que es como estaba: en local no hay datos reales.
+
+### Una nota sobre el encargo, otra vez
+
+El guion pide `_rateOk('static-deny', ip, 30)`. **Esa función no existe en
+este servidor**: el primitivo real es `_tokenBucket(clave, capacidad,
+reposición)`, y es lo que usa `_logStaticDeny` con capacidad 30 y reposición
+de 0,1/s. El efecto es el que pedía el encargo; el nombre no.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más
