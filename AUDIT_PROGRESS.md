@@ -1864,6 +1864,177 @@ de 0,1/s. El efecto es el que pedía el encargo; el nombre no.
 
 ---
 
+## FASE 20 — `server.cjs` listo para un hosting real · ✅ COMPLETA
+
+Documentado en [DEPLOY.md](DEPLOY.md). Aquí sí había trabajo de verdad: de
+las nueve cosas del encargo, cinco no existían.
+
+### Lo que ya estaba (de fases anteriores)
+
+`PORT = Number(process.env.PORT)`, `/api/health`, el cierre ordenado
+(`_gracefulShutdown`, SIGTERM/SIGINT, `uncaughtException`), `SERVE_STATIC` y
+`_resolveStatic`. Se reutilizó todo; no se duplicó nada. El encargo decía
+que el puerto estaba fijo a 3000 y que no había health ni cierre ordenado:
+medido, ya estaban.
+
+### EL FALLO IMPORTANTE: todos los límites por IP se esquivaban con una cabecera
+
+`_clientIp` tomaba `.split(',')[0]` de `X-Forwarded-For`: **el elemento de
+la IZQUIERDA, que lo escribe quien envía la petición.**
+
+No es teórico. Medido antes del arreglo, agotando el cubo de
+`/api/waitlist` (5 por IP):
+
+```
+sin cabecera, intentos 1-5    -> 400  (pasan)
+sin cabecera, intento 6       -> 429  (cubo agotado)
+X-Forwarded-For: 1.2.3.4      -> 400  <- cubo NUEVO
+X-Forwarded-For: 5.6.7.8      -> 400  <- cubo NUEVO
+X-Forwarded-For: 9.9.9.9      -> 400  <- cubo NUEVO
+```
+
+Afectaba a **todos** los límites del servidor: IA (que cuesta dinero), sync,
+borrado de cuenta, feedback, admin, y al registro de intentos denegados de
+estáticos de la Fase 15.
+
+Arreglado con `TRUST_PROXY_HOPS`: 0 por defecto (se ignora la cabecera y se
+usa la IP de la conexión), y con N se toma el elemento **N desde la
+DERECHA** — porque los proxies construyen la cabecera añadiendo al final, así
+que los últimos elementos los puso infraestructura de confianza.
+
+Verificado con servidor real y los tres valores:
+
+| `X-Forwarded-For` | hops=0 | hops=1 | hops=2 |
+|---|---|---|---|
+| `1.2.3.4` | 429 | 400 | **429** |
+| `203.0.113.9, 70.41.3.18` | 429 | 400 | 400 |
+| `203.0.113.9, 70.41.3.18, 150.172.238.178` | 429 | 400 | 400 |
+| `basura, no-una-ip` | 429 | **429** | **429** |
+| (sin cabecera) | 429 | 429 | 429 |
+
+Las tres celdas en negrita son las interesantes: con `hops=2` una cadena de
+**un solo** elemento cae a la IP de conexión (no se coge «lo que haya»: una
+cadena más corta de lo configurado es la señal de manipulación), y una
+entrada malformada también.
+
+Y hay un endpoint nuevo **solo admin**, `/api/admin/whoami`, que devuelve la
+IP derivada con los dos últimos octetos tapados. Existe porque
+`TRUST_PROXY_HOPS` no se puede calibrar a ciegas: sin ver qué IP deriva el
+servidor, el único síntoma de un valor mal puesto es que el rate limit
+agrupa a todos en un cubo o que no limita nada.
+
+### `DATA_DIR` configurable
+
+Las 12 rutas literales `path.join(ROOT, 'data', …)` pasan por `DATA_DIR`.
+Al arrancar se crean los subdirectorios, **se comprueba que se puede
+escribir y leer de verdad** con un fichero temporal, y si no se puede el
+proceso **no arranca** — mejor eso que descubrirlo cuando un usuario guarda
+y recibe un 500 sin explicación.
+
+En producción, si `DATA_DIR` queda dentro del proyecto, se avisa: en la
+mayoría de los hostings ese disco es efímero y los datos desaparecen en el
+siguiente despliegue. **No se abortan** esos arranques (una demo sin
+persistencia es legítima) y **no se mueve nada automáticamente**: copiar
+datos de usuario sin que nadie lo pida es la clase de cosa que sale mal en
+silencio. El procedimiento de copia está en DEPLOY.md.
+
+### Escrituras atómicas
+
+`_writeFileAtomic` en los **13** sitios que escriben datos: usuario, meta,
+roles, bloqueados, extra_admins, sync, sync_owners, waitlist, analytics,
+ratelimit, bank_requisitions, feedback_read y la purga de admin.
+
+Antes era `writeFileSync` directo. Si el proceso moría a mitad —un
+despliegue, un OOM, un SIGKILL— el JSON quedaba truncado, y como va cifrado
+con AES-GCM **no hay recuperación parcial posible**: la etiqueta de
+autenticación falla y el fichero entero es ilegible. El temporal va en la
+MISMA carpeta a propósito: un `rename` entre sistemas de ficheros distintos
+no es atómico y falla con EXDEV. Los huérfanos se limpian al arrancar.
+
+### El resto
+
+| Qué | Antes | Ahora |
+|---|---|---|
+| `HOST` | `0.0.0.0` fijo | `0.0.0.0` en producción, `127.0.0.1` en local (no se expone el servidor de desarrollo a la wifi) |
+| Redirección `127.0.0.1`→`localhost` | siempre | solo en desarrollo (en producción mandaría al usuario a su propia máquina) |
+| `/api/health` | solo GET | GET y HEAD, con límite de 120/min por IP |
+| Cuerpo del health | `ts` ISO | `ts` epoch. Nada lo consume: el monitor busca la palabra `ok` (MONITORING_SETUP.md) |
+| Segunda señal | `return`, se ignoraba | fuerza la salida |
+| Tope de espera al cerrar | 8 s | 10 s |
+| `keepAliveTimeout` | por defecto (5 s) | 65 s |
+| `headersTimeout` | por defecto | 66 s |
+| `requestTimeout` | sin poner | **120 s**, no 30: con los 8 MB de sync-upload, 30 s exigirían 273 kB/s sostenidos y cortaría subidas desde móvil |
+| Navegador | `exec('start …')` | `spawn` con argumentos separados, por plataforma, con `unref` y error ignorado |
+| Banner en producción | caja ANSI de 5 líneas | una línea sin colores |
+| `_IS_CLOUD_DEPLOY` | expresión duplicada | alias de `_IS_PROD`, una sola fuente |
+
+### Dos bugs propios, los dos encontrados ejecutando
+
+**1. `DATA_DIR` se definía en términos de sí mismo.** La sustitución masiva
+de `path.join(ROOT, 'data')` alcanzó la propia definición:
+
+```js
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(...) : DATA_DIR;
+```
+
+`ReferenceError: Cannot access 'DATA_DIR' before initialization`. **`node
+--check` lo da por bueno**, porque es un error de zona muerta temporal y no
+de sintaxis. Solo lo encontró arrancar el servidor.
+
+**2. El regex de limpieza de temporales perdió sus barras invertidas.**
+Quedó `/.tmp-d+-[a-z0-9]+$/` en vez de `/\.tmp-\d+-[a-z0-9]+$/`: escribí el
+parche con una sola barra dentro de una plantilla de JavaScript, que se las
+come. El efecto era silencioso —la limpieza no borraba nada y no fallaba—, y
+lo destapó el test, no la lectura.
+
+### Pruebas
+
+`tests/server-boot.test.cjs`, **29 casos** con `node:test` y sin
+dependencias nuevas. Arrancan el proceso de verdad con `NODE_ENV=production`
+y un `DATA_DIR` temporal fuera del proyecto.
+
+```
+npm run test:boot      ->  tests 29 · pass 29 · fail 0
+npm run test:security  ->  tests 81 · pass 81 · fail 0  (static-guard + boot)
+npm test (calc)        ->  33 passed
+npm test (completa)    ->  942 passed, 31 suites
+node --check server.cjs -> OK
+```
+
+Flujo local intacto:
+
+```
+localhost:3000/   -> 200
+127.0.0.1:3000/   -> 301 -> http://localhost:3000/
+/api/health       -> {"ok":true,"ts":1793581895529}
+```
+
+### Lo que NO se pudo verificar
+
+**El cierre ordenado, de forma conductual.** Windows no implementa las
+señales POSIX: `child.kill('SIGTERM')` llama a `TerminateProcess` y el
+proceso muere sin ejecutar su manejador. Reproducido con un caso mínimo: un
+hijo con un manejador de SIGTERM que imprime y sale con 0 muere con
+`exitCode: null` y sin imprimir nada. En Windows la prueba solo comprueba
+que los manejadores están registrados y que el proceso muere; **la
+verificación real hay que hacerla en Linux**, que es donde corre el hosting.
+
+**El hosting real.** Nada se ha desplegado. Todo está medido en local con
+`NODE_ENV=production` simulado.
+
+**Los nombres de variable de los proveedores.** `RAILWAY_*` salen del código
+que ya había; `RENDER` y `FLY_APP_NAME` de lo que se cita habitualmente. **No
+verificados contra su documentación.** Lo fiable es `NODE_ENV=production`,
+que la pone el usuario.
+
+**Que `/api/health` llegue a través del proxy de Vercel.** `vercel.json`
+tiene un rewrite catch-all a `/index.html`, pero Vercel resuelve las
+funciones de `api/` antes de los rewrites y `api/[...path].js` reenvía todo
+`/api/*` sin filtrar. Es comportamiento documentado de Vercel, no algo
+comprobado contra un despliegue.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más

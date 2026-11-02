@@ -94,7 +94,8 @@ const PATRONES = [
   { que: 'token de GitHub',    re: new RegExp('g' + 'ithub_pat_[A-Za-z0-9_]{30,}', 'g') },
   { que: 'clave de AWS',       re: new RegExp('A' + 'KIA[0-9A-Z]{16}', 'g') },
   { que: 'clave de Stripe',    re: new RegExp('s' + 'k_live_[A-Za-z0-9]{20,}', 'g') },
-  { que: 'clave privada',      re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/g },
+  // La clave privada NO se busca aquí: necesita mirar el fichero completo y
+  // exigir cuerpo. Ver _buscarClavePrivada más abajo.
   { que: 'webhook de Slack o Discord', re: /hooks\.(?:slack|discord)\.com\/[A-Za-z0-9/_-]{24,}/g },
   // Clave de cifrado simétrico: 64 hex asignados a una variable de cifrado.
   { que: 'clave de cifrado (64 hex)', re: /\b(?:ENC(?:RYPTION)?_KEY|FINOVA_ENC_KEY|MASTER_KEY|SECRET_KEY)\s*[:=]\s*["'`]?([0-9a-fA-F]{64})\b/g },
@@ -114,6 +115,41 @@ const PATRONES = [
  * el primer commit. Incluirla haría que CADA commit que toque esos ficheros
  * se bloqueara, y la guardia duraría una semana.
  */
+
+/**
+ * Clave privada PEM. Se busca aparte del resto por dos motivos.
+ *
+ * 1. Hay que exigir CUERPO, no solo la cabecera. Un `-----BEGIN PRIVATE
+ *    KEY-----` suelto, sin base64 detrás, es exactamente lo que lleva una
+ *    plantilla `.env.*.example` — y bloquear por eso es un falso positivo
+ *    sobre un fichero que SÍ debe estar versionado. Pasó de verdad: esta
+ *    guardia bloqueó el commit que añadía DEPLOY.md por la plantilla de
+ *    `.env.server.example`, que no contiene ninguna clave.
+ *
+ * 2. Hay que mirar el fichero COMPLETO, no línea a línea. Un PEM aparece de
+ *    dos formas, y las dos son reales:
+ *      · En un .env o un .json de cuenta de servicio, en UNA línea con los
+ *        saltos escapados como «\n» literales.
+ *      · En un fichero suelto, repartido en varias líneas de verdad.
+ *    Un escaneo por líneas solo ve la cabecera en el segundo caso.
+ *
+ * Devuelve el número de línea de la cabecera, o 0 si no hay clave.
+ */
+function _buscarClavePrivada(contenido) {
+  const re = /-----BEGIN [A-Z ]*PRIVATE KEY-----/g;
+  let m;
+  while ((m = re.exec(contenido))) {
+    // A partir de la cabecera, ¿hay una tirada de base64 larga cerca? Un
+    // cuerpo de clave real empieza en la línea siguiente; 120 caracteres de
+    // margen cubren los saltos escapados, las comillas y algún espacio.
+    const trozo = contenido.slice(m.index + m[0].length, m.index + m[0].length + 200);
+    // Se admite \n literal (dos caracteres) o salto real entre medias.
+    if (/[A-Za-z0-9+/=]{40,}/.test(trozo.slice(0, 120))) {
+      return contenido.slice(0, m.index).split('\n').length;
+    }
+  }
+  return 0;
+}
 
 /** ¿Este valor es obviamente un ejemplo y no una clave? */
 function esEjemplo(valor, linea) {
@@ -164,6 +200,9 @@ for (const fichero of enStaging) {
   if (!contenido) continue;
   if (contenido.length > 8 * 1024 * 1024) continue;
   if (contenido.includes('\0')) continue;   // binario sin extensión conocida
+
+  const lineaPem = _buscarClavePrivada(contenido);
+  if (lineaPem) hallazgos.push({ fichero, linea: lineaPem, que: 'clave privada (PEM con cuerpo)' });
 
   const lineas = contenido.split('\n');
   for (let i = 0; i < lineas.length; i++) {

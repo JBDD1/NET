@@ -40,12 +40,148 @@ try {
 // comparación estricta contra un número no.
 const PORT = Number(process.env.PORT) || 3000;
 const ROOT = __dirname;
-const SYNC_DIR       = path.join(ROOT, 'data', 'sync');
-const USERS_DIR      = path.join(ROOT, 'data', 'users');
-const ANALYTICS_FILE = path.join(ROOT, 'data', 'analytics.json');
-const WAITLIST_FILE  = path.join(ROOT, 'data', 'waitlist.json');
-if (!fs.existsSync(SYNC_DIR))  fs.mkdirSync(SYNC_DIR,  { recursive: true });
-if (!fs.existsSync(USERS_DIR)) fs.mkdirSync(USERS_DIR, { recursive: true });
+
+/* ═══════════════════════════════════════════════════════════════
+   ENTORNO DE EJECUCIÓN
+
+   Una sola fuente de verdad para «¿esto es producción?». Antes había dos
+   expresiones distintas (una en _validateEnv y otra en _IS_CLOUD_DEPLOY) que
+   podían divergir, y divergir ahí significa que una comprobación de
+   producción se salta y la otra no.
+
+   Los nombres de variable de los proveedores NO están inventados, pero
+   TAMPOCO los he verificado contra su documentación desde aquí: los he
+   tomado de lo que ya usaba este fichero (RAILWAY_*) más los dos que se
+   citan habitualmente para Render y Fly. **Verifica cada uno en la
+   documentación de tu proveedor antes de confiar en la detección
+   automática.** Lo que SÍ es fiable es NODE_ENV=production, que lo pones
+   tú: si tienes dudas, pon esa y no dependas de la detección.
+═══════════════════════════════════════════════════════════════ */
+const _IS_PROD = !!(
+  process.env.NODE_ENV === 'production'
+  // Railway: presentes en el entorno de cualquier servicio desplegado.
+  || process.env.RAILWAY_ENVIRONMENT
+  || process.env.RAILWAY_PROJECT_ID
+  // Render: su documentación cita RENDER=true. VERIFICAR.
+  || process.env.RENDER
+  // Fly.io: su documentación cita FLY_APP_NAME. VERIFICAR.
+  || process.env.FLY_APP_NAME
+);
+
+// En producción hay que escuchar en todas las interfaces: el proxy que
+// enruta el tráfico público corre FUERA del contenedor y se conecta por red
+// al puerto, así que un bind a loopback es invisible desde ahí — y el
+// proceso arranca limpio, sin ningún error en los logs, lo que hace el
+// diagnóstico especialmente desagradable.
+//
+// En local se escucha solo en loopback: no hay motivo para exponer el
+// servidor de desarrollo, con sus datos reales, a toda la red wifi.
+const HOST = process.env.HOST || (_IS_PROD ? '0.0.0.0' : '127.0.0.1');
+
+/* ═══════════════════════════════════════════════════════════════
+   DIRECTORIO DE DATOS
+
+   Configurable con DATA_DIR. Por defecto, data/ dentro del proyecto, que es
+   lo que hacía antes y lo correcto en local.
+
+   En un hosting esto importa mucho: el disco del contenedor suele ser
+   EFÍMERO, así que data/ dentro del proyecto se borra en cada despliegue y
+   con él los datos de todos los usuarios. Hay que montar un volumen
+   persistente y apuntar DATA_DIR a él.
+═══════════════════════════════════════════════════════════════ */
+const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.join(ROOT, 'data');
+
+const SYNC_DIR       = path.join(DATA_DIR, 'sync');
+const USERS_DIR      = path.join(DATA_DIR, 'users');
+const ANALYTICS_FILE = path.join(DATA_DIR, 'analytics.json');
+const WAITLIST_FILE  = path.join(DATA_DIR, 'waitlist.json');
+
+/**
+ * Prepara DATA_DIR y comprueba que de verdad se puede usar.
+ *
+ * No basta con mkdirSync: un volumen mal montado, un permiso equivocado o un
+ * disco lleno dejan el directorio creado pero inservible, y entonces el
+ * primer fallo aparece cuando un usuario guarda sus datos — con un 500 y sin
+ * pista de la causa. Se comprueba al arrancar, con un fichero temporal, y si
+ * no se puede el proceso NO arranca.
+ */
+function _prepararDataDir() {
+  for (const d of [DATA_DIR, SYNC_DIR, USERS_DIR]) {
+    try {
+      fs.mkdirSync(d, { recursive: true });
+    } catch (e) {
+      console.error('[FINOVA] No se pudo crear el directorio de datos:', d);
+      console.error('[FINOVA]', e.code || e.message, '— revisa DATA_DIR y los permisos del volumen.');
+      process.exit(1);
+    }
+  }
+  // Escritura y lectura de verdad, no solo fs.accessSync: en algunos
+  // sistemas de ficheros de red accessSync dice que sí y la escritura falla.
+  const sonda = path.join(DATA_DIR, '.write-probe-' + process.pid);
+  try {
+    fs.writeFileSync(sonda, 'ok', 'utf8');
+    if (fs.readFileSync(sonda, 'utf8') !== 'ok') throw new Error('lectura inconsistente');
+    fs.unlinkSync(sonda);
+  } catch (e) {
+    console.error('[FINOVA] El directorio de datos no es escribible:', DATA_DIR);
+    console.error('[FINOVA]', e.code || e.message);
+    console.error('[FINOVA] Si usas un volumen, comprueba que está montado en esa ruta y que el proceso tiene permiso de escritura.');
+    process.exit(1);
+  }
+
+  // Aviso de disco efímero. No se aborta: hay despliegues legítimos sin
+  // persistencia (una demo, una preview), pero quien lo haga debe saberlo.
+  if (_IS_PROD && (DATA_DIR === DATA_DIR || DATA_DIR.startsWith(ROOT + path.sep))) {
+    console.error('[FINOVA] AVISO: DATA_DIR está DENTRO del directorio del proyecto (' + DATA_DIR + ').');
+    console.error('[FINOVA] En la mayoría de los hostings ese disco es EFÍMERO: los datos de los usuarios');
+    console.error('[FINOVA] se perderán en el próximo despliegue. Monta un volumen persistente y apunta');
+    console.error('[FINOVA] DATA_DIR a su ruta. Consulta en la documentación de tu proveedor cómo se');
+    console.error('[FINOVA] declara un volumen y en qué ruta queda montado.');
+  }
+
+  // Temporales huérfanos de una escritura atómica interrumpida (ver
+  // _writeFileAtomic). Si el proceso murió entre el write y el rename, el
+  // .tmp se queda ahí para siempre y nadie lo mira.
+  let limpiados = 0;
+  for (const d of [DATA_DIR, SYNC_DIR, USERS_DIR]) {
+    let entradas;
+    try { entradas = fs.readdirSync(d); } catch { continue; }
+    for (const n of entradas) {
+      if (!/\.tmp-\d+-[a-z0-9]+$/.test(n)) continue;
+      try { fs.unlinkSync(path.join(d, n)); limpiados++; } catch { /* ya no está */ }
+    }
+  }
+  if (limpiados) console.log('[FINOVA] Limpiados ' + limpiados + ' temporal(es) huérfano(s) de escrituras interrumpidas');
+}
+_prepararDataDir();
+
+/**
+ * Escritura atómica: se escribe en un temporal de la MISMA carpeta y se
+ * renombra encima. rename es atómico dentro del mismo sistema de ficheros,
+ * así que un lector nunca ve un fichero a medias.
+ *
+ * Antes se escribía directamente con writeFileSync. Si el proceso moría a
+ * mitad — un despliegue, un OOM, un SIGKILL — el JSON del usuario quedaba
+ * truncado, y como va cifrado (AES-GCM) no hay recuperación parcial posible:
+ * la etiqueta de autenticación falla y el fichero entero es ilegible.
+ *
+ * El temporal va en la misma carpeta a propósito: rename entre sistemas de
+ * ficheros distintos (p. ej. de /tmp a un volumen montado) NO es atómico y
+ * falla con EXDEV.
+ */
+function _writeFileAtomic(ruta, contenido, codificacion) {
+  const dir = path.dirname(ruta);
+  const tmp = path.join(dir, path.basename(ruta) + '.tmp-' + process.pid + '-' + Math.random().toString(36).slice(2, 8));
+  try {
+    fs.writeFileSync(tmp, contenido, codificacion || 'utf8');
+    fs.renameSync(tmp, ruta);
+  } catch (e) {
+    try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch { /* da igual */ }
+    throw e;
+  }
+}
 
 // ─── Admin ────────────────────────────────────────────────────
 // Configura con variable de entorno: FINOVA_ADMIN_EMAILS=correo1@x.com,correo2@x.com
@@ -58,7 +194,7 @@ const ADMIN_EMAILS = (process.env.FINOVA_ADMIN_EMAILS || '')
 // x-finova-proxy header with the matching value. This ensures traffic
 // arrives through the Vercel proxy and not directly from the internet.
 const _PROXY_SECRET = process.env.FINOVA_PROXY_SECRET || '';
-const _EXTRA_ADMINS_FILE = path.join(ROOT, 'data', 'extra_admins.json');
+const _EXTRA_ADMINS_FILE = path.join(DATA_DIR, 'extra_admins.json');
 let _extraAdminsCache    = { emails: [], mtime: 0 };
 function _extraAdmins() {
   try {
@@ -98,7 +234,7 @@ function _isBlocked(uid) {
 // Roles: 'free' (default), 'premium', 'admin'
 // Stored in data/roles.json as { uid: role }
 // Admin role is also derived from _isAdminUid() (email-based)
-const _ROLES_FILE = path.join(ROOT, 'data', 'roles.json');
+const _ROLES_FILE = path.join(DATA_DIR, 'roles.json');
 
 function _getRoles() {
   try { return JSON.parse(fs.readFileSync(_ROLES_FILE, 'utf8')); }
@@ -117,7 +253,7 @@ function _setUserRole(uid, role) {
   const roles = _getRoles();
   if (role === 'free') delete roles[uid];
   else roles[uid] = role;
-  fs.writeFileSync(_ROLES_FILE, JSON.stringify(roles, null, 2), 'utf8');
+  _writeFileAtomic(_ROLES_FILE, JSON.stringify(roles, null, 2));
 }
 
 // Returns false and sends 403 if the verified uid doesn't have the required role.
@@ -613,7 +749,7 @@ function _groqGlobalOk() {
 }
 
 // ─── Persistence: AI daily quotas survive server restarts ────────
-const RATELIMIT_FILE = path.join(ROOT, 'data', 'ratelimit.json');
+const RATELIMIT_FILE = path.join(DATA_DIR, 'ratelimit.json');
 
 function _saveRateLimits() {
   try {
@@ -621,7 +757,7 @@ function _saveRateLimits() {
     for (const [k, v] of _buckets) {
       if (k.startsWith('ai-uid:')) aiUidBuckets[k] = { tokens: v.tokens, lastRefill: v.lastRefill };
     }
-    fs.writeFileSync(RATELIMIT_FILE, JSON.stringify({ aiUidBuckets, savedAt: Date.now() }), 'utf8');
+    _writeFileAtomic(RATELIMIT_FILE, JSON.stringify({ aiUidBuckets, savedAt: Date.now() }));
   } catch {}
 }
 
@@ -653,9 +789,80 @@ setInterval(() => {
 // ─── Persist AI daily quotas every 5 minutes ───────────────────
 setInterval(_saveRateLimits, 300_000).unref();
 
+/*
+ * Número de proxies de confianza DELANTE de este servidor.
+ *
+ * 0 (por defecto) = no hay ninguno: se usa la dirección de la conexión y se
+ * IGNORA X-Forwarded-For por completo.
+ *
+ * N = hay N proxies: se toma el elemento N contando desde la DERECHA de
+ * X-Forwarded-For.
+ *
+ * Por qué desde la derecha y nunca desde la izquierda: la cabecera la
+ * construyen los proxies añadiendo al final, así que los últimos elementos
+ * los puso infraestructura de confianza y los primeros los puede escribir
+ * quien envía la petición. Tomar el de la izquierda, que es lo que hacía
+ * este servidor, es confiar en un valor que controla el atacante.
+ *
+ * Esto NO era teórico. Medido antes del arreglo: agotado el cubo de
+ * /api/waitlist (5 por IP) con 429, bastaba añadir
+ * «X-Forwarded-For: 1.2.3.4» para obtener un cubo nuevo. Afectaba a TODOS
+ * los límites por IP del servidor — IA (que cuesta dinero), sync, borrado de
+ * cuenta, feedback, admin — y al registro de intentos denegados de
+ * estáticos.
+ *
+ * Cómo calibrarlo: ver DEPLOY.md y el endpoint /api/admin/whoami.
+ */
+const TRUST_PROXY_HOPS = (() => {
+  const n = Number(process.env.TRUST_PROXY_HOPS);
+  return Number.isInteger(n) && n >= 0 && n <= 10 ? n : 0;
+})();
+
+/** ¿Es una IPv4 o IPv6 con forma válida? */
+function _esIpValida(v) {
+  const s = String(v || '').trim();
+  if (!s) return false;
+  // IPv4, con los octetos en rango.
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(s)) {
+    return s.split('.').every(o => Number(o) <= 255);
+  }
+  // IPv6: se acepta la forma general, incluida la comprimida y la
+  // «::ffff:1.2.3.4» que usa Node para conexiones IPv4 sobre un socket IPv6.
+  if (/^[0-9a-fA-F:]+(?:\.\d{1,3}){0,3}$/.test(s) && s.includes(':')) return true;
+  return false;
+}
+
+/** Quita el prefijo IPv4-mapeada y los corchetes de una IPv6. */
+function _normalizaIp(v) {
+  let s = String(v || '').trim().replace(/^\[|\]$/g, '');
+  const m = s.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
+  if (m) s = m[1];
+  // Un puerto pegado detrás de una IPv4 («1.2.3.4:5678») no es parte de la IP.
+  const p = s.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
+  if (p) s = p[1];
+  return s;
+}
+
+/**
+ * IP del cliente, según TRUST_PROXY_HOPS.
+ *
+ * Si la cabecera no tiene suficientes elementos para el número de saltos
+ * configurado, se cae a la dirección de la conexión en vez de coger lo que
+ * haya: una cabecera más corta de lo esperado es, justamente, la señal de
+ * que alguien la está manipulando.
+ */
 function _clientIp(req) {
-  return ((req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1')
-    .split(',')[0].trim());
+  const directa = _normalizaIp(req.socket?.remoteAddress) || '127.0.0.1';
+  if (TRUST_PROXY_HOPS === 0) return directa;
+
+  const bruto = req.headers['x-forwarded-for'];
+  if (!bruto) return directa;
+  const cadena = String(Array.isArray(bruto) ? bruto.join(',') : bruto)
+    .split(',').map(x => _normalizaIp(x)).filter(Boolean);
+  if (cadena.length < TRUST_PROXY_HOPS) return directa;
+
+  const elegida = cadena[cadena.length - TRUST_PROXY_HOPS];
+  return _esIpValida(elegida) ? elegida : directa;
 }
 
 // ─── AI prompt helpers ────────────────────────────────────────
@@ -1564,7 +1771,7 @@ const _GC_INST_TTL  = 24 * 60 * 60 * 1000;
 // podría leer la conexión bancaria (IBAN, saldo, movimientos) de otro con solo
 // adivinar/obtener su requisitionId. Se persiste el propietario al crearla y
 // se exige que coincida con el uid verificado en cualquier lectura/importación.
-const _BANK_REQ_FILE = path.join(ROOT, 'data', 'bank_requisitions.json');
+const _BANK_REQ_FILE = path.join(DATA_DIR, 'bank_requisitions.json');
 
 function _getBankReqOwners() {
   try { return JSON.parse(fs.readFileSync(_BANK_REQ_FILE, 'utf8')); }
@@ -1574,7 +1781,7 @@ function _getBankReqOwners() {
 function _recordBankReqOwner(requisitionId, uid) {
   const owners = _getBankReqOwners();
   owners[requisitionId] = { uid, createdAt: Date.now() };
-  try { fs.writeFileSync(_BANK_REQ_FILE, JSON.stringify(owners, null, 2), 'utf8'); }
+  try { _writeFileAtomic(_BANK_REQ_FILE, JSON.stringify(owners, null, 2)); }
   catch (e) { console.error('[FINOVA/GoCardless] No se pudo persistir la propiedad de la requisition:', e.message); }
 }
 
@@ -2096,7 +2303,7 @@ async function handleUserDataPost(req, res) {
         return res.end(JSON.stringify({ error: 'Error de integridad de datos' }));
       }
       const toWrite = _encryptUserData(data);
-      fs.writeFileSync(targetFile, toWrite, 'utf8');
+      _writeFileAtomic(targetFile, toWrite);
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true, saved: new Date().toISOString() }));
     } catch (e) {
@@ -2128,7 +2335,7 @@ function _saveAnalytics(data) {
       .slice(0, keys.length - _ANALYTICS_MAX_CLIENTS)
       .forEach(k => delete data[k]);
   }
-  fs.writeFileSync(ANALYTICS_FILE, JSON.stringify(data), 'utf8');
+  _writeFileAtomic(ANALYTICS_FILE, JSON.stringify(data));
 }
 function _addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00Z');
@@ -2245,7 +2452,7 @@ function handleWaitlist(req, res) {
     }
     list.push({ email, date: new Date().toISOString(), ip });
     try {
-      fs.writeFileSync(WAITLIST_FILE, JSON.stringify(list, null, 2));
+      _writeFileAtomic(WAITLIST_FILE, JSON.stringify(list, null, 2));
     } catch (err) {
       res.writeHead(500, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'Error al guardar. Inténtalo de nuevo.' }));
     }
@@ -2307,7 +2514,7 @@ async function handleSyncUpload(req, res) {
         res.writeHead(400, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'Código inválido' }));
       }
-      fs.writeFileSync(destinoSync, data, 'utf8');
+      _writeFileAtomic(destinoSync, data);
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true, saved: new Date().toISOString() }));
     } catch (e) {
@@ -2390,7 +2597,7 @@ async function handleUserMeta(req, res) {
         res.writeHead(400, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'UID inválido' }));
       }
-      fs.writeFileSync(destinoMeta, JSON.stringify(meta), 'utf8');
+      _writeFileAtomic(destinoMeta, JSON.stringify(meta));
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true }));
     } catch (e) {
@@ -2410,7 +2617,7 @@ async function handleUserMeta(req, res) {
 //      tiene data/users/). Cualquier usuario autenticado que conociera un
 //      código leía la economía completa de otro.
 // Este registro arregla las dos cosas.
-const _SYNC_OWNERS_FILE = path.join(ROOT, 'data', 'sync_owners.json');
+const _SYNC_OWNERS_FILE = path.join(DATA_DIR, 'sync_owners.json');
 
 // Acepta la ruta para poder apuntar a un directorio temporal en los tests.
 function _getSyncOwnersFrom(file) {
@@ -2434,7 +2641,7 @@ function _claimSyncCode(code, uid) {
   if (cur && cur.uid !== uid) return false;
   if (!cur) {
     owners[code] = { uid, createdAt: Date.now() };
-    try { fs.writeFileSync(_SYNC_OWNERS_FILE, JSON.stringify(owners), 'utf8'); }
+    try { _writeFileAtomic(_SYNC_OWNERS_FILE, JSON.stringify(owners)); }
     catch (e) { console.error('[FINOVA/Sync] No se pudo registrar la propiedad del código:', e.message); }
   }
   return true;
@@ -2481,7 +2688,7 @@ async function _deleteAccountData(uid, opts = {}) {
   const D = dirs || {
     users: USERS_DIR,
     sync:  SYNC_DIR,
-    data:  path.join(ROOT, 'data'),
+    data:  DATA_DIR,
   };
   const F = {
     roles:       path.join(D.data, 'roles.json'),
@@ -2523,7 +2730,7 @@ async function _deleteAccountData(uid, opts = {}) {
     catch (e) { report.errors.push(label + ': ' + e.message); return; }
     if (!changed) return;
     try {
-      fs.writeFileSync(file, JSON.stringify(obj), 'utf8');
+      _writeFileAtomic(file, JSON.stringify(obj));
       report.keysPurged.push(label);
     } catch (e) { report.errors.push(label + ' no se pudo escribir: ' + (e.code || e.message)); }
   };
@@ -2831,7 +3038,7 @@ async function handleHealthDeep(req, res) {
   // 1. Disco: escribir y leer de verdad en el directorio de datos. Es lo que
   //    de verdad distingue "el proceso responde" de "el proceso sirve".
   try {
-    const probe = path.join(ROOT, 'data', '.health-probe');
+    const probe = path.join(DATA_DIR, '.health-probe');
     const marca = String(Date.now());
     fs.writeFileSync(probe, marca, 'utf8');
     checks.disco = fs.readFileSync(probe, 'utf8') === marca ? 'ok' : 'fallo';
@@ -2857,8 +3064,8 @@ async function handleHealthDeep(req, res) {
 
 /* ─── Feedback de usuarios ───────────────────────────────────── */
 
-const FEEDBACK_FILE      = path.join(ROOT, 'data', 'feedback.jsonl');
-const FEEDBACK_READ_FILE = path.join(ROOT, 'data', 'feedback_read.json');
+const FEEDBACK_FILE      = path.join(DATA_DIR, 'feedback.jsonl');
+const FEEDBACK_READ_FILE = path.join(DATA_DIR, 'feedback_read.json');
 const FEEDBACK_WEBHOOK_URL   = process.env.FEEDBACK_WEBHOOK_URL   || '';
 // Documentada pero NO implementada: sin un servicio de correo configurado,
 // mandar notificaciones es imposible y simularlo sería mentir. Ver
@@ -3218,7 +3425,7 @@ async function handleAdminFeedbackRead(req, res) {
       // lo hace robusto si el proceso muere a mitad.
       const ids = new Set(_fbReadIds());
       if (read === false) ids.delete(id); else ids.add(id);
-      fs.writeFileSync(FEEDBACK_READ_FILE, JSON.stringify([...ids].slice(-5000)), 'utf8');
+      _writeFileAtomic(FEEDBACK_READ_FILE, JSON.stringify([...ids].slice(-5000)));
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true }));
     } catch (e) {
@@ -3290,7 +3497,7 @@ async function handleAdminBlock(req, res) {
           res.writeHead(400, _apiHeaders(req));
           return res.end(JSON.stringify({ error: 'UID inválido' }));
         }
-        fs.writeFileSync(destinoBloqueo, '', 'utf8');
+        _writeFileAtomic(destinoBloqueo, '');
       } else {
         const rutaBloqueo = _blockedPath(targetUid);
         if (rutaBloqueo && fs.existsSync(rutaBloqueo)) fs.unlinkSync(rutaBloqueo);
@@ -3314,7 +3521,7 @@ async function handleAdminSetAdmin(req, res) {
         res.writeHead(400, _apiHeaders(req)); return res.end(JSON.stringify({ error: 'Email inválido' }));
       }
       const email = targetEmail.toLowerCase().trim();
-      const file  = path.join(ROOT, 'data', 'extra_admins.json');
+      const file  = path.join(DATA_DIR, 'extra_admins.json');
       let list = [];
       try { list = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
       if (isAdmin) {
@@ -3322,7 +3529,7 @@ async function handleAdminSetAdmin(req, res) {
       } else {
         list = list.filter(e => e !== email);
       }
-      fs.writeFileSync(file, JSON.stringify(list), 'utf8');
+      _writeFileAtomic(file, JSON.stringify(list));
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true }));
     } catch (e) {
@@ -3464,6 +3671,60 @@ async function handleAdminSetRole(req, res) {
   });
 }
 
+/**
+ * Diagnóstico de la IP derivada. SOLO admin.
+ *
+ * Existe porque TRUST_PROXY_HOPS no se puede calibrar a ciegas: depende de
+ * cuántos proxies hay delante en TU despliegue concreto, y eso cambia según
+ * si el tráfico entra por Vercel, directo al hosting, o por un CDN más. Sin
+ * una forma de ver qué IP está derivando el servidor, el único síntoma de un
+ * valor mal puesto es que el rate limit agrupa a todos los usuarios en un
+ * cubo (si sale la IP del proxy) o que no limita nada (si sale una IP que el
+ * cliente controla).
+ *
+ * Los dos últimos octetos van tapados: la IP de un usuario es un dato
+ * personal, y este endpoint existe para verificar la CONFIGURACIÓN, no para
+ * mirar quién se conecta. Con «a.b.x.x» ya se distingue una IP pública real
+ * de la de un proxy o de una privada, que es lo que hace falta.
+ */
+async function handleAdminWhoami(req, res) {
+  const uid = await _requireAuth(req, res);
+  if (uid === null) return;
+  if (!_isAdminUid(uid)) {
+    res.writeHead(403, _apiHeaders(req));
+    return res.end(JSON.stringify({ error: 'Acceso denegado' }));
+  }
+
+  const tapar = (ip) => {
+    const v = String(ip || '');
+    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(v)) return v.split('.').slice(0, 2).join('.') + '.x.x';
+    if (v.includes(':')) return v.split(':').slice(0, 2).join(':') + ':…';
+    return '(desconocida)';
+  };
+
+  const xff = req.headers['x-forwarded-for'];
+  const cadena = xff
+    ? String(Array.isArray(xff) ? xff.join(',') : xff).split(',').map(x => x.trim()).filter(Boolean)
+    : [];
+
+  res.writeHead(200, _apiHeaders(req, { 'Cache-Control': 'no-store' }));
+  res.end(JSON.stringify({
+    ok: true,
+    // Lo que el servidor usará para el rate limit.
+    ipDerivada: tapar(_clientIp(req)),
+    // De dónde sale.
+    trustProxyHops: TRUST_PROXY_HOPS,
+    fuente: TRUST_PROXY_HOPS === 0 ? 'conexión directa (X-Forwarded-For ignorada)'
+      : `elemento ${TRUST_PROXY_HOPS} desde la derecha de X-Forwarded-For`,
+    // Para poder calibrar: cuántos saltos hay de verdad y cuál es cada uno,
+    // todos tapados. Si la cadena tiene 2 elementos, TRUST_PROXY_HOPS=1 toma
+    // el último, que es el que puso el proxy más cercano.
+    xffLongitud: cadena.length,
+    xffTapada: cadena.map(tapar),
+    ipConexion: tapar(req.socket?.remoteAddress),
+  }));
+}
+
 async function handleAdminGetRole(req, res) {
   const uid = await _requireAuth(req, res);
   if (uid === null) return;
@@ -3557,12 +3818,20 @@ function _validateEnv() {
 }
 _validateEnv();
 
-const _IS_CLOUD_DEPLOY = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID || process.env.NODE_ENV === 'production');
+// Alias histórico de _IS_PROD (definido arriba, junto a PORT y HOST). Se
+// conserva el nombre para no tocar sus usos, pero la expresión ya NO se
+// repite: tener dos definiciones de «esto es producción» que pueden divergir
+// significa que una comprobación se salta y la otra no.
+const _IS_CLOUD_DEPLOY = _IS_PROD;
 
 /* ─── HTTP server ────────────────────────────────────────────── */
 const _finovaServer = http.createServer((req, res) => {
-  // Redirigir 127.0.0.1 → localhost (Firebase Auth solo acepta 'localhost')
-  if (req.headers.host && req.headers.host.startsWith('127.0.0.1')) {
+  // Redirigir 127.0.0.1 → localhost (Firebase Auth solo acepta 'localhost'
+  // como dominio autorizado en desarrollo).
+  //
+  // SOLO en desarrollo: en producción el Host lo pone el proxy del hosting, y
+  // una redirección a «localhost» mandaría al usuario a su propia máquina.
+  if (!_IS_PROD && req.headers.host && req.headers.host.startsWith('127.0.0.1')) {
     res.writeHead(301, { 'Location': `http://localhost:${PORT}${req.url}`, ..._SEC });
     return res.end();
   }
@@ -3587,9 +3856,20 @@ const _finovaServer = http.createServer((req, res) => {
   //
   // La palabra "ok" del cuerpo es la que UptimeRobot busca para distinguir un
   // servidor vivo de un 200 devuelto por una página de error del proxy.
-  if (req.method === 'GET' && req.url === '/api/health') {
+  if ((req.method === 'GET' || req.method === 'HEAD') && req.url === '/api/health') {
+    // Límite holgado y propio: un monitor externo consulta cada minuto, pero
+    // el endpoint no debe servir de amplificador. 120/min por IP deja sitio a
+    // varios monitores y a los sondeos del propio hosting.
+    if (!_tokenBucket('health:' + _clientIp(req), 120, 2).ok) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '30', ..._SEC });
+      return res.end(JSON.stringify({ error: 'Too many requests' }));
+    }
+    if (req.method === 'HEAD') {
+      res.writeHead(200, { 'Content-Type': 'application/json', ..._SEC });
+      return res.end();
+    }
     res.writeHead(200, _apiHeaders(req, { 'Cache-Control': 'no-store' }));
-    return res.end(JSON.stringify({ ok: true, ts: new Date().toISOString() }));
+    return res.end(JSON.stringify({ ok: true, ts: Date.now() }));
   }
 
   // Verificar que la petición proviene del proxy de Vercel (cuando el secret está configurado)
@@ -3696,6 +3976,7 @@ const _finovaServer = http.createServer((req, res) => {
   if (req.method === 'GET'  && req.url.startsWith('/api/admin/stats'))    return handleAdminStats(req, res);
   if (req.method === 'POST' && req.url === '/api/admin/set-role')         return handleAdminSetRole(req, res);
   if (req.method === 'GET'  && req.url.startsWith('/api/admin/get-role'))    return handleAdminGetRole(req, res);
+  if (req.method === 'GET'  && req.url === '/api/admin/whoami')              return handleAdminWhoami(req, res);
   if (req.method === 'GET'  && req.url.startsWith('/api/admin/ratelimit'))  return handleRateLimitStats(req, res);
 
   // Analytics
@@ -3771,13 +4052,51 @@ const _finovaServer = http.createServer((req, res) => {
 
 // Referencia al servidor para poder cerrarlo en el apagado ordenado: antes la
 // llamada iba en cadena (createServer(...).listen(...)) y no quedaba ninguna.
-const _httpServer = _finovaServer.listen(PORT, '0.0.0.0', () => {
-  console.log('\x1b[36m%s\x1b[0m', `
+/*
+ * Timeouts de la conexión. Los valores por defecto de Node son
+ * keepAliveTimeout 5 s y headersTimeout 60 s, y detrás de un proxy eso
+ * produce 502 esporádicos: el proxy reutiliza una conexión justo cuando el
+ * servidor acaba de cerrarla por inactividad. La recomendación habitual es
+ * que el keep-alive del servidor sea MAYOR que el del proxy (60 s en la
+ * mayoría), y que headersTimeout sea mayor que keepAliveTimeout.
+ */
+_finovaServer.keepAliveTimeout = 65000;
+_finovaServer.headersTimeout   = 66000;
+/*
+ * requestTimeout: tiempo máximo para recibir la petición COMPLETA, cuerpo
+ * incluido. 30 s con los 8 MB que aceptan sync-upload y user-data exige
+ * ~273 kB/s sostenidos, que una conexión móvil mala no siempre da. Se pone
+ * en 120 s para no cortar esas dos subidas, que es justo lo que el encargo
+ * pedía comprobar. El tamaño ya está limitado aparte (MAX_BODY_SIZE y los
+ * 8 MB de esos dos endpoints), así que alargar el tiempo no abre la puerta a
+ * un cuerpo mayor.
+ */
+_finovaServer.requestTimeout   = 120000;
+
+const _httpServer = _finovaServer.listen(PORT, HOST, () => {
+  if (_IS_PROD) {
+    // Una línea, sin cajas ni colores: en los logs de un hosting los códigos
+    // de escape ANSI se ven como basura y las cajas ocupan cinco líneas.
+    console.log(`[FINOVA] listo · puerto=${PORT} host=${HOST} modo=producción data=${DATA_DIR} proxyHops=${TRUST_PROXY_HOPS}`);
+  } else {
+    console.log('\x1b[36m%s\x1b[0m', `
   ╔════════════════════════════════════╗
   ║   FINOVA — Servidor listo          ║
   ║   Puerto: ${PORT}
   ╚════════════════════════════════════╝
   `);
+  }
+
+  // Resumen de arranque: qué variables OPCIONALES faltan. Solo nombres,
+  // nunca valores — este log acaba en el panel del hosting y en Sentry.
+  const ausentes = [
+    'FINOVA_PROXY_SECRET', 'FINOVA_ENC_KEY', 'FIREBASE_PROJECT_ID',
+    'FINOVA_ADMIN_EMAILS', 'SENTRY_DSN_SERVER', 'FEEDBACK_WEBHOOK_URL',
+    'TRUST_PROXY_HOPS', 'DATA_DIR',
+  ].filter(k => !process.env[k]);
+  if (ausentes.length) {
+    console.log('[FINOVA] Variables opcionales sin configurar: ' + ausentes.join(', '));
+  }
   // Avisos del feedback. Importa saberlo al desplegar: sin volumen declarado,
   // Railway da un disco EFIMERO y data/feedback.jsonl desaparece en cada
   // redeploy. En ese caso el webhook es el canal fiable, no el fichero.
@@ -3797,9 +4116,32 @@ const _httpServer = _finovaServer.listen(PORT, '0.0.0.0', () => {
   // Y tampoco en una prueba: la suite de seguridad arranca el servidor una
   // vez por escenario, y sin esta condición cada ejecución abría una pestaña
   // nueva en la máquina de quien ejecuta los tests.
-  if (!_IS_CLOUD_DEPLOY && process.env.NODE_ENV !== 'test' && process.env.FINOVA_NO_OPEN !== '1') {
-    const { exec } = require('child_process');
-    exec(`start http://localhost:${PORT}`);
+  if (!_IS_PROD
+      && process.env.NODE_ENV !== 'test'
+      && process.env.OPEN_BROWSER !== 'false'
+      && process.env.FINOVA_NO_OPEN !== '1') {
+    // spawn con argumentos separados, no exec con una cadena: exec pasa el
+    // texto por el shell, así que cualquier carácter especial en la URL se
+    // interpretaría. Aquí la URL es nuestra y no tiene nada raro, pero la
+    // forma correcta cuesta lo mismo y no deja el patrón malo copiado.
+    //
+    // En Windows 'start' es un builtin de cmd, no un ejecutable, así que hay
+    // que invocarlo a través de cmd /c. El "" vacío es el título de la
+    // ventana: sin él, 'start' trata la URL entrecomillada como título y no
+    // abre nada.
+    try {
+      const { spawn } = require('child_process');
+      const url = `http://localhost:${PORT}`;
+      const [cmd, args] = process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
+        : process.platform === 'darwin' ? ['open', [url]]
+        : ['xdg-open', [url]];
+      const hijo = spawn(cmd, args, { detached: true, stdio: 'ignore' });
+      // Sin unref, el proceso del servidor no podría terminar nunca mientras
+      // el hijo siga vivo. Y el error se ignora: no abrir el navegador no es
+      // motivo para que el servidor falle.
+      hijo.on('error', () => {});
+      hijo.unref();
+    } catch (_) { /* no abrir el navegador no es un fallo */ }
   }
 });
 
@@ -3816,7 +4158,12 @@ const _httpServer = _finovaServer.listen(PORT, '0.0.0.0', () => {
 let _shuttingDown = false;
 
 async function _gracefulShutdown(motivo, codigo) {
-  if (_shuttingDown) return;
+  if (_shuttingDown) {
+    // Segunda señal: el operador ha pulsado Ctrl+C otra vez porque el cierre
+    // ordenado está tardando. Se sale ya, sin esperar nada más.
+    console.error('[FINOVA] Segunda señal (' + motivo + '): salida forzada');
+    process.exit(codigo == null ? 0 : codigo);
+  }
   _shuttingDown = true;
   console.log('[FINOVA] Apagando —', motivo);
 
@@ -3836,9 +4183,13 @@ async function _gracefulShutdown(motivo, codigo) {
   }
 
   // 4. Esperar a que cierren las conexiones, con tope. Railway manda SIGKILL
-  //    a los 30 s; 8 es de sobra para terminar una petición y no deja el
+  //    a los 30 s; 10 es de sobra para terminar una petición y no deja el
   //    contenedor colgado si una se queda abierta.
-  await Promise.race([cerrado, new Promise(r => setTimeout(r, 8000))]);
+  //
+  //    Una escritura de datos en curso termina sola: _writeFileAtomic es
+  //    síncrona, así que o ya hizo el rename o no se había llamado. No hay
+  //    estado a medias que esperar.
+  await Promise.race([cerrado, new Promise(r => setTimeout(r, 10000))]);
   process.exit(codigo == null ? 0 : codigo);
 }
 
@@ -3847,6 +4198,11 @@ process.on('SIGINT',  () => _gracefulShutdown('SIGINT', 0));
 
 process.on('uncaughtException', err => {
   console.error('[FINOVA] Excepción no capturada:', err && err.message);
+  // Las 8 primeras líneas del stack: las que apuntan a nuestro código. El
+  // resto son rutas internas de Node que no ayudan y llenan el panel de logs.
+  if (err && err.stack) {
+    console.error(err.stack.split('\n').slice(0, 8).join('\n'));
+  }
   _sentryCapture(err, null, { fatal: true });
   // Se sale: tras una excepción no capturada el proceso queda en un estado
   // que no se puede dar por bueno, y Railway lo reinicia. Pero se sale por el

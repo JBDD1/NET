@@ -15,14 +15,15 @@
     "preview": "vite preview",
     "start": "node server.cjs",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "test:security": "node --test tests/static-guard.test.cjs",
+    "test:security": "node --test tests/static-guard.test.cjs tests/server-boot.test.cjs",
     "test:isolation": "node --experimental-vm-modules node_modules/jest/bin/jest.js src/tests/isolation.test.js --testTimeout=15000",
     "release": "bash scripts/release.sh",
     "version:patch": "node -e \"const p=require('./package.json');const v=p.version.split('.').map(Number);v[2]++;require('fs').writeFileSync('package.json',JSON.stringify({...p,version:v.join('.')},null,2)+'\\n')\" && git add package.json && git commit -m \"chore: bump version\" && git tag -a v$(node -p \"require('./package.json').version\") -m 'release' && git push origin --tags && echo 'Tag creado y pusheado'",
     "build:sentry": "bash scripts/upload-sourcemaps.sh",
     "verify:dist": "node scripts/verify-dist.cjs",
     "hooks:install": "git config core.hooksPath .githooks",
-    "check:secrets": "node scripts/check-secrets.cjs"
+    "check:secrets": "node scripts/check-secrets.cjs",
+    "test:boot": "node --test tests/server-boot.test.cjs"
   },
   "dependencies": {
     "@sentry/browser": "^11.10.0",
