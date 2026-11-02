@@ -79,6 +79,14 @@ async function arrancar(envExtra = {}, dataDir) {
       DATA_DIR: dataDir,
       // Sin esto, cada arranque abriría una pestaña del navegador.
       OPEN_BROWSER: 'false',
+      // El servidor se niega a arrancar en producción sin clave de cifrado
+      // (los datos se guardarían en claro) y sin las credenciales del Admin
+      // SDK (no se comprobaría la revocación de tokens). Las dos puertas son
+      // deliberadas; aquí se satisfacen para poder probar lo que este fichero
+      // prueba, que es el arranque. Las puertas en sí tienen sus propios
+      // tests en tests/security-config.test.cjs.
+      FINOVA_ENC_KEY: require('node:crypto').randomBytes(32).toString('hex'),
+      ALLOW_NO_REVOCATION_CHECK: 'true',
     }, envExtra),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -273,6 +281,8 @@ describe('DATA_DIR', () => {
       env: Object.assign({}, process.env, {
         PORT: String(puerto), DATA_DIR: f, OPEN_BROWSER: 'false',
         NODE_ENV: 'production', ALLOWED_ORIGIN: 'https://finova.test',
+        FINOVA_ENC_KEY: require('node:crypto').randomBytes(32).toString('hex'),
+        ALLOW_NO_REVOCATION_CHECK: 'true',
       }),
       stdio: ['ignore', 'pipe', 'pipe'],
     });

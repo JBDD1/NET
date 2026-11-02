@@ -100,6 +100,12 @@ beforeEach(() => {
   const gcCalls = [];
   ctx = vm.createContext({
     fs, path, crypto, console: { error() {}, warn() {}, log() {} },
+    // process hace falta para _writeFileAtomic, que mete el pid en el nombre
+    // del temporal. No es un global de JavaScript sino de Node, así que un
+    // contexto de vm no lo trae: sin él la escritura lanzaba ReferenceError,
+    // el try/catch de _deleteAccountData se la comía y el borrado parecía
+    // ejecutarse sin hacer nada.
+    process,
     // Con dirs pasado, estos nunca se evaluan; estan por si acaso.
     USERS_DIR: path.join(TMP, 'users'), SYNC_DIR: path.join(TMP, 'sync'), ROOT: TMP,
     _buckets: new Map(),
@@ -109,7 +115,14 @@ beforeEach(() => {
     __gcCalls: gcCalls,
   });
   vm.runInContext(
-    extractFn(SERVER, '_getSyncOwnersFrom') + '\n' + extractFn(SERVER, '_deleteAccountData'),
+    // _writeFileAtomic también: server.cjs dejó de escribir los ficheros de
+    // datos con fs.writeFileSync directo (una escritura interrumpida dejaba
+    // el JSON truncado, y cifrado eso es irrecuperable). Sin el helper en el
+    // contexto, la escritura lanzaba, el try/catch de _deleteAccountData se
+    // la comía y el borrado parecía no hacer nada.
+    extractFn(SERVER, '_writeFileAtomic') + '\n'
+    + extractFn(SERVER, '_getSyncOwnersFrom') + '\n'
+    + extractFn(SERVER, '_deleteAccountData'),
     ctx, { filename: 'server.cjs' }
   );
   fns = vm.runInContext('({ _deleteAccountData })', ctx);

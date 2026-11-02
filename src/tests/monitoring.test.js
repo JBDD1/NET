@@ -424,16 +424,26 @@ describe('Apagado ordenado', () => {
     const iClose = fn.indexOf('_httpServer.close');
     const iSave  = fn.indexOf('_saveRateLimits()');
     const iFlush = fn.indexOf('.flush(');
-    const iExit  = fn.indexOf('process.exit');
+    // lastIndexOf, no indexOf: ahora hay un process.exit más arriba, en la
+    // rama de la SEGUNDA señal (un Ctrl+C repetido fuerza la salida sin
+    // esperar). Lo que este test comprueba es que la salida NORMAL va
+    // después del flush, y esa es la última.
+    const iExit  = fn.lastIndexOf('process.exit');
     expect(iClose).toBeGreaterThan(-1);
     expect(iSave).toBeGreaterThan(iClose);
     expect(iFlush).toBeGreaterThan(iSave);
     expect(iExit).toBeGreaterThan(iFlush);
   });
 
-  test('es idempotente: dos señales no lo ejecutan dos veces', () => {
+  test('una segunda señal no repite el apagado: fuerza la salida', () => {
+    // Antes la segunda señal hacía `return` y se ignoraba, así que un cierre
+    // colgado (una petición que no termina) hacía que el Ctrl+C del operador
+    // no sirviera de nada. Ahora sale ya, sin esperar.
     const fn = extractFn(SERVER, '_gracefulShutdown');
-    expect(fn).toMatch(/if \(_shuttingDown\) return;/);
+    expect(fn).toMatch(/if \(_shuttingDown\)/);
+    const guarda = fn.slice(fn.indexOf('if (_shuttingDown)'), fn.indexOf('_shuttingDown = true'));
+    expect(guarda).toMatch(/process\.exit/);
+    expect(guarda).toMatch(/Segunda señal/);
   });
 
   test('está enganchado a SIGTERM y SIGINT', () => {
@@ -458,8 +468,10 @@ describe('Apagado ordenado', () => {
 
 describe('Endpoints de salud', () => {
   test('/api/health no expone versiones, uptime ni estado interno', () => {
+    // 1200 y no 400: delante del cuerpo hay ahora el límite por IP y la
+    // rama de HEAD, que se añadieron después de escribirse este test.
     const bloque = SERVER.slice(SERVER.indexOf("req.url === '/api/health'"),
-                                SERVER.indexOf("req.url === '/api/health'") + 400);
+                                SERVER.indexOf("req.url === '/api/health'") + 1200);
     expect(bloque).toMatch(/ok: true/);
     expect(bloque).toMatch(/ts:/);
     // Lo que NO puede estar.

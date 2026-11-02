@@ -2035,6 +2035,186 @@ comprobado contra un despliegue.
 
 ---
 
+## FASE 21 — Fallos silenciosos: arranque seguro, errores sin fugas y límites · ✅ COMPLETA
+
+Documentado en [SECURITY.md](SECURITY.md). La regla que gobierna la fase:
+**un servidor mal configurado tiene que negarse a arrancar, no arrancar
+peor.** Los fallos silenciosos son los que sobreviven años, porque nada los
+delata.
+
+### Los cinco hallazgos del encargo, reproducidos uno a uno
+
+| # | Hallazgo | Veredicto |
+|---|---|---|
+| 1 | Sin `FINOVA_ENC_KEY`, los datos se guardan en claro sin avisar | **CONFIRMADO.** `if (!_ENC_KEY) return plaintext;` |
+| 2 | `FINOVA_FIREBASE_PROJECT=DISABLED` desactiva la autenticación | **NO.** Ese mecanismo se retiró ya (hay un comentario llamándolo «silent footgun»). El interruptor real es `FINOVA_DISABLE_AUTH=true`, y las rutas `?uid=` y `dev-uid` sí existen colgando de él |
+| 3 | Dos rutas de verificación, y la de reserva no comprueba revocación | **CONFIRMADO, y es el más sutil de todos** |
+| 4 | Al menos 8 sitios filtran `e.message` al cliente | **PARCIAL.** Solo **1** llegaba al cliente; 6 más iban a un informe de admin |
+| 5 | Sin límite por IP en IA, sync-upload y banca | **NO.** Los tres lo tienen. El único que faltaba era `handleUserMeta` |
+
+### El hallazgo 3, explicado, porque es el que más cuesta ver
+
+`_requireAuth` usa el Admin SDK, que comprueba **revocación**
+(`verifyIdToken(token, true)`). Si el SDK no se inicializa —porque falta
+`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL` o `FIREBASE_PRIVATE_KEY`—
+cae a `_verifyFirebaseToken`, que valida la firma RS256 contra las JWKS de
+Google pero **no comprueba revocación**.
+
+Consecuencia: un usuario al que acabas de expulsar, bloquear o cerrarle la
+sesión **sigue entrando hasta que su token caduque**, hasta una hora. Y lo
+único que lo delataba era una línea informativa al arrancar, fácil de no ver
+nunca. Ahora en producción impide arrancar, con válvula
+`ALLOW_NO_REVOCATION_CHECK=true` si se acepta a propósito.
+
+### Un hallazgo NUEVO, y es grave
+
+**`_isBlocked` se comprobaba en 2 de 10 endpoints autenticados.** Un usuario
+suspendido podía:
+
+- guardar sus datos (`handleUserDataPost`)
+- cambiar sus metadatos (`handleUserMeta`)
+- subir y bajar backups de sync
+- mandar feedback
+- importar movimientos del banco
+
+«Cuenta suspendida» era casi decorativo. Movido a `_requireAuth`, el punto
+por el que pasan todos — el mismo criterio que `_safeJoin` en la Fase 20: la
+garantía vive donde no depende de que cada handler se acuerde.
+
+**Con una excepción deliberada:** `/api/account/delete`. El derecho de
+supresión del RGPD no se pierde por estar sancionado, y negarlo convertiría
+una suspensión en una retención indefinida de datos personales.
+
+### La matriz de arranque, medida
+
+| Configuración | Resultado |
+|---|---|
+| Producción sin `FINOVA_ENC_KEY` | **exit 1** |
+| Clave malformada (6 hex, 64 no-hex, 32 hex) | **exit 1** |
+| Clave OK, sin Admin SDK | **exit 1** |
+| Clave OK + `ALLOW_NO_REVOCATION_CHECK` | arranca **avisando** |
+| Sin clave + las dos válvulas | arranca con el cartel de «datos sin cifrar» |
+| Todo OK + `FINOVA_DISABLE_AUTH=true` | **exit 1** |
+| Desarrollo sin clave | arranca con el cartel |
+
+### Cifrado: los tres casos de descifrado
+
+| Caso | Antes | Ahora |
+|---|---|---|
+| No empieza por `enc1:` | se devolvía tal cual | igual (**compatibilidad deliberada** con los ficheros antiguos) |
+| `enc1:` y sin clave | se devolvía **el texto cifrado**, que el frontend intentaba leer como JSON | lanza con `enc/missing-key` |
+| `enc1:` y clave mala | excepción de la librería, sin contexto | lanza con `enc/wrong-key` |
+
+`scripts/encrypt-existing-data.cjs`: por defecto **solo informa**. Con
+`--apply` exige `--backup` a un directorio vacío, verifica cada fichero dos
+veces (en memoria y releyendo del disco), escribe de forma atómica, es
+idempotente, y **se para** si encuentra ficheros cifrados con otra clave en
+vez de escribir encima. Probados los cinco caminos.
+
+**La rotación sigue pendiente**, y por un motivo concreto: `enc1` es la
+versión del FORMATO, no de la clave, así que no hay forma de saber con qué
+clave se cifró cada fichero. La propuesta (`enc2:<kid>:…` con llavero) está
+en SECURITY.md y ROTATE_SECRETS.md. No implementada.
+
+### Errores sin fugas
+
+`_sendError(req, res, status, code, err, ctx)` con 12 mensajes públicos
+FIJOS. Y dos mejoras en el registro que ya existía: la ruta va **sin query**
+(ahí viajan el uid y el código de sync) y el uid va **hasheado** (`u:` + 10
+hex de sha256) — basta para correlacionar, y no es un identificador
+reutilizable si el log se filtra.
+
+Probado provocando errores de verdad contra un servidor real: JSON mal
+formado (5 variantes), token falso (4), uid inválido (4), ruta inexistente,
+cuerpo de 200 kB. Ningún cuerpo de respuesta contiene una línea de stack,
+una ruta del sistema, un nombre de fichero interno, el prefijo `Error:` ni
+un código de Node (`ENOENT`, `ECONNREFUSED`…).
+
+Y hay un **test de regresión** que falla si reaparece un `res.end` con
+`e.message` o `.stack`: el patrón es fácil de reintroducir sin pensarlo.
+
+### Límites y coste de la IA
+
+`user-meta` era el único endpoint autenticado sin límite por IP, y escribe
+un fichero por llamada. Añadido, con un test que falla si alguno se queda
+sin él.
+
+Tres frenos nuevos para la IA, porque la cuota por usuario limita a cada uno
+pero **no limita el total**: con suficientes cuentas la factura crece sin
+tope.
+
+| Variable | Por defecto | Qué frena |
+|---|---|---|
+| `AI_DAILY_LIMIT_GLOBAL` | 2000 | Consultas de todo el servidor. Al llegar, 503 |
+| `AI_MAX_CONTEXT_CHARS` | 24000 | Contexto enviado (los tokens de **entrada** también se pagan) |
+| `AI_MAX_OUTPUT_TOKENS` | 1024 | Tokens de salida (antes era la constante `1024` en tres sitios) |
+
+El orden de las puertas en `handleAIProxy` está fijado por un test:
+**auth → bloqueo → correo verificado → tope global → cuota individual**. El
+tope global va después de las puertas de seguridad para que un abuso no
+gaste el cupo de todos, y antes de la cuota individual para no descontarle su
+cupo a alguien a quien se va a rechazar igualmente.
+
+### Lo que costó: seis tests existentes se rompieron
+
+Y los seis por buenos motivos, que merece la pena distinguir:
+
+**Dos eran regresiones reales de mis cambios.** `account-delete.test.js`
+extrae `_deleteAccountData` a un contexto `vm` y las escrituras ahora pasan
+por `_writeFileAtomic`, que usa `process.pid`. **`process` no es un global
+de JavaScript sino de Node**, así que un contexto de `vm` no lo trae: la
+escritura lanzaba `ReferenceError`, el `try/catch` del borrado se la comía y
+el borrado parecía ejecutarse **sin hacer nada**. Fallo silencioso creado por
+mí al arreglar fallos silenciosos.
+
+**Tres afirmaban sobre la forma del código antiguo**, no sobre su intención:
+`indexOf('process.exit')` encontraba el nuevo exit de la segunda señal en
+vez del final (ahora `lastIndexOf`), una ventana de 400 caracteres que ya no
+alcanzaba el cuerpo del health, y el patrón
+`/if \(_shuttingDown\) return;/` de un comportamiento que la Fase 20 cambió
+a propósito. Reescritos para comprobar la intención.
+
+**Uno era la puerta nueva funcionando:** los tests de arranque fallaban
+porque el servidor **se niega a arrancar** sin clave de cifrado. Se les da
+lo que ahora exige.
+
+### Pruebas
+
+```
+npm run test:security  ->  tests 115 · suites 14 · pass 115 · fail 0
+npm test               ->  942 passed, 31 suites
+node --check server.cjs -> OK
+```
+
+`tests/security-config.test.cjs`, 34 casos nuevos: matriz de arranque,
+cifrado de ida y vuelta, los tres casos de descifrado, los cinco caminos del
+script de migración, errores sin fugas contra un servidor real, la regresión
+de `e.message`, y los límites.
+
+### Lo que NO se pudo verificar
+
+**El Admin SDK funcionando.** No tengo credenciales de Firebase, así que la
+ruta con comprobación de revocación **nunca se ha ejecutado**: solo se ha
+probado que su ausencia impide arrancar. Que `verifyIdToken(token, true)`
+rechace un token revocado es documentación de Firebase, no algo medido aquí.
+
+**La escalada de privilegios, solo por lectura.** `set-admin` y `set-role`
+pasan por `_adminGuard`, que exige `_isAdminUid`. Lo he leído y es correcto,
+pero **no lo he probado con dos cuentas reales** (una admin y una normal)
+porque hace falta autenticación de Firebase. Queda como pendiente.
+
+**El coste real de la IA.** Los topes están puestos y se aplican, pero no he
+llamado a ningún proveedor: no hay claves configuradas. Que
+`AI_MAX_OUTPUT_TOKENS` llegue al proveedor y lo respete está verificado por
+lectura del payload, no por una respuesta real.
+
+**Los 6 `e.message` del informe de admin** siguen ahí. Van a una respuesta
+que solo ve un administrador autenticado, así que el riesgo es bajo, pero un
+mensaje de `fs` puede llevar una ruta del servidor. No los he tocado para no
+cambiar el contrato de ese endpoint sin que lo pidas.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más

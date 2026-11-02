@@ -117,6 +117,12 @@ async function arrancar(envExtra) {
       // Sin esto cada arranque abre una pestaña del navegador en la máquina
       // de quien ejecuta los tests.
       FINOVA_NO_OPEN: '1',
+      // El servidor se niega a arrancar en produccion sin clave de cifrado y
+      // sin credenciales del Admin SDK. Las dos puertas son deliberadas y
+      // tienen sus propios tests en tests/security-config.test.cjs; aqui se
+      // satisfacen para poder probar lo que este fichero prueba.
+      FINOVA_ENC_KEY: require('node:crypto').randomBytes(32).toString('hex'),
+      ALLOW_NO_REVOCATION_CHECK: 'true',
       ...envExtra,
     },
     stdio: ['ignore', 'pipe', 'pipe'],

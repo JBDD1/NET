@@ -669,7 +669,42 @@ const _LIMITS = {
   // porque una IP compartida (una oficina, un operador móvil) no debe
   // gastar el cupo de todos los que están detrás.
   feedback:      { byIP: { capacity: 5, refillRate: 5 / 3600 } },
+  // user-meta era el ÚNICO endpoint autenticado sin límite por IP. Escribe
+  // un fichero por llamada, así que sin límite es una vía de desgaste del
+  // disco gratis.
+  userMeta:      { byIP: { capacity: 30, refillRate: 0.5 } },
 };
+
+/* ═══════════════════════════════════════════════════════════════
+   COSTE DE LA IA — frenos de emergencia
+
+   La cuota por usuario (5/día gratis, 50 premium) limita a cada uno, pero
+   NO limita el total: con suficientes cuentas, la factura crece sin tope.
+   Estos tres valores son el freno, y se ajustan por entorno.
+═══════════════════════════════════════════════════════════════ */
+
+/** Tope diario de TODO el servidor. El freno de mano. */
+const AI_DAILY_LIMIT_GLOBAL = Number(process.env.AI_DAILY_LIMIT_GLOBAL) || 2000;
+/** Caracteres de contexto que se envían al proveedor. */
+const AI_MAX_CONTEXT_CHARS  = Number(process.env.AI_MAX_CONTEXT_CHARS) || 24000;
+/** Tokens de salida que se le piden. Cada uno se paga. */
+const AI_MAX_OUTPUT_TOKENS  = Number(process.env.AI_MAX_OUTPUT_TOKENS) || 1024;
+
+/**
+ * Contador diario global, en memoria y con la fecha dentro.
+ *
+ * En memoria a propósito: un reinicio lo pone a cero, y eso es aceptable
+ * para un freno de emergencia. Persistirlo exigiría escribir en disco en
+ * cada consulta, que es justo lo que no interesa en la ruta caliente.
+ */
+let _aiGlobal = { dia: '', usados: 0 };
+function _aiGlobalOk() {
+  const hoy = new Date().toISOString().slice(0, 10);
+  if (_aiGlobal.dia !== hoy) _aiGlobal = { dia: hoy, usados: 0 };
+  if (_aiGlobal.usados >= AI_DAILY_LIMIT_GLOBAL) return false;
+  _aiGlobal.usados++;
+  return true;
+}
 
 // ─── Anti-bruteforce ────────────────────────────────────────────
 const _failedAttempts = new Map(); // ip → { count, lastAt, blockedUntil }
@@ -928,6 +963,14 @@ function _buildServerSystemPrompt(anonMode, snapshot) {
     contextBlock = `Tienes acceso en tiempo real a los datos financieros del usuario.\n\n[FINOVA ${date}]\nPatrimonio: ${_fmtEuro(patrimony)} (efectivo:${_fmtEuro(cash)}, inversión:${_fmtEuro(inv)}, alt:${_fmtEuro(alt)}${propsCtx})\nMes ${month}: ingresos ${_fmtEuro(inc)}, gastos ${_fmtEuro(exp)}, balance ${_fmtEuro(inc - exp)}\nTop gastos: ${topCatsStr}\nCartera (${portfLen}): ${portfStr}\nDividendos anuales: ${_fmtEuro(divAnual)}\nObjetivos: ${goalsStr}\nTransacciones: ${txCount} | Watchlist: ${wlCount} | Bizums pendientes: ${bizums}\n`;
   }
 
+  // El contexto se recorta a AI_MAX_CONTEXT_CHARS. Crece con los datos del
+  // usuario (cartera, transacciones, objetivos) y los tokens de ENTRADA se
+  // pagan igual que los de salida. Se avisa al modelo de que está recortado
+  // para que no dé por ausente lo que simplemente no cabía.
+  if (contextBlock.length > AI_MAX_CONTEXT_CHARS) {
+    contextBlock = contextBlock.slice(0, AI_MAX_CONTEXT_CHARS)
+      + '\n[CONTEXTO RECORTADO: hay más datos de los que caben. No afirmes que falta información sin avisar de que el contexto está truncado.]\n';
+  }
   return `Eres Finova AI, el asesor financiero personal integrado en la app Finova.\n${contextBlock}\nInstrucciones:\n- Responde siempre en español\n- Usa los datos reales del usuario para dar consejos personalizados con números concretos\n- Usa formato markdown básico (negritas con **, listas con -, saltos de línea) para estructurar respuestas\n- Usa el formato europeo de moneda (€1.234,56)\n- Si el usuario no tiene datos en alguna categoría, díselo\n- No garantices rentabilidades ni des consejos de inversión ilegales`;
 }
 
@@ -1135,7 +1178,57 @@ function _sentryCapture(err, req, extra) {
   } catch (_) { /* nunca romper por la monitorización */ }
 }
 
-function _serverError(req, res, e, status = 500, userMsg = null) {
+/** Hash corto y estable de un uid, para poder correlacionar sin identificar. */
+function _hashUid(uid) {
+  if (!uid) return 'anonymous';
+  return 'u:' + crypto.createHash('sha256').update(String(uid)).digest('hex').slice(0, 10);
+}
+
+/*
+ * Mensajes públicos FIJOS. La clave es que el cliente recibe siempre uno de
+ * estos, nunca el texto de una excepción: el mensaje de un fs, de un fetch o
+ * de una librería contiene rutas del servidor, nombres de fichero y a veces
+ * fragmentos de lo que se estaba procesando.
+ */
+const _ERRORES_PUBLICOS = {
+  INTERNAL_ERROR:   'Ha ocurrido un error inesperado. Si el problema persiste, contacta con soporte en MyFinova1@gmail.com',
+  BAD_REQUEST:      'La petición no es válida.',
+  BAD_JSON:         'El cuerpo de la petición no es JSON válido.',
+  PAYLOAD_TOO_BIG:  'Los datos enviados son demasiado grandes.',
+  UNAUTHORIZED:     'No autorizado.',
+  FORBIDDEN:        'Acceso denegado.',
+  NOT_FOUND:        'Not found',
+  RATE_LIMITED:     'Demasiadas peticiones. Espera unos segundos.',
+  UPSTREAM_TIMEOUT: 'El servicio externo no respondió a tiempo. Inténtalo de nuevo.',
+  UPSTREAM_ERROR:   'El servicio externo no está disponible ahora mismo.',
+  SERVICE_BUSY:     'Servicio temporalmente no disponible. Inténtalo más tarde.',
+  ENCRYPTION:       'No se pudieron leer tus datos guardados. Contacta con soporte en MyFinova1@gmail.com',
+};
+
+/**
+ * Responde un error sin filtrar nada.
+ *
+ * Firma del encargo. Internamente delega en _serverError, que ya hacía el
+ * registro estructurado y el envío a Sentry: duplicar esa lógica en dos
+ * funciones es la forma de que una se quede atrás.
+ *
+ * @param {string} code  clave de _ERRORES_PUBLICOS
+ * @param {Error}  err   se REGISTRA, nunca se envía
+ * @param {object} ctx   contexto extra para el log
+ */
+function _sendError(req, res, status, code, err, ctx) {
+  const publico = _ERRORES_PUBLICOS[code] || _ERRORES_PUBLICOS.INTERNAL_ERROR;
+  if (ctx) {
+    console.error('[FINOVA][ERROR][ctx]', {
+      route: String(req.url || '').split('?')[0],
+      uid: _hashUid(req.uid),
+      ...ctx,
+    });
+  }
+  return _serverError(req, res, err || new Error(code), status, publico, code);
+}
+
+function _serverError(req, res, e, status = 500, userMsg = null, code = null) {
   // Cada 500 va a Sentry con la ruta y el método, sin cuerpo y con el uid
   // hasheado. Va antes del log para que un fallo al escribir en consola no
   // impida el reporte.
@@ -1143,16 +1236,21 @@ function _serverError(req, res, e, status = 500, userMsg = null) {
   console.error('[FINOVA][ERROR]', {
     ts:      new Date().toISOString(),
     status,
-    route:   req.url,
+    // Sin la query: ahí viajan el uid y el código de sync, y este log acaba
+    // en el panel del hosting y en Sentry.
+    route:   String(req.url || '').split('?')[0],
     method:  req.method,
-    uid:     req.uid || 'anonymous',
+    // El uid, hasheado y corto. Basta para correlacionar varios errores del
+    // mismo usuario, que es para lo que sirve, y no es un identificador
+    // reutilizable si el log se filtra.
+    uid:     _hashUid(req.uid),
     message: e?.message?.slice(0, 300),
     stack:   e?.stack?.split('\n').slice(0, 4).join(' | '),
   });
   res.writeHead(status, _apiHeaders(req));
   res.end(JSON.stringify({
-    error: userMsg || 'Ha ocurrido un error inesperado. Si el problema persiste, contacta con soporte en MyFinova1@gmail.com',
-    code:  'INTERNAL_ERROR',
+    error: userMsg || _ERRORES_PUBLICOS.INTERNAL_ERROR,
+    code:  code || 'INTERNAL_ERROR',
   }));
 }
 
@@ -1249,7 +1347,7 @@ function httpsPost(hostname, path, headers, bodyStr) {
 async function proxyClaude(apiKey, messages, systemPrompt) {
   const body = JSON.stringify({
     model: 'claude-3-5-haiku-20241022',
-    max_tokens: 1024,
+    max_tokens: AI_MAX_OUTPUT_TOKENS,
     system: systemPrompt,
     messages: messages.map(m => ({ role: m.role, content: m.content })),
   });
@@ -1280,7 +1378,7 @@ async function proxyClaude(apiKey, messages, systemPrompt) {
 async function proxyOpenAI(apiKey, messages, systemPrompt) {
   const body = JSON.stringify({
     model: 'gpt-4o-mini',
-    max_tokens: 1024,
+    max_tokens: AI_MAX_OUTPUT_TOKENS,
     messages: [
       { role: 'system', content: systemPrompt },
       ...messages.map(m => ({ role: m.role, content: m.content })),
@@ -1352,7 +1450,7 @@ async function proxyGemini(apiKey, messages, systemPrompt) {
 async function proxyGroq(apiKey, messages, systemPrompt) {
   const body = JSON.stringify({
     model: 'llama-3.3-70b-versatile',
-    max_tokens: 1024,
+    max_tokens: AI_MAX_OUTPUT_TOKENS,
     messages: [
       { role: 'system', content: systemPrompt },
       ...messages.map(m => ({ role: m.role, content: m.content })),
@@ -1623,7 +1721,20 @@ async function handleAIProxy(req, res) {
   // 2. IP-based token bucket (burst protection)
   if (!_checkRateLimit(req, res, 'ai')) return;
 
-  // 3. Per-UID daily quota (free: 5/day, premium: 50/day, admin: unlimited)
+  // 3b. Tope diario de TODO el servidor: el freno de emergencia.
+  //
+  // La cuota por usuario limita a cada uno, pero no limita el total: con
+  // suficientes cuentas la factura crece sin tope. Va DESPUÉS de la
+  // autenticación, del bloqueo y de la verificación de correo, para que un
+  // abuso no gaste el cupo global; y antes de la cuota por usuario, para no
+  // descontarle su cupo a alguien a quien se va a rechazar igualmente.
+  if (!_aiGlobalOk()) {
+    console.error('[FINOVA/IA] Tope diario global alcanzado (' + AI_DAILY_LIMIT_GLOBAL + '). Rechazando consultas.');
+    res.writeHead(503, _apiHeaders(req, { 'Retry-After': '3600' }));
+    return res.end(JSON.stringify({ error: _ERRORES_PUBLICOS.SERVICE_BUSY, code: 'SERVICE_BUSY' }));
+  }
+
+  // 4. Per-UID daily quota (free: 5/day, premium: 50/day, admin: unlimited)
   const role = _getUserRole(uid);
   if (_AUTH_ENABLED && uid && role !== 'admin') {
     const dailyLimit = _LIMITS.ai.byUID[role] || _LIMITS.ai.byUID.free;
@@ -1687,6 +1798,32 @@ async function handleAIProxy(req, res) {
 
 // Verifies Firebase token and returns uid, or writes 401 and returns null.
 // Uses Admin SDK (with revocation check) when available; custom RS256 otherwise.
+/*
+ * Endpoints exentos del bloqueo de cuenta.
+ *
+ * El borrado de la propia cuenta NO puede depender de que la cuenta esté
+ * suspendida: el derecho de supresión del RGPD no se pierde por estar
+ * sancionado, y negarlo convertiría una suspensión en una retención
+ * indefinida de datos personales.
+ */
+const _EXENTOS_DE_BLOQUEO = ['/api/account/delete'];
+
+/**
+ * Si la cuenta está suspendida, responde 403 y devuelve true.
+ *
+ * Se llama desde _requireAuth, el único punto por el que pasan todos los
+ * endpoints autenticados. Antes se comprobaba handler a handler y solo
+ * estaba en 2 de 10.
+ */
+function _rechazarSiBloqueado(req, res, uid) {
+  const ruta = String(req.url || '').split('?')[0];
+  if (_EXENTOS_DE_BLOQUEO.includes(ruta)) return false;
+  if (!_isBlocked(uid)) return false;
+  res.writeHead(403, _apiHeaders(req));
+  res.end(JSON.stringify({ error: 'Cuenta suspendida. Contacta con soporte.', code: 'ACCOUNT_SUSPENDED' }));
+  return true;
+}
+
 async function _requireAuth(req, res) {
   if (!_AUTH_ENABLED) {
     req.uid = 'dev-uid';
@@ -1721,6 +1858,7 @@ async function _requireAuth(req, res) {
       req.uid = decoded.uid;
       req.emailVerified = decoded.email_verified === true;
       _clearFailedAttempts(ip);
+      if (_rechazarSiBloqueado(req, res, decoded.uid)) return null;
       return decoded.uid;
     }
     // full: true devuelve el payload entero en vez del uid a secas, que es lo
@@ -1729,6 +1867,7 @@ async function _requireAuth(req, res) {
     req.uid = payload.sub;
     req.emailVerified = payload.email_verified === true;
     _clearFailedAttempts(ip);   // sesión legítima: se borra el historial de la IP
+    if (_rechazarSiBloqueado(req, res, payload.sub)) return null;
     return payload.sub;
   } catch (e) {
     const code      = e.code || '';
@@ -2124,15 +2263,86 @@ async function _verifyFirebaseTokenInner(authHeader) {
 // AES-256-GCM encryption for user JSON files at rest.
 // Set FINOVA_ENC_KEY to a 64-char hex string (32 random bytes).
 // Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-const _ENC_KEY = (() => {
-  const hex = process.env.FINOVA_ENC_KEY || '';
-  if (!hex) return null;
-  const buf = Buffer.from(hex, 'hex');
-  return buf.length === 32 ? buf : null;
+/*
+ * Válvula explícita para guardar los datos SIN cifrar. Por defecto false.
+ *
+ * Existe porque hay escenarios legítimos (una demo, un entorno de pruebas)
+ * donde no hace falta cifrado, pero tiene que ser una decisión con nombre y
+ * no el efecto colateral de olvidar una variable.
+ */
+const ALLOW_PLAINTEXT_DATA = process.env.ALLOW_PLAINTEXT_DATA === 'true';
+
+/*
+ * Clave de cifrado en reposo. 64 caracteres hexadecimales = 32 bytes.
+ *
+ * El fallo que esto cierra: antes, si la variable faltaba o estaba mal,
+ * _ENC_KEY quedaba en null y _encryptUserData devolvía el texto EN CLARO sin
+ * decir nada. Los datos financieros de todos los usuarios se guardaban sin
+ * cifrar y en los logs no había ni una línea al respecto. Una configuración
+ * que degrada la seguridad en silencio es peor que una que falla.
+ */
+const _ENC_KEY_RAW = (process.env.FINOVA_ENC_KEY || '').trim();
+const _ENC_KEY_ESTADO = (() => {
+  if (!_ENC_KEY_RAW) return 'ausente';
+  if (!/^[0-9a-fA-F]{64}$/.test(_ENC_KEY_RAW)) return 'malformada';
+  return 'ok';
 })();
+const _ENC_KEY = _ENC_KEY_ESTADO === 'ok' ? Buffer.from(_ENC_KEY_RAW, 'hex') : null;
+
+/**
+ * Comprueba el cifrado al arrancar. En producción, sin clave válida el
+ * proceso NO arranca, salvo que se abra la válvula a propósito.
+ */
+function _validarCifrado() {
+  if (_ENC_KEY_ESTADO === 'ok') {
+    // Prueba de ida y vuelta: una clave con la forma correcta pero que no
+    // funcione (algo rarísimo, pero el coste de comprobarlo es cero) daría
+    // un fallo en la primera escritura de un usuario y no al arrancar.
+    try {
+      const marca = 'finova-selftest';
+      if (_decryptUserData(_encryptUserData(marca)) !== marca) throw new Error('ida y vuelta inconsistente');
+    } catch (e) {
+      console.error('[FINOVA] FINOVA_ENC_KEY tiene el formato correcto pero el cifrado no funciona:', e.message);
+      process.exit(1);
+    }
+    return;
+  }
+
+  const comoGenerarla = 'Genérala con:  node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"';
+  const motivo = _ENC_KEY_ESTADO === 'ausente'
+    ? 'FINOVA_ENC_KEY no está configurada'
+    : 'FINOVA_ENC_KEY no son 64 caracteres hexadecimales (32 bytes)';
+
+  if (_IS_PROD && !ALLOW_PLAINTEXT_DATA) {
+    console.error('[FINOVA] ' + motivo + '.');
+    console.error('[FINOVA] Sin ella, los datos financieros de los usuarios se guardarían EN CLARO.');
+    console.error('[FINOVA] ' + comoGenerarla);
+    console.error('[FINOVA] Guárdala en un gestor de contraseñas FUERA del servidor: si se pierde,');
+    console.error('[FINOVA] los datos ya cifrados son irrecuperables (ver ROTATE_SECRETS.md).');
+    console.error('[FINOVA] Si de verdad quieres guardar sin cifrar, pon ALLOW_PLAINTEXT_DATA=true.');
+    process.exit(1);
+  }
+
+  // Aviso visible en cada arranque, también con la válvula abierta: nadie
+  // debe poder olvidar que esto está así.
+  console.error('[FINOVA] ╔══════════════════════════════════════════════════════╗');
+  console.error('[FINOVA] ║  DATOS DE USUARIO SIN CIFRAR                         ║');
+  console.error('[FINOVA] ╚══════════════════════════════════════════════════════╝');
+  console.error('[FINOVA] ' + motivo + (ALLOW_PLAINTEXT_DATA ? ' y ALLOW_PLAINTEXT_DATA=true.' : '.'));
+  console.error('[FINOVA] Los ficheros de ' + (typeof USERS_DIR === 'string' ? USERS_DIR : 'data/users') + ' se escriben en claro.');
+  console.error('[FINOVA] ' + comoGenerarla);
+}
 
 function _encryptUserData(plaintext) {
-  if (!_ENC_KEY) return plaintext;
+  if (!_ENC_KEY) {
+    // NUNCA se devuelve el texto en claro en silencio. Si se permite guardar
+    // sin cifrar, tiene que ser porque alguien abrió la válvula.
+    if (ALLOW_PLAINTEXT_DATA) return plaintext;
+    throw Object.assign(
+      new Error('FINOVA_ENC_KEY no configurada: no se puede guardar cifrado'),
+      { code: 'enc/no-key' },
+    );
+  }
   const iv  = crypto.randomBytes(12);
   const c   = crypto.createCipheriv('aes-256-gcm', _ENC_KEY, iv);
   const enc = Buffer.concat([c.update(plaintext, 'utf8'), c.final()]);
@@ -2141,14 +2351,38 @@ function _encryptUserData(plaintext) {
 }
 
 function _decryptUserData(data) {
-  if (!_ENC_KEY || !data.startsWith('enc1:')) return data;
-  const buf = Buffer.from(data.slice(5), 'base64');
-  const iv  = buf.slice(0, 12);
-  const tag = buf.slice(12, 28);
-  const enc = buf.slice(28);
-  const d   = crypto.createDecipheriv('aes-256-gcm', _ENC_KEY, iv);
-  d.setAuthTag(tag);
-  return d.update(enc) + d.final('utf8');
+  // Caso 1: no está cifrado. Son los ficheros anteriores al cifrado, y se
+  // siguen leyendo tal cual: quitar esta rama dejaría ilegibles los datos de
+  // quien se registró antes.
+  if (typeof data !== 'string' || !data.startsWith('enc1:')) return data;
+
+  // Caso 2: está cifrado y no hay clave. Antes se devolvía el texto cifrado
+  // tal cual, que el frontend intentaba interpretar como JSON y fallaba con
+  // un error incomprensible. Ahora se dice exactamente qué pasa.
+  if (!_ENC_KEY) {
+    throw Object.assign(
+      new Error('El fichero está cifrado y FINOVA_ENC_KEY no está configurada'),
+      { code: 'enc/missing-key' },
+    );
+  }
+
+  // Caso 3: está cifrado y la clave no sirve. AES-GCM verifica la etiqueta
+  // de autenticación, así que d.final() lanza. Se traduce a un error con
+  // código propio y SIN incluir nada del contenido.
+  try {
+    const buf = Buffer.from(data.slice(5), 'base64');
+    const iv  = buf.slice(0, 12);
+    const tag = buf.slice(12, 28);
+    const enc = buf.slice(28);
+    const d   = crypto.createDecipheriv('aes-256-gcm', _ENC_KEY, iv);
+    d.setAuthTag(tag);
+    return d.update(enc) + d.final('utf8');
+  } catch (e) {
+    throw Object.assign(
+      new Error('No se pudo descifrar: la clave FINOVA_ENC_KEY no corresponde a estos datos'),
+      { code: 'enc/wrong-key' },
+    );
+  }
 }
 
 // CSRF: only allow requests from known origins (for state-mutating endpoints)
@@ -2556,6 +2790,7 @@ async function handleSyncDownload(req, res) {
 
 /* ─── User metadata (email, displayName, lastAccess) ─────────── */
 async function handleUserMeta(req, res) {
+  if (!_checkRateLimit(req, res, 'userMeta')) return;
   if (!_originOk(req)) {
     res.writeHead(403, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'Origen no permitido' }));
@@ -3664,7 +3899,10 @@ async function handleAdminSetRole(req, res) {
       // manejador genérico, que no expone nada al cliente.
       if (e.message === 'UID inválido' || e.message === 'Rol inválido (free|premium)') {
         res.writeHead(400, _apiHeaders(req));
-        return res.end(JSON.stringify({ error: e.message }));
+        // Antes: res.end(JSON.stringify({ error: e.message })). El mensaje
+        // de una excepción de fs o de una librería lleva rutas del servidor
+        // y nombres de fichero.
+        return _sendError(req, res, 400, 'BAD_REQUEST', e);
       }
       _serverError(req, res, e);
     }
@@ -3817,6 +4055,74 @@ function _validateEnv() {
   }
 }
 _validateEnv();
+
+/* ═══════════════════════════════════════════════════════════════
+   PUERTAS DE ARRANQUE
+
+   Todo lo que degradaría la seguridad en silencio se comprueba aquí, y en
+   producción impide arrancar. La idea es que no exista ninguna
+   configuración que empeore la seguridad sin dejar rastro.
+═══════════════════════════════════════════════════════════════ */
+
+_validarCifrado();
+
+/*
+ * Verificación de tokens: la degradación más sutil de todas.
+ *
+ * _requireAuth usa el Admin SDK, que comprueba REVOCACIÓN (el segundo
+ * argumento true de verifyIdToken). Si el SDK no se inicializa —porque falta
+ * FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL o FIREBASE_PRIVATE_KEY— cae a
+ * _verifyFirebaseToken, que valida la firma contra las JWKS de Google pero
+ * NO comprueba revocación.
+ *
+ * Consecuencia concreta: un usuario al que acabas de expulsar, bloquear o
+ * cerrarle la sesión sigue entrando con su token hasta que caduque, hasta
+ * una hora después. Y en los logs solo había una línea informativa al
+ * arrancar que es fácil no ver nunca.
+ *
+ * Decisión: en producción se EXIGEN las credenciales. La ruta por JWKS se
+ * queda, pero solo para desarrollo. Si alguien necesita producción sin
+ * Admin SDK, tiene que decirlo con ALLOW_NO_REVOCATION_CHECK=true y aceptar
+ * el aviso.
+ */
+const ALLOW_NO_REVOCATION_CHECK = process.env.ALLOW_NO_REVOCATION_CHECK === 'true';
+if (_IS_PROD && !_adminReady) {
+  if (!ALLOW_NO_REVOCATION_CHECK) {
+    console.error('[FINOVA] El SDK de Firebase Admin no está inicializado y esto es producción.');
+    console.error('[FINOVA] Sin él, los tokens se validan contra las JWKS de Google pero NO se');
+    console.error('[FINOVA] comprueba la REVOCACIÓN: un usuario expulsado o bloqueado sigue');
+    console.error('[FINOVA] entrando hasta que su token caduque (hasta una hora).');
+    console.error('[FINOVA] Configura FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL y');
+    console.error('[FINOVA] FIREBASE_PRIVATE_KEY (ver DEPLOY.md).');
+    console.error('[FINOVA] Si lo aceptas a propósito, pon ALLOW_NO_REVOCATION_CHECK=true.');
+    process.exit(1);
+  }
+  console.error('[FINOVA] AVISO: sin Admin SDK y ALLOW_NO_REVOCATION_CHECK=true.');
+  console.error('[FINOVA] NO se comprueba la revocación de tokens: expulsar a un usuario tarda');
+  console.error('[FINOVA] hasta una hora en surtir efecto.');
+}
+
+/*
+ * Autenticación desactivada. _validateEnv ya lo trata como fatal en
+ * producción; aquí se repite la comprobación porque es la más grave de
+ * todas y no debe depender de que otra función la haga.
+ *
+ * Con la autenticación apagada, _requireAuth devuelve 'dev-uid' y
+ * handleUserDataGet acepta el uid por la URL: cualquiera lee los datos de
+ * cualquiera con solo cambiar un parámetro.
+ */
+if (_IS_PROD && !_AUTH_ENABLED) {
+  console.error('[FINOVA] FINOVA_DISABLE_AUTH=true en producción. Con la autenticación apagada');
+  console.error('[FINOVA] cualquiera puede leer los datos de cualquier usuario cambiando ?uid=');
+  console.error('[FINOVA] en la URL. El servidor no arranca.');
+  process.exit(1);
+}
+if (!_AUTH_ENABLED) {
+  console.error('[FINOVA] ╔══════════════════════════════════════════════════════╗');
+  console.error('[FINOVA] ║  AUTENTICACIÓN DESACTIVADA — solo desarrollo         ║');
+  console.error('[FINOVA] ╚══════════════════════════════════════════════════════╝');
+  console.error('[FINOVA] _requireAuth devuelve «dev-uid» y los endpoints aceptan ?uid= de la URL.');
+}
 
 // Alias histórico de _IS_PROD (definido arriba, junto a PORT y HOST). Se
 // conserva el nombre para no tocar sus usos, pero la expresión ya NO se

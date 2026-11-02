@@ -197,6 +197,179 @@ miran el **cuerpo** buscando lo que no debe salir (datos de usuario, código
 de `server.cjs`, configuración de git, `/etc/passwd`, `package.json`). Cubren
 desarrollo, producción y `SERVE_STATIC=false` forzado.
 
+## Arranque seguro: nada se degrada en silencio
+
+La regla: **un servidor mal configurado tiene que negarse a arrancar, no
+arrancar peor.** Los fallos silenciosos son los que sobreviven años, porque
+nada los delata.
+
+### Lo que impide arrancar en producción
+
+| Condición | Por qué es fatal |
+|---|---|
+| `FINOVA_ENC_KEY` ausente o no son 64 hex | Los datos financieros se guardarían **en claro** |
+| Admin SDK no inicializado | No se comprueba la **revocación** de tokens |
+| `FINOVA_DISABLE_AUTH=true` | Cualquiera lee los datos de cualquiera con `?uid=` |
+| `ALLOWED_ORIGIN` sin configurar | CORS aceptaría orígenes no deseados |
+| `DATA_DIR` no escribible | Un 500 al primer guardado, sin pista de la causa |
+
+### Las tres válvulas
+
+Cada degradación tiene una válvula **con nombre**, porque hay escenarios
+legítimos (una demo, un entorno de pruebas). Lo que no puede pasar es que la
+degradación venga de olvidar una variable.
+
+| Válvula | Qué permite | Qué imprime |
+|---|---|---|
+| `ALLOW_PLAINTEXT_DATA=true` | Guardar sin cifrar | Un cartel en cada arranque |
+| `ALLOW_NO_REVOCATION_CHECK=true` | Producción sin Admin SDK | Un aviso en cada arranque |
+| `OPEN_BROWSER=false` | No abrir navegador | Nada (no es una degradación) |
+
+---
+
+## Cifrado en reposo
+
+Formato: `enc1:` + base64 de `iv(12) + tag(16) + datos`, con AES-256-GCM.
+`enc1` es la versión del **formato**, no un identificador de clave.
+
+### El fallo que esto cerró
+
+```js
+// ANTES
+function _encryptUserData(plaintext) {
+  if (!_ENC_KEY) return plaintext;   // ← sin avisar
+```
+
+Cualquier despliegue que arrancara sin `FINOVA_ENC_KEY` guardaba los datos
+financieros de todos los usuarios **en claro**, y en los logs no había ni una
+línea. Ahora `_encryptUserData` **lanza** si no hay clave, salvo que la
+válvula esté abierta.
+
+### `_decryptUserData` distingue tres casos
+
+| Caso | Qué hace |
+|---|---|
+| No empieza por `enc1:` | Lo devuelve tal cual. **Compatibilidad deliberada** con los ficheros anteriores al cifrado |
+| `enc1:` y no hay clave | Lanza con código `enc/missing-key` |
+| `enc1:` y la clave no sirve | Lanza con código `enc/wrong-key` |
+
+Antes el segundo caso devolvía el texto cifrado tal cual, y el frontend
+intentaba interpretarlo como JSON y fallaba con un error incomprensible.
+
+### Migrar los datos que ya están en claro
+
+```bash
+npm run encrypt:data                                   # solo informa
+node scripts/encrypt-existing-data.cjs --apply --backup ../copia
+```
+
+Por defecto **solo informa**. Con `--apply` exige `--backup` a un directorio
+vacío, verifica cada fichero dos veces (en memoria y releyendo del disco),
+escribe de forma atómica y es idempotente. Si encuentra ficheros cifrados con
+**otra** clave, se para en vez de escribir encima.
+
+Hazlo con el servidor **parado**: si un usuario guarda a mitad, su fichero
+puede quedar en claro después de haber sido migrado.
+
+### Rotación de claves: PENDIENTE
+
+No está resuelta, y conviene saber por qué. Como `enc1` es la versión del
+formato y no de la clave, **no hay forma de saber con qué clave se cifró cada
+fichero**. Cambiar `FINOVA_ENC_KEY` sin migrar deja todo ilegible.
+
+La propuesta, no implementada: pasar a `enc2:<kid>:<datos>` con un llavero
+`{kid → clave}`, y que `_decryptUserData` elija por `kid` aceptando `enc1:`
+como la clave antigua. Con eso la rotación sería gradual y sin parada: cada
+fichero se migraría al guardarse. Ver `ROTATE_SECRETS.md`.
+
+---
+
+## Autenticación: fallar cerrada
+
+### Dos rutas de verificación, y no son equivalentes
+
+| Ruta | Cuándo | Comprueba revocación |
+|---|---|---|
+| Admin SDK (`verifyIdToken(token, true)`) | Si hay credenciales | **Sí** |
+| JWKS manual (`_verifyFirebaseToken`) | Si no las hay | **No** |
+
+La segunda valida la firma RS256 contra las claves de Google, así que un
+token falsificado no pasa. Pero **no sabe si el token fue revocado**: un
+usuario al que acabas de expulsar sigue entrando hasta que caduque, hasta una
+hora. Antes eso ocurría en silencio con solo olvidar una variable; ahora
+impide arrancar en producción.
+
+### El bloqueo de cuenta, en un solo sitio
+
+`_isBlocked` se comprobaba en **2 de 10** endpoints autenticados. Un usuario
+suspendido podía guardar sus datos, subir y bajar backups de sync, cambiar
+sus metadatos, mandar feedback e importar movimientos del banco: «Cuenta
+suspendida» era casi decorativo.
+
+Ahora se comprueba dentro de `_requireAuth`, el punto por el que pasan todos
+los endpoints autenticados — el mismo criterio que `_safeJoin`: la garantía
+vive donde no depende de que cada handler se acuerde.
+
+**Con una excepción deliberada:** `/api/account/delete`. El derecho de
+supresión del RGPD no se pierde por estar sancionado, y negarlo convertiría
+una suspensión en una retención indefinida de datos personales.
+
+---
+
+## Errores sin fugas
+
+`_sendError(req, res, status, code, err, ctx)` responde **siempre** uno de
+los mensajes fijos de `_ERRORES_PUBLICOS`. El texto de la excepción no sale
+nunca: el mensaje de un `fs`, de un `fetch` o de una librería contiene rutas
+del servidor, nombres de fichero y a veces fragmentos de lo que se estaba
+procesando.
+
+Lo que se registra: timestamp, **ruta sin query** (ahí viajan el uid y el
+código de sync), método, status, el mensaje y 4 líneas de stack, y el **uid
+hasheado** (`u:` + 10 hex de sha256). Basta para correlacionar varios
+errores del mismo usuario, que es para lo que sirve, y no es un
+identificador reutilizable si el log se filtra.
+
+Hay un **test de regresión** que falla si reaparece un `res.end` con
+`e.message`, `err.message` o `.stack`. El patrón es fácil de reintroducir sin
+pensarlo.
+
+---
+
+## Límites por IP y coste
+
+Todos los endpoints autenticados tienen límite por IP, y hay un test que
+falla si alguno se queda sin él. `user-meta` era el único que faltaba:
+escribe un fichero por llamada, así que sin límite era una vía de desgaste
+del disco gratis.
+
+### Los tres frenos de la IA
+
+La cuota por usuario (5/día gratis, 50 premium) limita a cada uno, pero **no
+limita el total**: con suficientes cuentas la factura crece sin tope.
+
+| Variable | Por defecto | Qué frena |
+|---|---|---|
+| `AI_DAILY_LIMIT_GLOBAL` | 2000 | Consultas diarias de todo el servidor. Al llegar, 503 «servicio temporalmente no disponible» |
+| `AI_MAX_CONTEXT_CHARS` | 24000 | Caracteres de contexto enviados. Los tokens de **entrada** también se pagan |
+| `AI_MAX_OUTPUT_TOKENS` | 1024 | Tokens de salida pedidos |
+
+El contador global vive en memoria: un reinicio lo pone a cero. Es aceptable
+para un freno de emergencia, y persistirlo exigiría escribir en disco en cada
+consulta, que es justo lo que no interesa en la ruta caliente.
+
+El orden de las puertas en `handleAIProxy` importa y hay un test que lo fija:
+**autenticación → cuenta bloqueada → correo verificado → tope global → cuota
+por usuario**. El tope global va después de las puertas de seguridad para que
+un abuso no gaste el cupo de todos, y antes de la cuota individual para no
+descontarle su cupo a alguien a quien se va a rechazar igualmente.
+
+### Cómo comprobarlo
+
+```bash
+npm run test:security
+```
+
 ## Verificaciones rápidas
 
 ```bash
