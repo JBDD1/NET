@@ -71,7 +71,7 @@ function load() {
   vm.runInContext(FISCAL, ctx, { filename: 'fiscal.js' });
   fns = vm.runInContext(`({
     _calcGoalProgress, GOAL_LINK_NETWORTH, calcNetWorth, calcCashTotal,
-    calcIRPF, calcIRPFGeneral, calcReduccionTrabajo, IRPF_TRAMOS, IRPF_GENERAL,
+    calcIRPF, calcIRPFGeneral, calcReduccionTrabajo, ESCALAS, calcCuota,
     _invalidateCalcCache, _findTwoMonthsViolations, calcMinimosTotal,
   })`, ctx);
   APP = vm.runInContext('APP', ctx);
@@ -213,15 +213,25 @@ describe('Flujo 4 — simulador de interés compuesto', () => {
 
 /* ── Flujos 5-6: fiscalidad, base general ─────────────────────── */
 describe('Flujos 5-6 — IRPF base general (trabajo) 2024', () => {
-  test('los tramos de la base GENERAL son los de 2024', () => {
-    expect(fns.IRPF_GENERAL.map(t => [t.hasta, t.tipo])).toEqual([
+  // Las escalas dejaron de ser constantes sueltas (IRPF_TRAMOS,
+  // IRPF_GENERAL) y pasaron a ESCALAS[ejercicio], porque la del ahorro
+  // cambió en 2025: la Ley 7/2024 subió el último tramo del 28 % al 30 %.
+  // Antes se usaba la de 2024 para TODOS los ejercicios.
+  test('los tramos de la base GENERAL de 2024', () => {
+    expect(fns.ESCALAS[2024].general.map(t => [t.hasta, t.tipo])).toEqual([
       [12450, 19], [20200, 24], [35200, 30], [60000, 37], [300000, 45], [Infinity, 47],
     ]);
   });
 
-  test('los tramos de la base del AHORRO son los suyos propios (otra escala)', () => {
-    expect(fns.IRPF_TRAMOS.map(t => [t.hasta, t.tipo])).toEqual([
+  test('los tramos de la base del AHORRO de 2024 (último tramo al 28 %)', () => {
+    expect(fns.ESCALAS[2024].ahorro.map(t => [t.hasta, t.tipo])).toEqual([
       [6000, 19], [50000, 21], [200000, 23], [300000, 27], [Infinity, 28],
+    ]);
+  });
+
+  test('y los de 2025 difieren solo en el último tramo (30 %)', () => {
+    expect(fns.ESCALAS[2025].ahorro.map(t => [t.hasta, t.tipo])).toEqual([
+      [6000, 19], [50000, 21], [200000, 23], [300000, 27], [Infinity, 30],
     ]);
   });
 
@@ -423,9 +433,17 @@ describe('Pruebas destructivas', () => {
   test('salario bruto 0 → sin errores ni NaN', () => {
     APP.trabajo = { salarioBruto: 0, retencionEmpresa: 0, seguridadSocial: 0 };
     const rendNeto = 0;
-    expect(fns.calcReduccionTrabajo(rendNeto)).toBe(7302);
-    expect(Math.max(rendNeto - 7302, 0)).toBe(0);
+    // Sin rendimientos del trabajo no hay reducción que aplicar: ahora
+    // devuelve 0 y no 7.302. En la app da lo mismo, porque la base general
+    // es max(rendNeto − reduccion, 0) y sale 0 en los dos casos, pero decir
+    // «te corresponden 7.302 € de reducción» a quien no tiene ingresos del
+    // trabajo es afirmar algo que no es.
+    expect(fns.calcReduccionTrabajo(rendNeto)).toBe(0);
+    expect(Math.max(rendNeto - fns.calcReduccionTrabajo(rendNeto), 0)).toBe(0);
     expect(fns.calcIRPFGeneral(0)).toBe(0);
+    // Y lo que el test de verdad comprueba: nada de esto produce NaN.
+    expect(Number.isFinite(fns.calcIRPFGeneral(0))).toBe(true);
+    expect(Number.isFinite(fns.calcReduccionTrabajo(0))).toBe(true);
   });
 
   test('retención del 100 % → resultado negativo (a devolver), sin romperse', () => {

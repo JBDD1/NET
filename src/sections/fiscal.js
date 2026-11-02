@@ -7,30 +7,328 @@
    26. FISCALIDAD
 ═══════════════════════════════════════════════════════════════ */
 
-// Tramos IRPF base del ahorro 2024 (España) — art. 66 LIRPF, tras la
-// reforma de la Ley 31/2022 (vigente desde el ejercicio 2023): el tramo
-// 200.000-300.000€ es del 27%, no del 26% (tipo anterior a la reforma).
-const IRPF_TRAMOS = [
-  { hasta:   6000, tipo: 19 },
-  { hasta:  50000, tipo: 21 },
-  { hasta: 200000, tipo: 23 },
-  { hasta: 300000, tipo: 27 },
+/* ═══════════════════════════════════════════════════════════════
+   ESCALAS DEL IRPF, POR EJERCICIO
+
+   ── Lo que hay que entender antes de tocar esto ──
+
+   El IRPF se parte en dos mitades que se calculan de forma distinta:
+
+   · BASE DEL AHORRO. La escala es UNIFORME en todo el territorio de régimen
+     común, porque la fija la propia ley: el tramo estatal en el art. 66.1 y
+     el autonómico en el art. 76, y los dos tienen los mismos tipos. Las
+     comunidades NO pueden cambiarla. Verificado en el Manual práctico de
+     Renta 2025 de la AEAT:
+     https://sede.agenciatributaria.gob.es/Sede/ayuda/manuales-videos-folletos/manuales-practicos/irpf-2025/c15-calculo-impuesto-determinacion-cuotas-integras/gravamen-base-liquidable-ahorro/gravamen-estatal.html
+     https://sede.agenciatributaria.gob.es/Sede/ayuda/manuales-videos-folletos/manuales-practicos/irpf-2025/c15-calculo-impuesto-determinacion-cuotas-integras/gravamen-base-liquidable-ahorro/gravamen-autonomico.html
+     Los dos: 9,50 / 10,50 / 11,50 / 13,50 / 15,00 → sumados, 19/21/23/27/30.
+
+   · BASE GENERAL. Aquí NO. El tramo estatal lo fija el art. 63.1 (9,50 / 12
+     / 15 / 18,50 / 22,50 / 24,50, verificado en el Manual 2025:
+     https://sede.agenciatributaria.gob.es/Sede/ayuda/manuales-videos-folletos/manuales-practicos/irpf-2025/c15-calculo-impuesto-determinacion-cuotas-integras/gravamen-base-liquidable-general/gravamen-estatal.html
+     ) pero el autonómico lo aprueba CADA COMUNIDAD: la AEAT enlaza 16
+     escalas autonómicas distintas para 2025.
+
+     La tabla 19/24/30/37/45/47 de esta aplicación NO es el estatal
+     duplicado — eso daría 49 en el último tramo, no 47. Restando el estatal,
+     su mitad autonómica implícita es 9,50 / 12 / 15 / 18,50 / 22,50 / 22,50:
+     igual que la estatal salvo el último tramo. Es coherente y reconocible,
+     pero [VERIFICAR]: no he podido contrastar contra fuente oficial a qué
+     comunidad corresponde ni si es una escala complementaria por defecto.
+
+     Así que la base general es una REFERENCIA, no el impuesto de ninguna
+     comunidad concreta.
+
+     Por eso el resultado de la base general es una ESTIMACIÓN y así se
+     etiqueta en la interfaz y en el PDF. Ver ESCALAS_GENERAL_AVISO.
+
+   ── El cambio de 2025 ──
+   La Ley 7/2024, de 20 de diciembre (BOE-A-2024-26694) modificó los arts.
+   66 y 76 con efectos desde el 1 de enero de 2025 y subió el último tramo
+   del ahorro del 14 % al 15 % en cada mitad: el tipo combinado pasó del
+   28 % al 30 %.
+   https://www.boe.es/buscar/act.php?id=BOE-A-2024-26694
+
+   Comprobación independiente de la aritmética: la AEAT publica que a una
+   base del ahorro de 300.000 € le corresponde una cuota íntegra total de
+   71.880 €, que es exactamente lo que da la escala de abajo.
+═══════════════════════════════════════════════════════════════ */
+
+/** Escala del ahorro 2023 y 2024: el último tramo al 28 %. */
+const _AHORRO_2024 = [
+  { hasta:   6000,   tipo: 19 },
+  { hasta:  50000,   tipo: 21 },
+  { hasta: 200000,   tipo: 23 },
+  { hasta: 300000,   tipo: 27 },
   { hasta: Infinity, tipo: 28 },
 ];
 
-/** Calcula el impuesto según tramos */
-function calcIRPF(base) {
-  if (base <= 0) return 0;
-  let tax  = 0;
+/** Escala del ahorro desde 2025: el último tramo al 30 % (Ley 7/2024). */
+const _AHORRO_2025 = [
+  { hasta:   6000,   tipo: 19 },
+  { hasta:  50000,   tipo: 21 },
+  { hasta: 200000,   tipo: 23 },
+  { hasta: 300000,   tipo: 27 },
+  { hasta: Infinity, tipo: 30 },
+];
+
+/*
+ * Escala general de REFERENCIA: estatal (art. 63.1) más un autonómico
+ * idéntico. No es la de ninguna comunidad concreta — ver el aviso de arriba.
+ */
+const _GENERAL_REF = [
+  { hasta:  12450,   tipo: 19 },
+  { hasta:  20200,   tipo: 24 },
+  { hasta:  35200,   tipo: 30 },
+  { hasta:  60000,   tipo: 37 },
+  { hasta: 300000,   tipo: 45 },
+  { hasta: Infinity, tipo: 47 },
+];
+
+/*
+ * Reducción por obtención de rendimientos del trabajo (art. 20 LIRPF).
+ *
+ * Los importes de 2025 están verificados en el Manual práctico de Renta
+ * 2025, fase 3ª del capítulo 3:
+ * https://sede.agenciatributaria.gob.es/Sede/ayuda/manuales-videos-folletos/manuales-practicos/irpf-2025/c03-rendimientos-trabajo/rendimiento-neto-trabajo-integrar-base-imponible/fase-3-determinacion-rendimiento-neto-reducido.html
+ *   · hasta 14.852           → 7.302
+ *   · 14.852 a 17.673,52     → 7.302 − 1,75 × (RNT − 14.852)
+ *   · 17.673,52 a 19.747,50  → 2.364,34 − 1,14 × (RNT − 17.673,52)
+ * Y exige que NO haya otras rentas, distintas del trabajo y excluidas las
+ * exentas, superiores a 6.500 €.
+ *
+ * Los de 2024 son los anteriores a la subida (6.498 € de tope), tomados del
+ * art. 20 tras la Ley 31/2022. [VERIFICAR] contra el Manual de Renta 2024:
+ * no he contrastado los tramos intermedios de 2024 con la fuente oficial,
+ * solo los de 2025.
+ */
+const _REDUCCION_2025 = {
+  tope: 7302, limite1: 14852, limite2: 17673.52, limite3: 19747.5,
+  coef1: 1.75, tramo2Base: 2364.34, coef2: 1.14,
+  otrasRentasMax: 6500,
+};
+/*
+ * 2024 es IGUAL que 2025, y esto lo comprobé en vez de suponerlo.
+ *
+ * Mi primera versión puso aquí 6.498 € dando por hecho que la subida era de
+ * 2025. Es falso: el Real Decreto-ley 4/2024, de 26 de junio, subió la
+ * reducción de 6.498 a 7.302 € con efectos desde el 1 de ENERO DE 2024, así
+ * que los mismos importes valen para los dos ejercicios. Verificado en:
+ * https://sede.agenciatributaria.gob.es/Sede/irpf/novedades-impuesto/novedades-normativa-2024/principales-novedades-real-decreto-ley-junio.html
+ */
+const _REDUCCION_2024 = _REDUCCION_2025;
+
+/**
+ * ESCALAS por ejercicio.
+ *
+ * `fuente` dice de dónde sale cada cosa, y `verificar` lo que NO está
+ * contrastado. Un ejercicio sin verificar no se oculta: se usa y se avisa,
+ * que es mejor que no poder calcular nada.
+ */
+const ESCALAS = {
+  2024: {
+    ahorro:    _AHORRO_2024,
+    general:   _GENERAL_REF,
+    reduccion: _REDUCCION_2024,
+    fuente: 'Manual práctico de Renta 2024 (AEAT) · arts. 63, 66, 76 LIRPF',
+    verificar: null,
+  },
+  2025: {
+    ahorro:    _AHORRO_2025,
+    general:   _GENERAL_REF,
+    reduccion: _REDUCCION_2025,
+    fuente: 'Manual práctico de Renta 2025 (AEAT) · arts. 63.1, 66.1, 76 LIRPF · Ley 7/2024',
+    verificar: null,
+  },
+  2026: {
+    // Se reutilizan las de 2025 porque al escribir esto la campaña de Renta
+    // 2026 no se ha abierto y no hay Manual práctico publicado. Si hay
+    // cambios normativos para 2026, ESTO ESTÁ MAL y hay que actualizarlo.
+    ahorro:    _AHORRO_2025,
+    general:   _GENERAL_REF,
+    reduccion: _REDUCCION_2025,
+    fuente: 'Sin Manual práctico publicado — se reutilizan las tablas de 2025',
+    verificar: 'EJERCICIO NO VERIFICADO: no existe Manual práctico de Renta 2026. Las tablas son las de 2025 y pueden no corresponder al ejercicio.',
+  },
+};
+
+/**
+ * Último ejercicio con campaña de Renta ya cerrada.
+ *
+ * La campaña de un ejercicio se presenta entre abril y junio del año
+ * siguiente, así que antes de julio el último ejercicio cerrado es el de
+ * hace dos años. Se calcula en vez de fijarlo para que no caduque.
+ */
+function getDefaultFiscalYear() {
+  const hoy = new Date();
+  const anio = hoy.getFullYear();
+  // Mes 6 = julio (getMonth es 0-based). A partir de julio, la campaña del
+  // ejercicio anterior ya ha terminado.
+  const cerrado = hoy.getMonth() >= 6 ? anio - 1 : anio - 2;
+  // Y nunca por debajo del ejercicio más antiguo que se conoce.
+  const conocidos = Object.keys(ESCALAS).map(Number).sort((a, b) => a - b);
+  if (cerrado < conocidos[0]) return conocidos[0];
+  if (cerrado > conocidos[conocidos.length - 1]) return conocidos[conocidos.length - 1];
+  return cerrado;
+}
+
+/** Devuelve las escalas del ejercicio, cayendo al más cercano conocido. */
+function getEscalas(ejercicio) {
+  const y = Number(ejercicio);
+  if (ESCALAS[y]) return ESCALAS[y];
+  const conocidos = Object.keys(ESCALAS).map(Number).sort((a, b) => a - b);
+  // Un ejercicio desconocido usa el más cercano, y lo dice.
+  const elegido = y < conocidos[0] ? conocidos[0] : conocidos[conocidos.length - 1];
+  return {
+    ...ESCALAS[elegido],
+    verificar: `El ejercicio ${y} no tiene tablas propias: se están usando las de ${elegido}.`,
+  };
+}
+
+/**
+ * Cuota por tramos. Función PURA: ni lee el DOM ni depende del ejercicio
+ * seleccionado.
+ *
+ * Se acumula en céntimos enteros y se divide al final, para no arrastrar
+ * error de coma flotante tramo a tramo. Con cinco o seis tramos el error de
+ * sumar euros con decimales es de céntimas, pero es acumulativo y gratuito
+ * de evitar.
+ *
+ * Devuelve 0 para base 0, negativa, no numérica o no finita: una cuota
+ * negativa o NaN no significa nada y propagarla rompe todo lo de arriba.
+ */
+function calcCuota(base, escala) {
+  const b = Number(base);
+  if (!Number.isFinite(b) || b <= 0) return 0;
+  if (!Array.isArray(escala) || !escala.length) return 0;
+
+  let centimos = 0;
   let prev = 0;
-  for (const tramo of IRPF_TRAMOS) {
-    const chunk = Math.min(base, tramo.hasta) - prev;
-    if (chunk <= 0) break;
-    tax  += chunk * (tramo.tipo / 100);
-    prev  = tramo.hasta;
-    if (base <= tramo.hasta) break;
+  for (const tramo of escala) {
+    const techo = tramo.hasta;
+    const tope = Math.min(b, techo);
+    const chunk = tope - prev;
+    if (chunk > 0) {
+      // × 100 antes de aplicar el tipo: el tipo es un entero (19, 21…), así
+      // que chunk * tipo es exacto en enteros y solo se divide una vez.
+      centimos += chunk * 100 * tramo.tipo / 100;
+    }
+    prev = techo;
+    if (b <= techo) break;
   }
-  return tax;
+  // Único redondeo de todo el cálculo.
+  return Math.round(centimos) / 100;
+}
+
+/*
+ * Envoltorios que usan el ejercicio seleccionado en la pantalla. Se
+ * conservan los nombres calcIRPF/calcIRPFGeneral y IRPF_TRAMOS para no
+ * tocar los ~20 sitios que los usan; lo que cambia es que ahora dependen
+ * del ejercicio en vez de ser constantes de 2024.
+ */
+function getEscalaAhorro()  { return getEscalas(getFiscalYear()).ahorro; }
+function getEscalaGeneral() { return getEscalas(getFiscalYear()).general; }
+
+/** Compatibilidad: la escala del ahorro del ejercicio activo. */
+function getIRPFTramos() { return getEscalaAhorro(); }
+
+function calcIRPF(base)        { return calcCuota(base, getEscalaAhorro()); }
+function calcIRPFGeneral(base) { return calcCuota(base, getEscalaGeneral()); }
+
+/* ═══════════════════════════════════════════════════════════════
+   AVISO DE ALCANCE
+
+   Lo que esta aplicación NO puede calcular bien, dicho donde se ve.
+
+   El motivo no es pereza: la base general del IRPF se compone de un tramo
+   estatal (igual para todos) y uno AUTONÓMICO que aprueba cada comunidad.
+   Hay 15 comunidades de régimen común, cada una con su escala, más las dos
+   ciudades autónomas, más los territorios forales con un impuesto distinto.
+   Verificar 15 escalas contra fuente oficial y mantenerlas cada año es un
+   trabajo que no se puede hacer a medias: una escala mal copiada da un
+   número confiado y equivocado, que es peor que no dar número.
+
+   Así que se usa la escala de referencia (estatal duplicado) y se dice.
+═══════════════════════════════════════════════════════════════ */
+
+/*
+ * Territorios con impuesto propio: NO es que falte su escala, es que no
+ * aplican la Ley 35/2006. País Vasco tiene una Norma Foral por cada
+ * diputación (Álava, Bizkaia, Gipuzkoa) y Navarra su propia Ley Foral.
+ * Para estos la estimación de la base general no vale en absoluto.
+ */
+const FISCAL_TERRITORIOS_FORALES = [
+  'País Vasco (Álava, Bizkaia y Gipuzkoa)',
+  'Navarra',
+];
+
+/*
+ * Comunidades de régimen común cuya escala autonómica NO está verificada en
+ * esta aplicación. Son todas: no se ha contrastado ninguna contra su
+ * boletín oficial, así que no se afirma nada sobre ninguna.
+ */
+const FISCAL_CCAA_PENDIENTES = [
+  'Andalucía', 'Aragón', 'Asturias', 'Baleares', 'Canarias', 'Cantabria',
+  'Castilla-La Mancha', 'Castilla y León', 'Cataluña', 'Extremadura',
+  'Galicia', 'La Rioja', 'Madrid', 'Murcia', 'Comunidad Valenciana',
+  'Ceuta y Melilla (régimen propio de deducciones)',
+];
+
+/** Enlace a la herramienta oficial, para contrastar. */
+const FISCAL_URL_OFICIAL = 'https://sede.agenciatributaria.gob.es/Sede/irpf.html';
+
+/**
+ * Bloque de aviso. Se pinta arriba de Fiscalidad, sin plegar y sin
+ * esconder: un aviso detrás de un «ver más» no es un aviso.
+ */
+function renderFiscalDisclaimer() {
+  const el = document.getElementById('fisc-disclaimer');
+  if (!el) return;
+  const year = getFiscalYear();
+  const esc  = getEscalas(year);
+
+  el.innerHTML = `
+    <div class="fisc-aviso">
+      <div class="fisc-aviso-titulo">
+        Estimación orientativa · ejercicio ${year}
+      </div>
+      <p class="fisc-aviso-texto">
+        La <strong>base del ahorro</strong> (dividendos, intereses, ganancias y
+        pérdidas) usa la escala que fija la ley para todo el territorio común,
+        así que no depende de tu comunidad autónoma.
+      </p>
+      <p class="fisc-aviso-texto">
+        La <strong>base general</strong> (trabajo) <strong>sí depende</strong>, y
+        aquí es una estimación: se usa la escala estatal duplicada como
+        referencia, no la escala real de ninguna comunidad. Tu resultado
+        auténtico será distinto, y la diferencia puede ser de cientos de euros.
+      </p>
+      <p class="fisc-aviso-texto">
+        No se soportan los territorios forales
+        (${FISCAL_TERRITORIOS_FORALES.join(' y ')}), que tienen impuesto propio
+        y no aplican la escala estatal.
+      </p>
+      <p class="fisc-aviso-texto">
+        Esto <strong>no sustituye</strong> a Renta WEB ni a un asesor fiscal.
+        Contrasta siempre con la
+        <a href="${FISCAL_URL_OFICIAL}" target="_blank" rel="noopener noreferrer">herramienta
+        oficial de la Agencia Tributaria</a> antes de presentar.
+      </p>
+      ${esc.verificar ? `
+      <p class="fisc-aviso-texto fisc-aviso-alerta">
+        <strong>Atención:</strong> ${_fiscEsc(esc.verificar)}
+      </p>` : ''}
+      <p class="fisc-aviso-pie">
+        Tablas: ${_fiscEsc(esc.fuente)}
+      </p>
+    </div>`;
+}
+
+/** Escape mínimo, para no depender del orden de carga de utils.js. */
+function _fiscEsc(s) {
+  return typeof escapeHtml === 'function'
+    ? escapeHtml(String(s ?? ''))
+    : String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
 /** Devuelve el año fiscal seleccionado */
@@ -141,6 +439,7 @@ function _renderFiscalidadInner() {
   populateFiscalSimAssets();
   renderTrabajo();
   renderMinimos();
+  renderFiscalDisclaimer();
   renderResumenIRPF(gains, losses, annualDivs, retention);
 
   // ─── Eventos ────────────────────────────────────────────────
@@ -802,28 +1101,10 @@ function deleteSale(id) {
    27. RENDIMIENTOS DEL TRABAJO
 ═══════════════════════════════════════════════════════════════ */
 
-// Tramos IRPF base GENERAL (trabajo) 2024 — España
-const IRPF_GENERAL = [
-  { hasta: 12450,  tipo: 19 },
-  { hasta: 20200,  tipo: 24 },
-  { hasta: 35200,  tipo: 30 },
-  { hasta: 60000,  tipo: 37 },
-  { hasta: 300000, tipo: 45 },
-  { hasta: Infinity, tipo: 47 },
-];
-
-function calcIRPFGeneral(base) {
-  if (base <= 0) return 0;
-  let tax = 0, prev = 0;
-  for (const t of IRPF_GENERAL) {
-    const chunk = Math.min(base, t.hasta) - prev;
-    if (chunk <= 0) break;
-    tax  += chunk * (t.tipo / 100);
-    prev  = t.hasta;
-    if (base <= t.hasta) break;
-  }
-  return tax;
-}
+// La escala general vive ahora en ESCALAS[ejercicio].general, arriba, con
+// el aviso de que es una REFERENCIA (estatal duplicado) y no la escala de
+// ninguna comunidad autónoma concreta. calcIRPFGeneral es el envoltorio que
+// usa el ejercicio seleccionado.
 
 // Reducción por obtención de rendimientos del trabajo (art. 20 LIRPF), cifras
 // VIGENTES EN 2024 tras el RDL 4/2024, de 26 de junio (verificado contra la
@@ -841,10 +1122,33 @@ function calcIRPFGeneral(base) {
 // resultado no cambia (ambos tramos ya eran correctos ahí).
 // (La ley exige además no tener otras rentas > 6.500 €; Finova no modela esa
 // condición.)
-function calcReduccionTrabajo(rendNeto) {
-  if (rendNeto <= 14852)   return 7302;
-  if (rendNeto <= 17673.52) return Math.max(0, 7302 - 1.75 * (rendNeto - 14852));
-  if (rendNeto < 19747.5)  return Math.max(0, 2364.34 - 1.14 * (rendNeto - 17673.52));
+/**
+ * Reducción por obtención de rendimientos del trabajo (art. 20 LIRPF).
+ *
+ * @param {number} rendNeto     rendimiento neto del trabajo
+ * @param {number} ejercicio    ejercicio fiscal
+ * @param {number} otrasRentas  rentas distintas del trabajo, excluidas las
+ *                              exentas. La ley EXIGE que no pasen de 6.500 €
+ *                              para tener derecho a la reducción, y la app no
+ *                              lo comprobaba: a quien tuviera 20.000 € en
+ *                              dividendos le aplicaba igual una reducción a
+ *                              la que no tiene derecho, y el resultado salía
+ *                              hasta 7.302 € de base por debajo del real.
+ */
+function calcReduccionTrabajo(rendNeto, ejercicio, otrasRentas) {
+  const r = getEscalas(ejercicio == null ? getFiscalYear() : ejercicio).reduccion;
+  const rn = Number(rendNeto);
+  if (!Number.isFinite(rn) || rn <= 0) return 0;
+
+  // La condición de las otras rentas. Si no se pasa el dato se asume 0, que
+  // es el comportamiento anterior: así ningún llamante antiguo se rompe,
+  // pero los que sí lo pasan obtienen el cálculo correcto.
+  const otras = Number(otrasRentas) || 0;
+  if (otras > r.otrasRentasMax) return 0;
+
+  if (rn <= r.limite1)  return r.tope;
+  if (rn <= r.limite2)  return Math.max(0, r.tope - r.coef1 * (rn - r.limite1));
+  if (rn <  r.limite3)  return Math.max(0, r.tramo2Base - r.coef2 * (rn - r.limite2));
   return 0;
 }
 
@@ -1171,7 +1475,11 @@ function renderResumenIRPF(gainsAhorro, lossesAhorro, annualDivs, retencionesDiv
   const retenTrab  = parseFloat(t.retencionEmpresa) || 0;
 
   const rendNeto    = bruto - ss - dietas - sindicatos - otros;
-  const reduccion   = calcReduccionTrabajo(rendNeto); // misma función que renderTrabajo()
+  // Las otras rentas del ejercicio son, en lo que esta app modela, la base
+  // del ahorro: dividendos más ganancias patrimoniales. Si pasan de 6.500 €
+  // no hay derecho a la reducción (art. 20 LIRPF).
+  const otrasRentas = Math.max(annualDivs, 0) + Math.max(gainsAhorro - lossesAhorro, 0);
+  const reduccion   = calcReduccionTrabajo(rendNeto, getFiscalYear(), otrasRentas);
   const baseGeneral = Math.max(rendNeto - reduccion, 0);
 
   // Base del ahorro — art. 49 LIRPF: pérdidas solo compensan hasta el 25% de rentas positivas

@@ -625,8 +625,20 @@ async function exportFiscalPDF() {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
     doc.setTextColor(..._PDF.kpiFg);
-    doc.text('Estimación orientativa · consulte su asesor fiscal antes de presentar la declaración', 19.5, y + 13);
-    y += 22;
+    // El EJERCICIO y el alcance tienen que salir aquí: un PDF se guarda, se
+    // reenvía y se mira meses después, cuando ya nadie recuerda con qué
+    // tablas se generó ni que la base general no es la de su comunidad.
+    const _ejFiscal = typeof getFiscalYear === 'function' ? getFiscalYear() : '';
+    const _escFiscal = typeof getEscalas === 'function' ? getEscalas(_ejFiscal) : null;
+    doc.text(`Estimación orientativa · ejercicio ${_ejFiscal} · consulte su asesor fiscal antes de presentar`, 19.5, y + 13);
+    y += 19;
+    doc.setFontSize(6);
+    doc.text('Base del ahorro: escala estatal uniforme (arts. 66 y 76 LIRPF). Base general: escala de REFERENCIA, no la de su', 19.5, y);
+    doc.text('comunidad autónoma. No se soportan País Vasco ni Navarra (impuesto propio). Contraste en Renta WEB (AEAT).', 19.5, y + 3);
+    if (_escFiscal && _escFiscal.fuente) {
+      doc.text(`Tablas: ${_escFiscal.fuente}`, 19.5, y + 6);
+    }
+    y += 12;
   }
 
   // Ventas realizadas

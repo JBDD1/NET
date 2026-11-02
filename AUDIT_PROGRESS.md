@@ -2215,6 +2215,108 @@ cambiar el contrato de ese endpoint sin que lo pidas.
 
 ---
 
+## FASE 22 — IRPF: escalas por ejercicio, verificación oficial y honestidad · ✅ COMPLETA
+
+Detalle en [FISCAL_AUDIT.md](FISCAL_AUDIT.md), con la URL de la AEAT o el BOE
+al lado de cada regla verificada.
+
+### El error que importaba
+
+La escala del ahorro era una constante única con el último tramo al **28 %**,
+aplicada a 2025 y 2026 igual que a 2024. La **Ley 7/2024, de 20 de
+diciembre** la subió al **30 %** con efectos 1-1-2025. A una base de
+400.000 € le calculaba **99.880 € en vez de 101.880 €**: 2.000 € de menos.
+
+**El enunciado decía que el tramo 200.000–300.000 estaba al 26 %. No era
+así:** ya estaba al 27 %, con un comentario correcto citando la Ley 31/2022.
+El error real era otro, y solo se vio leyendo el código antes de tocarlo.
+
+### Un segundo error, no previsto en el encargo
+
+El art. 20 LIRPF exige, para la reducción por trabajo, que **no haya otras
+rentas superiores a 6.500 €**. La app no lo comprobaba: a quien tuviera
+20.000 € en dividendos le aplicaba una reducción a la que no tiene derecho, y
+la base general salía **hasta 7.302 € por debajo** de la real.
+
+### Y un error MÍO, que merece constar
+
+Mi primera versión puso la reducción de 2024 en 6.498 €, suponiendo que la
+subida a 7.302 era de 2025. **Falso:** el RDL 4/2024 la subió con efectos
+**1-1-2024**. El comentario que ya había en el código estaba bien y mi
+corrección estaba mal. Lo detecté al verificar contra la AEAT, no antes.
+
+### Lo que estaba BIEN y conviene no romper
+
+- **El mínimo personal y familiar se aplica a la CUOTA, no a la base**
+  (`calcIRPFGeneral(base) − calcIRPFGeneral(minimo)`), que es el método del
+  art. 63.1.2º. Sospeché que estaba mal y lo comprobé: era correcto.
+- Los importes de la reducción por trabajo, verificados contra el Manual 2025.
+- El límite del 25 % del art. 49 en la compensación del ahorro.
+- Los textos de la interfaz y del PDF ya decían «orientativo». **No había
+  ningún «cálculo exacto» ni «listo para presentar»** que eliminar.
+
+### La corrección más interesante
+
+Supuse que la tabla 19/24/30/37/45/47 era la escala estatal duplicada. **Un
+test lo desmintió:** el tipo estatal máximo es 24,5 %, así que el doble daría
+**49 %**, no 47. Restando, la mitad autonómica implícita es
+9,5/12/15/18,5/22,5/**22,5** — igual que la estatal salvo el último tramo.
+Coherente, pero no he podido verificar a qué comunidad corresponde. Queda
+como [VERIFICAR], y el test documenta la descomposición.
+
+### Lo construido
+
+- `ESCALAS[ejercicio]` con 2024, 2025 y 2026, cada uno con su `fuente` y su
+  `verificar`. 2026 **reutiliza** las de 2025 y lo declara: no hay Manual
+  práctico publicado.
+- `calcCuota(base, escala)` pura: no lee el DOM, acumula en céntimos enteros
+  y **redondea una sola vez al final**. Devuelve 0 con base 0, negativa, NaN,
+  Infinity, `null`, `undefined`, cadenas y objetos.
+- `getDefaultFiscalYear()` calcula el último ejercicio con campaña cerrada en
+  vez de fijarlo, para que no caduque.
+- Aviso visible en Fiscalidad y en el PDF: ejercicio usado, que el ahorro
+  **sí** es uniforme pero la base general **no**, los forales no soportados,
+  la fuente de las tablas y enlace a la AEAT.
+
+### Pruebas
+
+`src/tests/irpf.test.js`, **49 casos**, con cada cuenta escrita a mano en un
+comentario. Ancla externa: la AEAT publica que a 300.000 € de base del ahorro
+le corresponden **71.880 €** de cuota, y es exactamente lo que da la suma de
+tramos.
+
+```
+npm test                 ->  992 passed, 32 suites
+npm test calc.test.js    ->  33 passed  (los de siempre, intactos)
+npm run build            ->  dist/ es desplegable
+```
+
+Tres tests existentes hubo que actualizar: dos porque las escalas dejaron de
+ser constantes sueltas y uno porque `calcReduccionTrabajo(0)` ahora devuelve
+0 en vez de 7.302 (sin ingresos del trabajo no hay nada que reducir; en la app
+da lo mismo porque la base es `max(rendNeto − reduccion, 0)`).
+
+### No soportado, y ahora dicho
+
+**Forales:** País Vasco (tres normas forales) y Navarra. **Régimen común:**
+las 15 comunidades, ninguna con escala verificada, más Ceuta y Melilla.
+
+### Lo que NO se pudo comprobar
+
+**Nada contra Renta WEB.** No he ejecutado un solo caso en la herramienta
+oficial, que es la única comparación que valida el módulo completo. He
+verificado las **tablas y las reglas**, una a una, contra el Manual y el BOE.
+
+Sin verificar: los **importes de los mínimos** personales y familiares, la
+**escala autonómica**, el **ejercicio 2026**, la distinción **2 meses / 1 año**
+de la regla antiaplicación, el **arrastre a 4 años** (la app no lo modela), y
+los **dividendos extranjeros** (se calculan como nacionales, así que para una
+cartera internacional el resultado es incorrecto).
+
+Y el aviso nuevo **no se ha visto**: no hay navegador aquí.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más
