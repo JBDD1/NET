@@ -2371,6 +2371,32 @@ opaco; esa validación es del frontend.
 
 ---
 
+## FASE 24 — Pentest de autenticación y cifrado · ✅ COMPLETA
+
+Informe en [PENTEST_AUTH.md](PENTEST_AUTH.md). Instancia local, datos falsos.
+
+**Pregunta del encargo —** ¿puede un usuario leer o modificar datos de otro?
+**NO.** El uid sale del token verificado; user-meta valida _verifyOwnership;
+sync-download liga el código al uid; el bloqueo se aplica en _requireAuth.
+Ninguna petición cruzó datos.
+
+Resistieron: forja de JWT (alg:none/firma/kid/vacío → 401), bloqueo de cuenta
+en caliente (403 sin reiniciar), cifrado en reposo (ciphertext en disco + GCM
+detecta manipulación y clave mala, nunca devuelve basura), fuerza bruta del
+código de sync (48 bits + 10/min), y logs (ni token ni body ni clave).
+
+Un hallazgo bajo, corregido: un dato ilegible (manipulado o clave mala) daba
+500 genérico; ahora da el mensaje ENCRYPTION con código propio. El dato nunca
+se devolvió corrupto. Un informativo sin tocar: códigos de sync legados sin
+dueño registrado (mitigado por 48 bits; invalidarlos rompería a quien ya los
+usa).
+
+No probado sin Firebase real: IDOR positivo (token de A, uid de B), token de
+otro proyecto, revocación del Admin SDK, y enlaces de reset/verificación (los
+gestiona Firebase en el cliente). 992 (jest) + 115 (seguridad) en verde.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más

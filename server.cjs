@@ -2467,6 +2467,17 @@ async function handleUserDataGet(req, res) {
     res.writeHead(200, _apiHeaders(req));
     res.end(JSON.stringify({ ok: true, data }));
   } catch (e) {
+    // Un fallo de DESCIFRADO no es una caída del servidor: o el fichero está
+    // manipulado (la etiqueta GCM no cuadra) o la clave no corresponde a
+    // estos datos (p.ej. tras cambiar FINOVA_ENC_KEY sin migrar). Se
+    // distingue del 500 genérico para que el usuario sepa que sus datos no se
+    // pueden leer y para que la monitorizacion no lo cuente como crash. El
+    // dato NUNCA se devuelve corrupto: AES-GCM lo impide y aquí se corta.
+    if (e && typeof e.code === 'string' && e.code.startsWith('enc/')) {
+      console.error('[FINOVA][ENC] Datos ilegibles para', _hashUid(req.uid), '·', e.code);
+      res.writeHead(500, _apiHeaders(req));
+      return res.end(JSON.stringify({ error: _ERRORES_PUBLICOS.ENCRYPTION, code: 'ENCRYPTION' }));
+    }
     _serverError(req, res, e);
   }
 }
