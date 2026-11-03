@@ -2397,8 +2397,52 @@ gestiona Firebase en el cliente). 992 (jest) + 115 (seguridad) en verde.
 
 ---
 
+## FASE 25 — Pentest de frontend / cliente · ✅ COMPLETA
+
+Informe en [PENTEST_CLIENT.md](PENTEST_CLIENT.md). Build local, datos falsos.
+Sin navegador en el entorno: lo del DOM se dedujo por lectura de código y de
+las cabeceras servidas; queda dicho dónde eso limita la conclusión.
+
+Resistió XSS: todo campo de usuario (nombres, categorías, transacciones,
+feedback, búsqueda) se escapa con escapeHtml; la salida de la IA escapa & < >
+antes del markdown; el admin pinta con textContent. Las únicas interpolaciones
+sin escapar son data-URLs de IndexedDB del propio usuario (self-only). El
+Service Worker NO cachea user-data (solo yahoo/fx), HTML network-first, cache
+con hash de build. Las claves de API sí se cifran (AES-GCM, clave solo en
+memoria); los datos financieros van en claro en localStorage, inherente al
+local-first (riesgo solo con XSS —no hay— o acceso físico al perfil).
+
+Hallazgo importante, reportado SIN tocar (regla «lo dudoso, sin tocar»): la CSP
+servida (server.cjs:4366 en .html, y vercel.json) tiene script-src SIN
+'unsafe-inline'/nonce/hash, pero la app genera 120 onclick= en línea, incluido
+el login (_submitLogin, sin addEventListener de respaldo). Por especificación
+esos manejadores no dispararían bajo esa CSP. En dev (Vite) no hay cabecera, por
+eso pasa desapercibido. No pude ejecutar un navegador para confirmar el efecto
+en runtime → **comprobación de 2 min pendiente para el usuario** (abrir la app
+servida con CSP, pulsar login, mirar violaciones en consola). No lo corrijo
+porque las dos salidas son arriesgadas a ciegas: añadir 'unsafe-inline' mata la
+defensa anti-XSS; migrar 120 manejadores sin navegador puede romper flujos.
+
+Otros bajos sin tocar: CSP duplicada en server.cjs y vercel.json (pueden
+divergir, ya difieren en connect-src); scripts de CDN (chart.js@4.4.0,
+firebase 10.12.0) anclados a versión exacta pero SIN SRI. npm audit: 26 (4
+bajas, 22 moderadas), TODAS en build/test/servidor (minimatch/glob/deepmerge
+vía sentry-bundler, jest, firebase-admin) — ninguna llega al navegador. 992
+(jest) + 115 (seguridad) en verde.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
+0. **CSP vs onclick en línea — comprobar YA en navegador** (Fase 25, H1). Abrir
+   la app **servida con la CSP** (producción, `server.cjs`/Vercel — NO `npm run
+   dev`, que no manda la cabecera), abrir la consola de DevTools y pulsar
+   «Iniciar sesión». Si aparece `Refused to execute inline event handler
+   because it violates ... Content Security Policy`, el login por
+   email/contraseña y la mayoría de botones `onclick=` están rotos en
+   producción (el inicio con Google seguiría bien). Solución correcta: migrar a
+   `addEventListener`/`data-action`, **no** añadir `'unsafe-inline'`. Ver
+   [PENTEST_CLIENT.md](PENTEST_CLIENT.md).
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más
    frágil por no estar probado así: el escáner de tickets y el importador de
    cartera, ambos recién añadidos.
