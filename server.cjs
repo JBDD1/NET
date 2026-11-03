@@ -2516,7 +2516,15 @@ async function handleUserDataPost(req, res) {
         res.writeHead(413, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'Datos demasiado grandes (máx 8 MB)' }));
       }
-      const { data } = JSON.parse(body);
+      let parsed;
+      try { parsed = JSON.parse(body); } catch {
+        // JSON mal formado es un error del CLIENTE (400), no del servidor:
+        // antes caía al catch de abajo y devolvía 500 INTERNAL_ERROR, que
+        // además implica un fallo del servidor que no existe.
+        res.writeHead(400, _apiHeaders(req));
+        return res.end(JSON.stringify({ error: 'JSON inválido.' }));
+      }
+      const { data } = parsed;
       // UID comes exclusively from the verified Firebase token; body uid is not trusted.
       const uid = verifiedUid;
       if (!uid || !_UID_RE.test(uid)) {
@@ -2820,10 +2828,13 @@ async function handleUserMeta(req, res) {
       }
       if (!_verifyOwnership(req, res, verifiedUid, uid)) return;
       const existing = _readMeta(uid) || {};
+      // Tope de longitud: un nombre o un correo reales caben de sobra en 200
+      // caracteres. Sin tope, el campo lo marca el límite de body (50 KB).
+      const _cap = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
       const meta = {
         ...existing,
-        email:       (email       || existing.email       || '').toLowerCase().trim(),
-        displayName: displayName  || existing.displayName || '',
+        email:       (_cap(email, 254)      || existing.email       || '').toLowerCase().trim(),
+        displayName: _cap(displayName, 200) || existing.displayName || '',
         lastAccess:  new Date().toISOString(),
         createdAt:   existing.createdAt || new Date().toISOString(),
       };
@@ -4219,8 +4230,13 @@ const _finovaServer = http.createServer((req, res) => {
 
   // CORS preflight
   if (req.method === 'OPTIONS') {
+    // Si el origen no está permitido, se OMITE Access-Control-Allow-Origin en
+    // vez de poner _corsOrigin() (null), que writeHead serializaría a la
+    // cadena "null" — un origen que un iframe sandbox o un documento data:
+    // pueden adoptar. Mismo criterio que _apiHeaders.
+    const _co = _corsOrigin(req);
     res.writeHead(204, {
-      'Access-Control-Allow-Origin':  _corsOrigin(req),
+      ...(_co ? { 'Access-Control-Allow-Origin': _co } : {}),
       'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Vary': 'Origin',

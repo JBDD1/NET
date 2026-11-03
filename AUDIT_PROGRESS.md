@@ -2317,6 +2317,60 @@ Y el aviso nuevo **no se ha visto**: no hay navegador aquí.
 
 ---
 
+## FASE 23 — Pentest de la API (OWASP) · ✅ COMPLETA
+
+Informe completo en [PENTEST_API.md](PENTEST_API.md). Instancia local, datos
+falsos, dos modos (prod en 5301, dev en 5302). Cada afirmación con petición y
+respuesta reales.
+
+### Veredicto: bien blindado
+
+Los ataques de alto impacto **fallaron todos**, demostrado con peticiones:
+
+- **IDOR (prod):** `?uid=` y uid en el body → 401 sin token; el uid sale del
+  token verificado. `user-meta` usa `_verifyOwnership` (403 si el uid del
+  body no es el del token). Admin exige token.
+- **JWT:** `alg:none`, firma basura, RS256 con kid falso y token vacío →
+  401. La verificación corta `alg!==RS256` (elude HS256/none) y comprueba
+  exp, iat, aud, iss, kid contra JWKS y firma con crypto.verify.
+- **Prototype pollution:** ningún handler hace merge recursivo del body;
+  todos desestructuran campos con nombre. No contamina.
+- **Path traversal:** uid y código de sync validados por regex antes de
+  construir la ruta, y pasan por `_safeJoin`. Sin lectura cruzada.
+- **ReDoS:** los 4 regex son lineales con 200.000 caracteres (medido).
+- **Límites:** body de 12 MB → 413 antes de procesar; waitlist corta en 5;
+  `X-Forwarded-For` NO resetea el límite.
+- **XSS almacenado:** el panel de admin pinta el feedback con `textContent`,
+  no `innerHTML`. Inerte.
+- **Fuga de info:** ni `Server` ni `X-Powered-By`; errores con cuerpo fijo,
+  sin stack ni rutas ni eco del contenido recibido.
+
+### Tres hallazgos BAJOS, los tres corregidos
+
+1. **CORS:** el preflight emitía `Access-Control-Allow-Origin: null` para
+   orígenes no permitidos (el `null` de JS serializado a cadena). Impacto
+   bajo (sin `Allow-Credentials`, API con Bearer no cookies), pero mala
+   config. Ahora se omite la cabecera, igual que `_apiHeaders`.
+2. **500 en JSON malformado** en user-data POST (debía ser 400; no filtraba
+   nada). Ahora 400 `JSON inválido.`, como waitlist y feedback.
+3. **user-meta sin tope** de longitud en displayName/email (no era XSS: el
+   admin los escapa). Ahora 200/254 caracteres.
+
+Los tres verificados tras el arreglo. `server.cjs` es lo único de código que
+cambia. Suites: 992 (jest) + 115 (seguridad) en verde. Datos falsos borrados.
+
+### Lo que NO se pudo probar
+
+Sin Firebase real: no pude emitir un token válido, así que el IDOR positivo
+(token de A, uid de B), el token de otro proyecto y la revocación del Admin
+SDK quedan cubiertos **por lectura del código**, no por petición. El cruce de
+sync entre dos usuarios reales, igual. El coste de la IA de punta a punta
+(sin clave, corta en el 401 previo). Y la lógica de importes/fechas **no es
+de servidor**: Finova es local-first y al servidor solo llega un blob cifrado
+opaco; esa validación es del frontend.
+
+---
+
 ## PENDIENTE PARA EL USUARIO (requiere navegador o despliegue)
 
 1. **Flujos de UI reales** (Fase 5): recorrer la app en el navegador. Lo más
