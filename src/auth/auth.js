@@ -76,6 +76,18 @@ async function initAuth() {
     // Permite que el SDK use cookies de terceros en desarrollo local
     _fbAuth.settings = _fbAuth.settings || {};
 
+    // Completa un inicio de sesión por redirect (el fallback de signInGoogle
+    // cuando el popup no es viable). El caso de ÉXITO lo recoge
+    // onAuthStateChanged; aquí solo se enseña el error de la vuelta (p. ej.
+    // dominio no autorizado) para que el usuario no se quede sin saber qué pasó.
+    _fbAuth.getRedirectResult().catch(err => {
+      if (err && err.code && err.code !== 'auth/no-auth-event') {
+        console.error('[Finova Auth] getRedirectResult error:', err.code, err.message);
+        _setLoginLoading(false);
+        _showLoginMsg(_authErrMsg(err.code));
+      }
+    });
+
     _fbAuth.onAuthStateChanged(async user => {
       if (!user) {
         _showLoginScreen();
@@ -434,12 +446,34 @@ async function signUpEmail(email, password, name) {
 
 async function signInGoogle() {
   _setLoginLoading(true);
+  const provider = new firebase.auth.GoogleAuthProvider();
   try {
-    const provider = new firebase.auth.GoogleAuthProvider();
     await _fbAuth.signInWithPopup(provider);
   } catch (err) {
-    console.error('[Finova Auth] signInGoogle error:', err.code, err.message);
+    console.error('[Finova Auth] signInGoogle (popup) error:', err.code, err.message);
+    // Fallback a redirect cuando el popup NO es viable: lo bloquea el
+    // navegador, las cookies de terceros están desactivadas, o el entorno
+    // (móvil, webview, pestaña incrustada) no deja que el popup se comunique
+    // con la página. El redirect no abre ventana: navega a Google y vuelve,
+    // y getRedirectResult (en la init) completa el inicio de sesión.
+    const _popupNoViable =
+      err.code === 'auth/popup-blocked' ||
+      err.code === 'auth/cancelled-popup-request' ||
+      err.code === 'auth/operation-not-supported-in-this-environment' ||
+      err.code === 'auth/web-storage-unsupported';
+    if (_popupNoViable) {
+      try {
+        await _fbAuth.signInWithRedirect(provider);
+        return; // la página navega fuera; el resto lo hace getRedirectResult.
+      } catch (err2) {
+        console.error('[Finova Auth] signInGoogle (redirect) error:', err2.code, err2.message);
+        _setLoginLoading(false);
+        _showLoginMsg(_authErrMsg(err2.code));
+        return;
+      }
+    }
     _setLoginLoading(false);
+    // popup-closed-by-user es una acción deliberada del usuario: no se le grita.
     if (err.code !== 'auth/popup-closed-by-user') _showLoginMsg(_authErrMsg(err.code));
   }
 }
