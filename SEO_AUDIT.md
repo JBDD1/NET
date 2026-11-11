@@ -355,3 +355,115 @@ home se indexe; Google indexará `landing.html` directamente desde el sitemap.
 TU DOMINIO REAL EN `SITE_URL` (vite.config.js) ANTES DE DESPLEGAR Y ANTES DE
 VERIFICAR EN SEARCH CONSOLE.** Mientras no lo hagas, sitemap, robots y los
 canonical del build apuntarán a un dominio que no existe.
+
+---
+
+# Parte 3 — enlazado interno, Schema.org (JSON-LD) y Open Graph
+
+**Fecha:** 11 de noviembre de 2026
+
+## Paso 1 — Auditoría de enlaces internos
+
+**Enlaces internos por página (todos a archivos que existen):**
+
+| Página | Enlaza a |
+|---|---|
+| index.html (app, noindex) | faq.html · privacidad.html#s9 |
+| landing.html | faq.html · privacidad.html · terminos.html · index.html (footer) |
+| faq.html | landing.html (breadcrumb + footer) · privacidad.html · terminos.html · index.html#feedback |
+| privacidad.html | landing.html · terminos.html · index.html |
+| terminos.html | privacidad.html · landing.html · index.html |
+| privacy.html (noindex) | privacidad.html (canonical) · index.html · (isla con terms.html) |
+| terms.html (noindex) | terminos.html (canonical) · index.html · (isla con privacy.html) |
+
+- **Enlaces rotos: 0.** Todos los destinos `.html` existen. Anclas verificadas:
+  `privacidad.html#s2/#s7/#s9` existen; `index.html#feedback` **no es un `id`
+  estático pero NO está roto** — lo resuelve el enrutado por hash de la app
+  (`src/core/script.js:840-850` escucha `#feedback`/`#faq` desde faq.html y abre
+  el modal). Es navegación funcional de la app, no señal SEO.
+- **Páginas huérfanas:** `privacy.html` y `terms.html` no reciben enlaces desde
+  ninguna página **indexable** — y es **intencionado**: son los duplicados
+  `noindex` con canonical a las versiones completas, y la regla es no enlazarlos.
+  Forman una isla entre sí. Las 5 páginas indexables (landing, faq, privacidad,
+  terminos, index) son todas alcanzables entre sí. **Ninguna página indexable
+  enlaza a un duplicado no canónico** (verificado: 0).
+
+## Paso 2 — Mejoras de enlazado
+
+- **Footers** de landing.html y faq.html: ya enlazaban a FAQ, privacidad
+  (canónica) y términos (canónica) de forma visible. **No** enlazan a
+  privacy/terms. Sin cambios necesarios.
+- **FAQ → política de privacidad (enlaces contextuales nuevos, texto
+  descriptivo):** en `src/data/faq.js` (fuente única, se refleja en faq.html y
+  en la FAQ de la app):
+  - Respuesta «¿Dónde se guardan mis datos?» → enlace a
+    `privacidad.html#s2` («qué datos tratamos»).
+  - Respuesta «¿Cómo borro mi cuenta?» → enlace a `privacidad.html#s7`
+    («eliminación de cuenta y datos»).
+- **Texto de enlace:** descriptivo en todos los casos (nunca «clic aquí»).
+
+## Paso 3 — Breadcrumb
+
+`faq.html` ya tenía un breadcrumb visible «Finova › Preguntas frecuentes».
+**Mejora accesible:** `<div class="doc-breadcrumb">` → `<nav … aria-label="Ruta
+de navegación">`, separador `aria-hidden`, y `aria-current="page"` en la actual.
+Mismo aspecto visual. Las páginas legales no tienen secciones navegables tipo
+breadcrumb (son documentos lineales), así que no se les añade.
+
+## Paso 4 — Schema markup (JSON-LD) — todos validados como JSON
+
+| Página | Schema | Datos | Validez |
+|---|---|---|---|
+| landing.html | **SoftwareApplication** (ya existía; se le añadió `image`) | name Finova, description real, FinanceApplication, offers price 0 EUR (es gratis, real), featureList real, logo icon-512. **Sin** aggregateRating/review | ✅ parseado |
+| faq.html | **FAQPage** | 14 Question/Answer generados en runtime desde `FINOVA_FAQ` (misma fuente que pinta la FAQ) → el marcado coincide SIEMPRE con lo visible, texto exacto | ✅ parseado (14 preguntas) |
+| faq.html | **BreadcrumbList** (estático) | 2 items: Finova → landing, Preguntas frecuentes → faq. Coincide con el breadcrumb visible | ✅ parseado |
+
+- **Por qué el FAQPage se genera en JS:** la FAQ se renderiza desde
+  `src/data/faq.js`; generar el schema desde esa misma fuente garantiza que
+  texto visible y marcado no diverjan (lo contrario de incrustar una 2ª copia
+  que se desincroniza). Validado reproduciendo la generación en Node.
+- **Sin schema inventado:** no se añadió ningún `aggregateRating`, `review` ni
+  campo con datos que no existan.
+
+## Paso 5 — Open Graph y Twitter Card
+
+| Página | Antes | Ahora |
+|---|---|---|
+| landing.html | completo | + `og:image:width/height` (512×512 reales) |
+| faq.html | faltaban og:image y todo twitter | **set completo** (og:image 512×512, locale, site_name, twitter card/title/description/image); og:title alineado al nuevo title |
+| privacidad.html | **ninguno** | **set completo** (og:type article, og:url = su canonical) |
+| privacy.html | **ninguno** | **set completo** (og:url = canonical → privacidad.html) |
+| terminos.html | **ninguno** | **set completo** |
+| terms.html | **ninguno** | **set completo** (og:url = canonical → terminos.html) |
+
+Imagen: `icon-512.png` (512×512, existe y resuelve). `og:url` coincide con el
+canonical en cada página. Todas las URLs usan la base única (se reescriben a
+`SITE_URL` en el build: 31 URLs reescritas, 0 `jbdd1` en `dist`).
+
+## Verificación final (parte 3)
+
+- Los 3 bloques JSON-LD (SoftwareApplication, FAQPage, BreadcrumbList) **parsean
+  como JSON válido**. FAQPage: 14 preguntas, texto exacto de `faq.js`.
+- `grep`: 0 enlaces relativos rotos; **0 enlaces a páginas legales no canónicas**
+  desde páginas indexables; anclas `#s2/#s7/#s9` existen.
+- `npm run build` → «dist/ es desplegable». **992 jest + 115 seguridad** en verde
+  (se ajustó un enlace contextual para no superar el límite de 900 caracteres de
+  respuesta que valida `feedback.test.js`).
+
+## Hallazgo extra (bug que bloqueaba esta ronda): `src/data/faq.js` no estaba en git
+
+Al intentar commitear los enlaces contextuales descubrí que **`src/data/faq.js`
+nunca se había trackeado**: el `.gitignore` tenía `data/` sin anclar (pensado para
+el `/data/` raíz de runtime de Railway), y ese patrón capturaba también
+`src/data/`. Consecuencia real: **en un deploy desde git la FAQ se quedaría sin su
+fuente de datos** (FINOVA_FAQ undefined → FAQ vacía y FAQPage sin generar).
+**Corregido:** anclé los patrones (`data/` → `/data/`, etc.) para que solo
+excluyan el directorio de runtime en la raíz, y añadí `src/data/faq.js` al repo.
+Verificado: `src/data/faq.js` ya no se ignora y el `/data/` raíz sigue excluido.
+
+## Enlaces rotos corregidos / huérfanas (resumen)
+
+- **Enlaces rotos corregidos:** ninguno — no había enlaces internos rotos.
+- **Huérfanas antes de esta ronda:** `privacy.html` y `terms.html` (sin enlaces
+  entrantes desde indexables). **Se mantienen así a propósito** (duplicados
+  noindex); no se enlazan desde páginas indexables por diseño.

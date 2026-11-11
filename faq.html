@@ -7,9 +7,18 @@
   <meta name="description" content="Preguntas frecuentes sobre Finova: dónde se guardan tus datos, cómo importar los movimientos del banco, cómo funciona sin conexión y cómo borrar tu cuenta." />
   <link rel="canonical" href="https://jbdd1.github.io/NET/faq.html" />
   <meta property="og:type"        content="website" />
-  <meta property="og:title"       content="Preguntas frecuentes — Finova" />
+  <meta property="og:title"       content="Preguntas frecuentes de Finova: datos, banco y cuenta" />
   <meta property="og:description" content="Dónde se guardan tus datos, cómo importar del banco, qué pasa sin conexión y cómo borrar tu cuenta." />
   <meta property="og:url"         content="https://jbdd1.github.io/NET/faq.html" />
+  <meta property="og:image"       content="https://jbdd1.github.io/NET/icon-512.png" />
+  <meta property="og:image:width"  content="512" />
+  <meta property="og:image:height" content="512" />
+  <meta property="og:locale"      content="es_ES" />
+  <meta property="og:site_name"   content="Finova" />
+  <meta name="twitter:card"        content="summary" />
+  <meta name="twitter:title"       content="Preguntas frecuentes de Finova: datos, banco y cuenta" />
+  <meta name="twitter:description" content="Dónde se guardan tus datos, cómo importar del banco, qué pasa sin conexión y cómo borrar tu cuenta." />
+  <meta name="twitter:image"       content="https://jbdd1.github.io/NET/icon-512.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preload" as="style"
@@ -20,6 +29,18 @@
   <link rel="icon" type="image/png" sizes="16x16" href="icon-16.png"/>
   <meta name="theme-color" content="#d4a960" />
   <meta name="robots" content="index, follow" />
+
+  <!-- Schema.org — BreadcrumbList (coincide con el breadcrumb visible) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Finova", "item": "https://jbdd1.github.io/NET/landing.html" },
+      { "@type": "ListItem", "position": 2, "name": "Preguntas frecuentes", "item": "https://jbdd1.github.io/NET/faq.html" }
+    ]
+  }
+  </script>
 <style>
 /* ══ DESIGN TOKENS — 5 themes ═══════════════════════════════════ */
 :root {
@@ -400,11 +421,11 @@ try {
 <!-- PAGE HERO -->
 <div class="doc-hero">
   <div class="doc-hero-inner">
-    <div class="doc-breadcrumb">
+    <nav class="doc-breadcrumb" aria-label="Ruta de navegación">
       <a href="landing.html">Finova</a>
-      <span class="doc-breadcrumb-sep">›</span>
-      <span>Preguntas frecuentes</span>
-    </div>
+      <span class="doc-breadcrumb-sep" aria-hidden="true">›</span>
+      <span aria-current="page">Preguntas frecuentes</span>
+    </nav>
     <div class="doc-tag">❓ Ayuda</div>
     <h1>Preguntas frecuentes</h1>
     <p>Lo que nos preguntan más a menudo. Si no encuentras tu respuesta aquí, escríbenos: contestamos.</p>
@@ -525,6 +546,31 @@ try {
   }
 
   render('');
+
+  // ── Schema.org FAQPage ──────────────────────────────────────────
+  // Se genera desde la MISMA fuente (FINOVA_FAQ) que pinta las preguntas, así
+  // el marcado estructurado coincide SIEMPRE con lo que lee el usuario. La
+  // respuesta conserva el HTML permitido (<strong>, <a>…) y se normaliza el
+  // espacio en blanco igual que lo colapsa el navegador al mostrarlo.
+  try {
+    if (typeof FINOVA_FAQ !== 'undefined' && Array.isArray(FINOVA_FAQ)) {
+      var faqLd = {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: FINOVA_FAQ.map(function (e) {
+          return {
+            '@type': 'Question',
+            name: e.q,
+            acceptedAnswer: { '@type': 'Answer', text: String(e.a).replace(/\s+/g, ' ').trim() }
+          };
+        })
+      };
+      var ld = document.createElement('script');
+      ld.type = 'application/ld+json';
+      ld.textContent = JSON.stringify(faqLd);
+      document.head.appendChild(ld);
+    }
+  } catch (e) { /* el schema es un extra: nunca debe romper la página */ }
 
   if (input) {
     input.addEventListener('input', function () { render(this.value); });

@@ -61,7 +61,7 @@ const NOMBRES_PROHIBIDOS = [
   { re: /\.(sqlite3?|db|dump|sql)$/i,             que: 'base de datos o volcado' },
   { re: /\.(enc|tar\.gz|tgz)$/i,                  que: 'archivo cifrado o comprimido' },
   { re: /(^|\/)backups?\//i,                      que: 'copia de seguridad' },
-  { re: /(^|\/)data\//i,                          que: 'datos de usuario' },
+  { re: /^data\//i,                               que: 'datos de usuario' }, // solo el /data/ de runtime en la RAÍZ; src/data/ es código fuente (FAQ)
 ];
 
 /*
