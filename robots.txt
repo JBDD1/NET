@@ -1,6 +1,33 @@
+# robots.txt — Finova
+# El dominio (TU-DOMINIO-REAL) se reescribe en el build desde la constante
+# única SITE_URL de vite.config.js. Sustitúyelo por el dominio real antes de
+# desplegar (ver SEO_AUDIT.md).
+
 User-agent: *
 Allow: /
+
+# Páginas públicas indexables (permiso explícito; ya cubiertas por "Allow: /")
+Allow: /landing.html
+Allow: /faq.html
+Allow: /privacidad.html
+Allow: /terminos.html
+
+# index.html (la app) NO se indexa, pero NO se bloquea aquí a propósito: la
+# señal es su <meta name="robots" content="noindex, follow">, y para que Google
+# la respete tiene que poder RASTREAR la página. Un Disallow impediría que viera
+# el noindex y la URL podría acabar listada igualmente. Mismo criterio para
+# privacy.html y terms.html (duplicados legales con noindex por meta).
+
+# Rutas y ficheros que no deben rastrearse. Es una capa de INTENCIÓN: la
+# seguridad real la aplica el servidor (static-guard devuelve 404 a estos).
+Disallow: /api/
 Disallow: /data/
 Disallow: /src/
-Disallow: /api/
-Sitemap: https://jbdd1.github.io/NET/sitemap.xml
+Disallow: /admin
+Disallow: /.env
+Disallow: /.env.production
+Disallow: /package.json
+Disallow: /server.cjs
+Disallow: /vite.config.js
+
+Sitemap: https://TU-DOMINIO-REAL/sitemap.xml

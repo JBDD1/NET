@@ -174,15 +174,27 @@ function buildScripts(outDir = 'dist', mode = 'production') {
       async handler() {
       if (!fs.existsSync(outDir)) return;
 
-      // ── SEO: dominio canónico, UNA sola fuente de verdad ──────────────
-      // Cambia SOLO `SITE_URL` cuando se compre el dominio definitivo: el
-      // build reescribe todas las URLs canónicas, og:url, og:image y
-      // twitter:image de cada HTML. En el código fuente esas URLs usan la
-      // base provisional `SRC_BASE`, que NO se toca (es el "desde" del
-      // reemplazo). Mientras SITE_URL === SRC_BASE, el reemplazo es un no-op.
-      const SITE_URL = 'https://jbdd1.github.io/NET';   // ← cambiar al comprar dominio
-      const SRC_BASE = 'https://jbdd1.github.io/NET';   // base usada en el código fuente
+      // ── SEO: dominio canónico, ÚNICA fuente de verdad ─────────────────
+      // Cambia SOLO `SITE_URL` el día que se compre el dominio: el build
+      // reescribe TODAS las URLs (canonical/og/twitter de los HTML + sitemap.xml
+      // + robots.txt) a ese dominio. `BASES_ORIGEN` son las bases que aparecen
+      // en el código fuente y que el build mapea a SITE_URL:
+      //   · la provisional de GitHub Pages (en los HTML, del prompt de SEO previo)
+      //   · el placeholder TU-DOMINIO-REAL (en sitemap.xml y robots.txt)
+      // Mientras SITE_URL siga siendo el placeholder, esas URLs se quedan con el
+      // placeholder: HAY QUE SUSTITUIRLO a mano antes de desplegar (ver SEO_AUDIT.md).
+      const SITE_URL     = 'https://TU-DOMINIO-REAL';   // ← ÚNICO lugar a cambiar
+      const BASES_ORIGEN = ['https://jbdd1.github.io/NET', 'https://TU-DOMINIO-REAL'];
       let urlsReescritas = 0;
+      const aplicarDominio = (txt) => {
+        let out = txt;
+        for (const base of BASES_ORIGEN) {
+          if (base === SITE_URL || !out.includes(base)) continue;
+          urlsReescritas += out.split(base).length - 1;
+          out = out.split(base).join(SITE_URL);
+        }
+        return out;
+      };
 
       const htmls = fs.readdirSync(outDir).filter(f => f.endsWith('.html'));
       const hashes = new Map();   // ruta relativa -> hash
@@ -219,16 +231,21 @@ function buildScripts(outDir = 'dist', mode = 'production') {
           },
         );
 
-        // Reescribe la base del dominio en canonical/og:url/og:image/twitter
-        // desde la constante única SITE_URL (no-op mientras no cambie).
-        if (SITE_URL !== SRC_BASE && html.includes(SRC_BASE)) {
-          urlsReescritas += html.split(SRC_BASE).length - 1;
-          html = html.split(SRC_BASE).join(SITE_URL);
-        }
+        // Dominio canónico desde la constante única SITE_URL.
+        html = aplicarDominio(html);
 
         fs.writeFileSync(rutaHtml, html, 'utf8');
       }
-      if (SITE_URL !== SRC_BASE) {
+
+      // sitemap.xml y robots.txt comparten el MISMO dominio único.
+      for (const estatico of ['sitemap.xml', 'robots.txt']) {
+        const ruta = resolve(outDir, estatico);
+        if (fs.existsSync(ruta)) {
+          fs.writeFileSync(ruta, aplicarDominio(fs.readFileSync(ruta, 'utf8')), 'utf8');
+        }
+      }
+
+      if (urlsReescritas > 0) {
         console.log(`[finova-build-scripts] dominio canónico reescrito a ${SITE_URL} en ${urlsReescritas} URL(s)`);
       }
 

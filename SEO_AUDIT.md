@@ -250,3 +250,108 @@ desplegable» · 992 jest + 115 seguridad en verde.
    ser `noindex` y para no arriesgar el diseño. Si quieres jerarquía perfecta
    también ahí, habría que decidir si los 14 widgets del Dashboard pasan a `<h2>`
    (y revisar que su CSS no dependa del tag `h3`).
+
+---
+
+# Parte 2 — sitemap.xml, robots.txt, meta robots y Search Console
+
+**Fecha:** 11 de noviembre de 2026
+
+> 🔴 **FALTA SUSTITUIR EL DOMINIO. NO HAY DOMINIO REAL CONFIGURADO EN NINGÚN
+> SITIO** (ni variable de entorno ni archivo de config; solo existía el
+> provisional `jbdd1.github.io` y el backend de Railway). Todo usa el placeholder
+> **`https://TU-DOMINIO-REAL`**. **ANTES DE DESPLEGAR: cambia `SITE_URL` en
+> `vite.config.js` por tu dominio real y reconstruye.** Es el ÚNICO sitio a tocar.
+
+## Dominio centralizado (una sola constante)
+
+La constante única **`SITE_URL`** vive en **`vite.config.js`** (plugin
+`finova-build-scripts`). En el build, reescribe el dominio en **los HTML
+(canonical/og/twitter) + `sitemap.xml` + `robots.txt`** de una vez. Las bases de
+origen del código fuente (`jbdd1.github.io/NET` en los HTML, `TU-DOMINIO-REAL` en
+sitemap/robots) se mapean todas a `SITE_URL`. Verificado: el build reescribió 14
+URLs y `dist/` queda 100 % con el dominio de `SITE_URL`, **0 `jbdd1`**.
+
+> Nota: `jbdd1.github.io` aún aparece como **allowlist de `img-src` en la CSP** de
+> `vercel.json` y `server.cjs`. **No se toca aquí** (es seguridad, no SEO, y
+> cambiarlo mal rompe la carga de imágenes). Cuando migres de dominio, actualiza
+> también esas dos entradas de CSP.
+
+## Paso 1 — sitemap.xml (reconstruido)
+
+XML bien formado (validado: 4 `<url>`, namespace `sitemaps.org/schemas/sitemap/0.9`,
+UTF-8). `<lastmod>` reales según git (`git log -1 --date=short`). **URLs incluidas:**
+
+| URL | lastmod | changefreq | priority |
+|---|---|---|---|
+| `https://TU-DOMINIO-REAL/landing.html` | 2026-11-11 | weekly | 1.0 |
+| `https://TU-DOMINIO-REAL/faq.html` | 2026-11-11 | monthly | 0.7 |
+| `https://TU-DOMINIO-REAL/privacidad.html` | 2026-11-11 | yearly | 0.5 |
+| `https://TU-DOMINIO-REAL/terminos.html` | 2026-11-11 | yearly | 0.5 |
+
+**Excluidas a propósito:** `index.html` (noindex), `privacy.html` y `terms.html`
+(duplicados noindex con canonical), y cualquier ruta de `/api/`, `/data/`, `/src/`.
+
+## Paso 2 — robots.txt (reescrito)
+
+`Allow: /` + Allow explícito de las 4 públicas; `Disallow` de intención para
+`/api/`, `/data/`, `/src/`, `/admin`, `.env`, `package.json`, `server.cjs`,
+`vite.config.js`; línea `Sitemap:` con el dominio único. Sin reglas
+contradictorias.
+
+**index.html NO se bloquea con `Disallow` a propósito** (decisión técnica): un
+`Disallow` impediría que Googlebot **rastreara** la página y, por tanto, que
+**viera su `<meta name="robots" content="noindex">`**; la URL podría acabar
+listada igualmente. La vía correcta para desindexar es el `noindex` (que exige
+rastreo), no el `robots.txt`. Mismo criterio para `privacy.html`/`terms.html`.
+Queda explicado en un comentario dentro de `robots.txt`.
+
+## Paso 3 — meta robots por página (todas explícitas)
+
+| Página | meta robots | Estado |
+|---|---|---|
+| index.html | `noindex, follow` | ya estaba |
+| landing.html | `index, follow` | ya estaba |
+| faq.html | `index, follow` | ya estaba |
+| privacidad.html | `index, follow` | ya estaba |
+| **privacy.html** | `noindex, follow` | **AÑADIDO** (no tenía) |
+| terminos.html | `index, follow` | ya estaba |
+| **terms.html** | `noindex, follow` | **AÑADIDO** (no tenía) |
+
+Nota: `privacy.html`/`terms.html` llevan `noindex` **y** el canonical del prompt
+anterior. Google puede considerarlo señal mixta (prioriza el `noindex`, que es lo
+que queremos: sacarlas del índice). Se mantienen ambos por continuidad con el
+prompt 1; si GSC marcara conflicto, se quitaría el canonical (ver Search Console).
+
+## Paso 4 — Search Console
+
+Guía completa en **`SEARCH_CONSOLE_SETUP.md`**: alta de propiedad, verificación
+por **DNS TXT** (recomendado) o por **archivo HTML** (con el paso exacto de
+añadirlo a `staticFiles` en `vite.config.js`, porque `publicDir:false` no lo
+copia solo), envío del sitemap, y qué vigilar las 2 primeras semanas (cobertura,
+errores, y la señal de «duplicada sin canónica» como aviso de que el canonical no
+se respeta). Incluye el aviso de verificar la UI actual de GSC.
+
+## Decisión sobre index.html
+
+**NO es indexable.** Es la aplicación (una SPA), no una página de marketing. Se
+mantiene `noindex, follow` por meta (la vía correcta), **no** se incluye en el
+sitemap y **no** se bloquea por robots.txt (para que Google pueda leer el
+`noindex`). La página indexable de entrada es `landing.html`. El `/` del sitio
+sirve `index.html` vía el rewrite SPA de Vercel, pero su `noindex` evita que el
+home se indexe; Google indexará `landing.html` directamente desde el sitemap.
+
+## Verificación final (parte 2)
+
+- `sitemap.xml`: XML bien formado (parseado) · `npm run build` → «dist/ es
+  desplegable» · `dist/sitemap.xml` y `dist/robots.txt` copiados y con el dominio
+  de `SITE_URL`.
+- `grep jbdd1` en `sitemap.xml` y `robots.txt` (fuente y dist) → **0**.
+- Suite de seguridad en verde.
+
+## 🔴 RECORDATORIO EN MAYÚSCULAS
+
+**EL DOMINIO ES UN PLACEHOLDER: `https://TU-DOMINIO-REAL`. DEBES SUSTITUIRLO POR
+TU DOMINIO REAL EN `SITE_URL` (vite.config.js) ANTES DE DESPLEGAR Y ANTES DE
+VERIFICAR EN SEARCH CONSOLE.** Mientras no lo hagas, sitemap, robots y los
+canonical del build apuntarán a un dominio que no existe.

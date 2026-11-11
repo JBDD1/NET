@@ -1,22 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://jbdd1.github.io/NET/landing.html</loc>
-    <changefreq>monthly</changefreq>
+    <loc>https://TU-DOMINIO-REAL/landing.html</loc>
+    <lastmod>2026-11-11</lastmod>
+    <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://jbdd1.github.io/NET/faq.html</loc>
+    <loc>https://TU-DOMINIO-REAL/faq.html</loc>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://jbdd1.github.io/NET/privacidad.html</loc>
+    <loc>https://TU-DOMINIO-REAL/privacidad.html</loc>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://jbdd1.github.io/NET/terminos.html</loc>
+    <loc>https://TU-DOMINIO-REAL/terminos.html</loc>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
