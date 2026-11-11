@@ -467,3 +467,117 @@ Verificado: `src/data/faq.js` ya no se ignora y el `/data/` raíz sigue excluido
 - **Huérfanas antes de esta ronda:** `privacy.html` y `terms.html` (sin enlaces
   entrantes desde indexables). **Se mantienen así a propósito** (duplicados
   noindex); no se enlazan desde páginas indexables por diseño.
+
+---
+
+# Parte 4 — Rendimiento (Core Web Vitals) y responsive móvil
+
+**Fecha:** 11 de noviembre de 2026
+
+## Cómo se midió (medición real, no opinión)
+
+No hay Lighthouse CLI en este entorno, **pero sí Chrome + Playwright + la
+librería oficial `web-vitals`**. Medí LCP/CLS/INP/FCP en un **navegador real**
+renderizando `dist/` servido con `vite preview`, en **móvil emulado con el perfil
+de Lighthouse** (CPU 4× más lenta + red Slow 4G: 1.6 Mbps, 150 ms RTT) y en
+escritorio. Scripts reproducibles: `scripts/measure-vitals.cjs` y
+`scripts/check-responsive.cjs` (requieren `playwright` + `web-vitals`). Resultados
+crudos en `lighthouse-before/` y `lighthouse-after/`.
+
+> ⚠️ **Esto NO es el "score" de Lighthouse** (no hay TBT/SI ni la puntuación
+> 0-100), son las métricas Web Vitals reales. Son **pasadas únicas** (hay
+> variación entre ejecuciones). **DEBES correr PageSpeed Insights / Lighthouse
+> sobre la URL real de producción** para confirmar: producción añade CDN,
+> compresión Brotli y latencias reales que aquí no se reproducen.
+
+## Métricas antes / después — MÓVIL (throttled, que es donde dolía)
+
+| Página | Métrica | Antes | Después | Objetivo |
+|---|---|---|---|---|
+| **landing** | **LCP** | **6440 ms** 🔴 | **1144 ms** ✅ | < 2500 ms |
+| landing | CLS | 0.035 | 0.000 | < 0.1 |
+| landing | FCP | 3376 ms | 492 ms | — |
+| **faq** | LCP | 3136 ms 🟠 | 1880 ms ✅ | < 2500 ms |
+| index (app) | LCP | 1880 ms ✅ | 1792 ms ✅ | < 2500 ms |
+| index | INP | 128 ms ✅ | 104 ms ✅ | < 200 ms |
+| index | CLS | 0.000 | 0.000 | < 0.1 |
+
+Escritorio: todo ya estaba en verde (LCP 640–2100 ms, CLS ≤0.005) antes y después;
+las variaciones son ruido de medición.
+
+**Honestidad sobre la variación:** la mejora de **landing** (6440→1144 ms) es
+**real y atribuible** (quitar el render-blocking de la fuente). La de **faq**
+(3136→1880) es en parte **ruido**: no toqué `faq.html` esta ronda (sus fuentes ya
+eran no bloqueantes). `index` ya estaba bien. INP de landing/faq salió «—» = no se
+registró ninguna interacción lenta.
+
+## LCP — qué se cambió
+
+**Causa raíz en landing e index:** la hoja de estilos de **Playfair Display se
+cargaba como render-blocking** (`<link rel="stylesheet">`), mientras que Inter ya
+iba con `preload`+`onload` (no bloqueante). En Slow 4G eso retrasaba el primer
+render ~3 s. **Corrección:** combinar Inter + Playfair en **una sola petición no
+bloqueante** (`preload as=style` + `onload`), con el `<noscript>` de respaldo. El
+texto pinta en la fuente de reserva al instante (`display=swap`) y el LCP cae de
+6,4 s a 1,1 s. `faq.html` ya lo hacía bien.
+
+**Decisión de fuentes (documentada):** se **mantiene Google Fonts** con
+`preconnect` + carga **no bloqueante**, en vez de auto-alojar. Motivo: auto-alojar
+Playfair+Inter con todos sus pesos e itálicas correctamente (subsetting, woff2)
+no puedo verificarlo con seguridad en este entorno, y la carga no bloqueante ya
+elimina el cuello de botella de render. **Recomendación futura:** auto-alojar las
+fuentes (woff2 locales + `@font-face` con `font-display:swap` y `size-adjust`)
+quita además los round-trips a `fonts.googleapis.com`/`gstatic.com` — mejora
+adicional en móvil.
+
+## INP y CLS — medidos buenos, sin cambios forzados
+
+- **INP:** mejor caso medido 104–128 ms (umbral 200). Escaneé los manejadores de
+  las páginas públicas (búsqueda FAQ, botones del header): son ligeros, sin
+  bucles ni DOM masivo síncrono. La app usa delegación `data-action` en vez de
+  miles de listeners. **No había problema medible**, así que no se trocea trabajo
+  sin necesidad (evitar cambios de riesgo sin beneficio).
+- **CLS:** ≤0.035 antes, 0.000–0.005 después (umbral 0.1). Las imágenes de
+  `index.html` ya llevan `width`/`height` (ronda SEO previa); los banners de la
+  app van `display:none` hasta tener contenido; las fuentes usan `display=swap`.
+  No hay anuncios ni iframes (confirmado).
+
+## Responsive móvil — problemas REALES encontrados y corregidos
+
+Medido con Playwright a **320 / 375 / 430 px**.
+
+| Problema (medido) | Página | Corrección |
+|---|---|---|
+| **Scroll horizontal** (+150 px a 320) | landing | `html { overflow-x: hidden }` (faltaba; solo estaba en `body`, que no clipa el header `position:fixed`). Resultado: `maxScrollX = 0` (el usuario ya no puede desplazar en horizontal). |
+| **Grid que desborda**: `.lp-shots` con `minmax(320px,1fr)` fuerza 320 px por columna | landing | `minmax(min(100%,320px),1fr)` — la columna puede encoger bajo 320 px. |
+| **Destino táctil**: hamburguesa 32×32 px | landing | `min-width/height: 44px` (WCAG 2.5.5). Verificado 44×44 y el menú **abre** (smoke test). |
+| Tablas | landing | La comparativa `.lp-cmp` ya está en `.lp-cmp-wrap { overflow-x:auto }` y se contiene (288 px a 320) — correcto, sin cambios. |
+| Viewport meta | las 3 | Presente y correcto (`width=device-width, initial-scale=1`) en landing/index/faq. |
+
+**Pendiente menor (documentado, no bloqueante):**
+- En la emulación, `window.innerWidth` queda en ~352 a 320 px (layout viewport
+  ligeramente expandido), lo que recorta ~16 px del borde del header. **No produce
+  scroll** (`maxScrollX=0`) y en un móvil real con `overflow-x:hidden` + viewport
+  meta el layout viewport se fija a device-width. **Conviene confirmarlo en un
+  dispositivo real.**
+- `index.html` (la app, noindex) tiene botones de UI densa < 44 px de alto (filas
+  de 33 px, toggle del sidebar). **No se fuerzan a 44 px**: es un cambio de diseño
+  grande y arriesgado en una app de productividad, con valor SEO nulo (noindex).
+  Queda anotado por si se quiere abordar como mejora de accesibilidad aparte.
+- `faq.html`: enlaces de texto del footer y «← Volver a inicio» < 44 px de alto
+  (patrón común de enlaces de texto). Bajo impacto.
+
+## Verificación
+
+- `npm run build` → «dist/ es desplegable», **sin avisos de tamaño de bundle**.
+- Smoke test (Playwright): landing (hero + menú hamburguesa abre), index (login
+  presente), faq (14 preguntas renderizadas), **0 errores de JS**. Los cambios son
+  CSS/`<head>`; no se tocó ningún JS ni el servidor.
+
+## 🔴 RECORDATORIO
+
+**CONFIRMA LAS CIFRAS CON PAGESPEED INSIGHTS / LIGHTHOUSE SOBRE LA URL REAL DE
+PRODUCCIÓN.** Lo de aquí es medición local en un navegador real (no el score de
+Lighthouse) y en pasadas únicas; producción (CDN, Brotli, latencia real, y el
+dominio definitivo aún por fijar) dará números distintos. La mejora de LCP de
+landing (−82 %) debería sostenerse, pero el número exacto hay que verlo en prod.

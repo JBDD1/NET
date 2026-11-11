@@ -1,0 +1,174 @@
+[
+  {
+    "route": "/landing.html",
+    "device": "mobile",
+    "loadMs": 12612,
+    "vitals": {
+      "FCP": {
+        "value": 3376,
+        "rating": "poor",
+        "target": null
+      },
+      "LCP": {
+        "value": 6440,
+        "rating": "poor",
+        "target": null
+      },
+      "TTFB": {
+        "value": 15.700000762939453,
+        "rating": "good",
+        "target": null
+      },
+      "CLS": {
+        "value": 0.0345975723441807,
+        "rating": "good",
+        "target": "html.js>body>section.lp-hero>div.lp-orb.lp-orb--2"
+      }
+    }
+  },
+  {
+    "route": "/landing.html",
+    "device": "desktop",
+    "loadMs": 5647,
+    "vitals": {
+      "TTFB": {
+        "value": 61.79999923706055,
+        "rating": "good",
+        "target": null
+      },
+      "FCP": {
+        "value": 456,
+        "rating": "good",
+        "target": null
+      },
+      "LCP": {
+        "value": 640,
+        "rating": "good",
+        "target": null
+      },
+      "CLS": {
+        "value": 0.0001276415156291043,
+        "rating": "good",
+        "target": "html.js>body>section.lp-hero>div.lp-hero-grid>div>div.in.lp-ani.lp-stats>div"
+      }
+    }
+  },
+  {
+    "route": "/index.html",
+    "device": "mobile",
+    "loadMs": 10517,
+    "vitals": {
+      "FCP": {
+        "value": 364,
+        "rating": "good",
+        "target": null
+      },
+      "LCP": {
+        "value": 1880,
+        "rating": "good",
+        "target": null
+      },
+      "CLS": {
+        "value": 0,
+        "rating": "good",
+        "target": null
+      },
+      "TTFB": {
+        "value": 25.300000190734863,
+        "rating": "good",
+        "target": null
+      },
+      "INP": {
+        "value": 128,
+        "rating": "good",
+        "target": "#login-tab-signup"
+      }
+    }
+  },
+  {
+    "route": "/index.html",
+    "device": "desktop",
+    "loadMs": 6671,
+    "vitals": {
+      "FCP": {
+        "value": 344,
+        "rating": "good",
+        "target": null
+      },
+      "LCP": {
+        "value": 808,
+        "rating": "good",
+        "target": null
+      },
+      "CLS": {
+        "value": 0.00009214618876696893,
+        "rating": "good",
+        "target": "#mainContent>header.topbar>button.topbar-search-btn"
+      },
+      "TTFB": {
+        "value": 35.30000019073486,
+        "rating": "good",
+        "target": null
+      },
+      "INP": {
+        "value": 64,
+        "rating": "good",
+        "target": "#login-tab-signup"
+      }
+    }
+  },
+  {
+    "route": "/faq.html",
+    "device": "mobile",
+    "loadMs": 7811,
+    "vitals": {
+      "FCP": {
+        "value": 1120,
+        "rating": "good",
+        "target": null
+      },
+      "LCP": {
+        "value": 3136,
+        "rating": "needs-improvement",
+        "target": null
+      },
+      "CLS": {
+        "value": 0,
+        "rating": "good",
+        "target": null
+      },
+      "TTFB": {
+        "value": 83.5,
+        "rating": "good",
+        "target": null
+      }
+    }
+  },
+  {
+    "route": "/faq.html",
+    "device": "desktop",
+    "loadMs": 4949,
+    "vitals": {
+      "TTFB": {
+        "value": 29.300000190734863,
+        "rating": "good",
+        "target": null
+      },
+      "FCP": {
+        "value": 940,
+        "rating": "good",
+        "target": null
+      },
+      "LCP": {
+        "value": 1572,
+        "rating": "good",
+        "target": null
+      },
+      "CLS": {
+        "value": 0.0007417487887809006,
+        "rating": "good",
+        "target": "html.js>body>a.lp-float-btn"
+      }
+    }
+  }
+]
