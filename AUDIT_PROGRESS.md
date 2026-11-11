@@ -2598,3 +2598,44 @@ idéntico a ese estado ya validado.
 NO se ha hecho ningún merge ni push: main, develop y rediseno-ui intactas en el
 remoto. Pendiente de que se libere espacio en disco (o de tu decisión) para
 reintentar la batería limpia.
+
+---
+
+## FASE 27 — Cifrado en reposo de los backups de sync · ✅ COMPLETA
+
+**Fecha:** 11 de noviembre de 2026
+
+**Paso 1 — Diagnóstico CONFIRMADO con prueba ejecutada (no solo lectura).**
+Arranqué server.cjs en local (FINOVA_ENC_KEY puesta, DATA_DIR temporal,
+FINOVA_DISABLE_AUTH), subí por HTTP un backup con `"desc":"TEST-CIFRADO-12345"`
+y leí el fichero del disco con fs.readFileSync:
+
+```
+disco: {"transactions":[{"desc":"TEST-CIFRADO-12345","amount":4242.42}]}
+¿"TEST-CIFRADO-12345" legible? -> SÍ (EN CLARO, confirmado)
+```
+
+`handleSyncUpload` escribía `_writeFileAtomic(destinoSync, data)` SIN
+`_encryptUserData`, y `handleSyncDownload` leía `fs.readFileSync` sin
+`_decryptUserData` — a diferencia de /api/user-data. **El hallazgo era real.**
+
+**Paso 2 — Corregido** (server.cjs):
+- `handleSyncUpload`: `_writeFileAtomic(destinoSync, _encryptUserData(data))`.
+- `handleSyncDownload`: `_decryptUserData(fs.readFileSync(file, 'utf8'))`.
+- Comentario «EN CLARO» actualizado. No se tocó la generación de códigos.
+Re-prueba sobre el código corregido: disco empieza por `enc1:`, el marcador ya
+NO es legible, y la descarga devuelve el original (round-trip OK).
+
+**Paso 3 — Migración:** `scripts/encrypt-existing-sync.cjs` (clon del de
+user-data): dry-run por defecto, `--apply --backup` obligatorio, detecta
+cifrados vs claro sin asumir, verificación doble, atómico, idempotente, se para
+ante otra clave. Probado en dry-run con un dir mixto (1 claro + 1 cifrado) →
+detecta bien. **No se ejecuta solo contra datos reales.** Documentado en
+SECURITY.md.
+
+**Paso 4 — Test:** `tests/sync-encryption.test.cjs` (añadido a `test:security`):
+arranca el servidor, sube un backup y falla si el fichero en disco queda en
+claro. `npm run test:security` → **117/117** (115 + 2 nuevos). `node --check
+server.cjs` OK. (jest/`npm test` sigue roto por `jsdom` ausente — daño del
+entorno de la Fase 26, disco lleno; ajeno a este cambio, que corre por node
+--test.)

@@ -271,6 +271,39 @@ escribe de forma atómica y es idempotente. Si encuentra ficheros cifrados con
 Hazlo con el servidor **parado**: si un usuario guarda a mitad, su fichero
 puede quedar en claro después de haber sido migrado.
 
+### Asimetría corregida: los backups de sync también se cifran
+
+Había una **asimetría**: `/api/user-data` cifraba con `_encryptUserData`, pero
+`handleSyncUpload` (los backups de sincronización entre dispositivos,
+`data/sync/<code>.json`) escribía el dataset **EN CLARO** con
+`_writeFileAtomic(destinoSync, data)`. Confirmado con una prueba real: se subía
+un backup con el marcador `TEST-CIFRADO-...` y aparecía legible en el disco.
+
+**Corrección** (`server.cjs`):
+
+- `handleSyncUpload` ahora escribe `_encryptUserData(data)` (envoltorio `enc1:`,
+  igual que los datos de usuario).
+- `handleSyncDownload` ahora lee `_decryptUserData(fs.readFileSync(...))`. Como
+  `_decryptUserData` devuelve el contenido tal cual si no empieza por `enc1:`,
+  **los backups antiguos en claro se siguen leyendo** sin romperse.
+
+No se tocó la generación de códigos de sync (longitud, vínculo al uid): solo el
+cifrado del contenido. Un test (`tests/sync-encryption.test.cjs`) sube un backup
+de verdad y falla si el fichero en disco vuelve a quedar en claro.
+
+**Backups de sync ya subidos en claro** (anteriores a la corrección): se migran
+igual que los datos de usuario, con su propio script:
+
+```bash
+node scripts/encrypt-existing-sync.cjs                               # solo informa
+node scripts/encrypt-existing-sync.cjs --apply --backup ../copia-sync
+```
+
+Mismas garantías: dry-run por defecto, `--backup` obligatorio a un directorio
+vacío, verificación doble, escritura atómica, idempotente, y se para si
+encuentra backups cifrados con otra clave. **No se ejecuta solo contra datos
+reales.**
+
 ### Rotación de claves: PENDIENTE
 
 No está resuelta, y conviene saber por qué. Como `enc1` es la versión del

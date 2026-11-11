@@ -2767,7 +2767,10 @@ async function handleSyncUpload(req, res) {
         res.writeHead(400, _apiHeaders(req));
         return res.end(JSON.stringify({ error: 'Código inválido' }));
       }
-      _writeFileAtomic(destinoSync, data);
+      // Cifrado en reposo, IGUAL que los datos de usuario normales: antes el
+      // backup de sync se escribía EN CLARO (asimetría corregida). Al descargar,
+      // _decryptUserData sigue leyendo los backups antiguos sin 'enc1:'.
+      _writeFileAtomic(destinoSync, _encryptUserData(data));
       res.writeHead(200, _apiHeaders(req));
       res.end(JSON.stringify({ ok: true, saved: new Date().toISOString() }));
     } catch (e) {
@@ -2787,10 +2790,10 @@ async function handleSyncDownload(req, res) {
     return res.end(JSON.stringify({ error: 'Código inválido' }));
   }
   // handleSyncDownload exigia *un* token valido pero no comprobaba de quien
-  // era el backup, y syncUpload sube el dataset EN CLARO: quien conociera un
-  // codigo leia la economia completa de otro. Los codigos anteriores a este
-  // registro no tienen dueno anotado y se siguen permitiendo para no romper a
-  // quien ya los usa; los nuevos quedan atados a su uid desde la subida.
+  // era el backup: quien conociera un codigo leia la economia completa de otro.
+  // Los codigos anteriores a este registro no tienen dueno anotado y se siguen
+  // permitiendo para no romper a quien ya los usa; los nuevos quedan atados a
+  // su uid desde la subida. (El contenido ya se cifra en reposo, ver abajo.)
   const owner = _syncOwnerOf(code);
   if (owner && owner !== req.uid) {
     console.warn('[FINOVA/Sync] Descarga rechazada: el codigo no pertenece al solicitante');
@@ -2802,7 +2805,10 @@ async function handleSyncDownload(req, res) {
     res.writeHead(404, _apiHeaders(req));
     return res.end(JSON.stringify({ error: 'No se encontró backup para ese código' }));
   }
-  const data = fs.readFileSync(file, 'utf8');
+  // Se descifra IGUAL que los datos de usuario. _decryptUserData devuelve el
+  // contenido tal cual si no empieza por 'enc1:', así que los backups antiguos
+  // en claro (anteriores a esta corrección) se siguen leyendo sin romperse.
+  const data = _decryptUserData(fs.readFileSync(file, 'utf8'));
   res.writeHead(200, _apiHeaders(req));
   res.end(JSON.stringify({ ok: true, data }));
 }
