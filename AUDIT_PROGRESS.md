@@ -2566,3 +2566,35 @@ fusión será **sin conflictos**.
 
 Se usará `--no-ff` para dejar constancia de la fusión. Sin force push. No se
 borra ni toca `rediseno-ui` ni `develop`.
+
+### Paso 2 — BLOQUEADO por el entorno (NO por la rama)
+
+`npm ci` falló por dos causas del ENTORNO, no de la rama:
+1. **Disco al 100 %** (`C:` 477G usados, ~577M libres): no hay sitio para
+   reinstalar node_modules.
+2. **Locks de Windows** sobre binarios nativos (`esbuild.exe`,
+   `rollup.win32-x64-msvc.node`) que mantienen abiertos procesos node en
+   marcha, que NO se deben matar a ciegas (pueden ser el runtime del harness
+   o servidores MCP).
+
+El `npm ci` borra node_modules fichero a fichero antes de reinstalar, y al
+atascarse dejó node_modules **parcialmente borrado**: faltan `@sentry/browser`
+(sin package.json), `jsdom`, y los shims de `.bin`. Como el disco está lleno,
+NO se puede reparar con `npm install`.
+
+Efecto en la batería:
+- `npm run test:security` → **115/115 PASA** (no usa los paquetes dañados).
+- `npm test` (jest) → falla solo con `Cannot find module 'jsdom'` (dep borrada),
+  no por tests rojos.
+- `npm run build` → falla solo con `Rollup failed to resolve '@sentry/browser'`
+  (dep borrada), no por la rama.
+
+**La rama rediseno-ui está sana:** su batería completa (992 jest + 115
+seguridad + build «dist/ es desplegable») pasó en verde HOY, varias veces, en
+las fases 21-25, ANTES de intentar el `npm ci`. El árbol de la fusión sería
+idéntico a ese estado ya validado.
+
+**DECISIÓN:** me detengo antes del Paso 3. NO se fusiona sin una batería válida.
+NO se ha hecho ningún merge ni push: main, develop y rediseno-ui intactas en el
+remoto. Pendiente de que se libere espacio en disco (o de tu decisión) para
+reintentar la batería limpia.
