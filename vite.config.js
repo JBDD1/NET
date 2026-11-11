@@ -174,6 +174,16 @@ function buildScripts(outDir = 'dist', mode = 'production') {
       async handler() {
       if (!fs.existsSync(outDir)) return;
 
+      // ── SEO: dominio canónico, UNA sola fuente de verdad ──────────────
+      // Cambia SOLO `SITE_URL` cuando se compre el dominio definitivo: el
+      // build reescribe todas las URLs canónicas, og:url, og:image y
+      // twitter:image de cada HTML. En el código fuente esas URLs usan la
+      // base provisional `SRC_BASE`, que NO se toca (es el "desde" del
+      // reemplazo). Mientras SITE_URL === SRC_BASE, el reemplazo es un no-op.
+      const SITE_URL = 'https://jbdd1.github.io/NET';   // ← cambiar al comprar dominio
+      const SRC_BASE = 'https://jbdd1.github.io/NET';   // base usada en el código fuente
+      let urlsReescritas = 0;
+
       const htmls = fs.readdirSync(outDir).filter(f => f.endsWith('.html'));
       const hashes = new Map();   // ruta relativa -> hash
       let etiquetas = 0;
@@ -209,7 +219,17 @@ function buildScripts(outDir = 'dist', mode = 'production') {
           },
         );
 
+        // Reescribe la base del dominio en canonical/og:url/og:image/twitter
+        // desde la constante única SITE_URL (no-op mientras no cambie).
+        if (SITE_URL !== SRC_BASE && html.includes(SRC_BASE)) {
+          urlsReescritas += html.split(SRC_BASE).length - 1;
+          html = html.split(SRC_BASE).join(SITE_URL);
+        }
+
         fs.writeFileSync(rutaHtml, html, 'utf8');
+      }
+      if (SITE_URL !== SRC_BASE) {
+        console.log(`[finova-build-scripts] dominio canónico reescrito a ${SITE_URL} en ${urlsReescritas} URL(s)`);
       }
 
       console.log(`[finova-build-scripts] ?v= añadido a ${etiquetas} etiquetas de script en ${htmls.length} HTML`);

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Finova — Gestión Financiera Personal</title>
-  <meta name="description" content="Finova — Gestión financiera personal. Controla tu patrimonio, inversiones, transacciones y objetivos en un solo lugar." />
+  <title>Tu panel de patrimonio, inversiones y objetivos | Finova</title>
+  <meta name="description" content="Panel privado de Finova para controlar tu patrimonio, cuentas, inversiones, transacciones, fiscalidad y objetivos. Tus datos se guardan en tu dispositivo." />
   <!-- App autenticada, no contenido de búsqueda: no indexar (evita competir
        con landing.html por las mismas keywords), pero sí seguir sus enlaces. -->
   <meta name="robots" content="noindex, follow" />
@@ -156,7 +156,7 @@
     <div class="login-card">
 
       <div class="login-logo">
-        <span class="login-logo-icon"><img src="icon-128.png" width="60" height="60" alt="Finova" style="display:block;border-radius:14px"></span>
+        <span class="login-logo-icon"><img src="icon-128.png" width="60" height="60" alt="Finova — gestión financiera personal" style="display:block;border-radius:14px"></span>
         <span class="login-logo-text">Finova</span>
       </div>
       <p class="login-tagline">Tu asistente financiero personal</p>
@@ -195,7 +195,7 @@
   <div id="app-loading" aria-hidden="true">
     <div class="app-loading-inner">
       <div class="app-loading-logo">
-        <span class="logo-icon"><img src="icon-128.png" width="68" height="68" alt="Finova" style="display:block;border-radius:17px"></span>
+        <span class="logo-icon"><img src="icon-128.png" width="68" height="68" alt="" style="display:block;border-radius:17px"></span>
         <span class="logo-text" style="font-size:1.6rem;letter-spacing:.04em">Finova</span>
       </div>
       <div class="app-loading-spinner"></div>
@@ -206,7 +206,7 @@
     <div class="sidebar-header">
       <div class="logo-wrap">
         <div class="logo">
-          <span class="logo-icon"><img src="icon-64.png" width="34" height="34" alt="Finova" style="display:block;border-radius:9px"></span>
+          <span class="logo-icon"><img src="icon-64.png" width="34" height="34" alt="Finova — gestión financiera personal" style="display:block;border-radius:9px"></span>
           <span class="logo-text">Finova</span>
         </div>
         <span class="logo-f" aria-hidden="true"><img src="icon-64.png" width="34" height="34" alt="" style="display:block;border-radius:9px"></span>
@@ -724,7 +724,7 @@
     <!-- ─── INGRESOS & GASTOS ─────────────────────────────────── -->
     <section class="section" id="section-transactions">
       <div class="section-header">
-        <h1>Ingresos &amp; Gastos</h1>
+        <h2>Ingresos &amp; Gastos</h2>
         <div class="btn-row">
           <div class="io-dropdown" id="io-dropdown-wrap">
             <button type="button" class="btn-secondary" data-action="toggle-io-dropdown" title="Importar / Exportar transacciones" style="padding:6px 12px" aria-label="Importar o exportar transacciones"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-swap"/></svg></button>
@@ -871,7 +871,7 @@
     <!-- ─── RECURRENTES ─────────────────────────────────────────── -->
     <section class="section" id="section-recurring">
       <div class="section-header">
-        <h1>Recurrentes</h1>
+        <h2>Recurrentes</h2>
         <button type="button" class="btn-primary" data-action="add-recurring">+ Añadir</button>
       </div>
       <p class="section-sub">Plantillas de ingresos y gastos periódicos. Pulsa "Registrar" para crear la transacción en el mes actual.</p>
@@ -881,7 +881,7 @@
     <!-- ─── VIAJES ──────────────────────────────────────────────── -->
     <section class="section" id="section-trips">
       <div class="section-header">
-        <h1>Viajes</h1>
+        <h2>Viajes</h2>
         <button type="button" class="btn-primary" data-action="add-trip">+ Añadir viaje</button>
       </div>
       <p class="section-sub">Agrupa los gastos de un viaje asignándolo al registrar o editar una transacción de gasto.</p>
@@ -910,7 +910,7 @@
     <!-- ─── BIZUMS ──────────────────────────────────────────────── -->
     <section class="section" id="section-bizums">
       <div class="section-header">
-        <h1>Bizums</h1>
+        <h2>Bizums</h2>
         <button type="button" class="btn-primary" id="btnAddBizum" data-action="add-bizum">+ Añadir bizum</button>
       </div>
 
@@ -979,7 +979,7 @@
     <!-- ─── CARTERA ───────────────────────────────────────────── -->
     <section class="section" id="section-portfolio">
       <div class="section-header">
-        <h1>Cartera</h1>
+        <h2>Cartera</h2>
         <div class="btn-row">
           <button type="button" class="btn-secondary" data-action="import-portfolio" title="Importar cartera desde tu bróker (CSV, TSV, Excel, JSON, XML o tabla HTML)"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Importar</button>
           <button type="button" class="btn-secondary" data-action="paste-portfolio" title="Pegar la tabla copiada de la web de tu bróker">Pegar</button>
@@ -1109,7 +1109,7 @@
     <!-- ─── WATCHLIST ─────────────────────────────────────────── -->
     <section class="section" id="section-watchlist">
       <div class="section-header">
-        <h1>Watchlist</h1>
+        <h2>Watchlist</h2>
         <div class="btn-row">
           <button type="button" class="btn-secondary btn-refresh-prices" data-action="refresh-prices">⟳ Precios</button>
           <button type="button" class="btn-primary" id="btnAddWatchlist" data-action="add-watchlist">+ Añadir</button>
@@ -1122,7 +1122,7 @@
     <!-- ─── DIVIDENDOS ────────────────────────────────────────── -->
     <section class="section" id="section-dividends">
       <div class="section-header">
-        <h1 id="div-section-title">Dividendos</h1>
+        <h2 id="div-section-title">Dividendos</h2>
         <button type="button" class="btn-primary" id="btnAddDividend" data-action="add-dividend">+ Registrar</button>
       </div>
 
@@ -1225,7 +1225,7 @@
     <!-- ─── PATRIMONIO NETO ───────────────────────────────────── -->
     <section class="section" id="section-networth">
       <div class="section-header">
-        <h1>Patrimonio Neto</h1>
+        <h2>Patrimonio Neto</h2>
       </div>
 
       <div class="kpi-grid kpi-grid-5" id="nw-widget-kpis">
@@ -1297,7 +1297,7 @@
     <!-- ─── PASIVOS & DEUDAS ─────────────────────────────────── -->
     <section class="section" id="section-pasivos">
       <div class="section-header">
-        <h1>Pasivos &amp; Deudas</h1>
+        <h2>Pasivos &amp; Deudas</h2>
         <button type="button" class="btn-primary" data-action="add-liability">+ Añadir deuda</button>
       </div>
       <p class="section-sub">Hipotecas, préstamos y deudas que reducen tu patrimonio neto</p>
@@ -1344,7 +1344,7 @@
     <!-- ─── ACTIVOS ALTERNATIVOS ──────────────────────────────── -->
     <section class="section" id="section-alternatives">
       <div class="section-header">
-        <h1>Activos Alternativos</h1>
+        <h2>Activos Alternativos</h2>
         <button type="button" class="btn-primary" id="btnAddAlternative" data-action="add-alternative">+ Añadir activo</button>
       </div>
       <p class="section-sub">Relojes, arte, inmuebles, coleccionables y otros activos tangibles</p>
@@ -1384,7 +1384,7 @@
     <!-- ─── OBJETIVOS ─────────────────────────────────────────── -->
     <section class="section" id="section-goals">
       <div class="section-header">
-        <h1>Objetivos</h1>
+        <h2>Objetivos</h2>
         <button type="button" class="btn-primary" id="btnAddGoal" data-action="add-goal">+ Nuevo objetivo</button>
       </div>
       <div class="table-toolbar mb-4" id="goals-toolbar" style="display:none">
@@ -1404,7 +1404,7 @@
     <!-- ─── SIMULADOR ─────────────────────────────────────────── -->
     <section class="section" id="section-simulator">
       <div class="section-header">
-        <h1>Simulador</h1>
+        <h2>Simulador</h2>
         <p class="section-sub">Calcula el poder del interés compuesto a largo plazo</p>
       </div>
 
@@ -1468,7 +1468,7 @@
     <!-- ─── FISCALIDAD ─────────────────────────────────────────── -->
     <section class="section" id="section-fiscalidad">
       <div class="section-header">
-        <h1>Fiscalidad</h1>
+        <h2>Fiscalidad</h2>
         <div class="btn-row">
           <div class="nav-tabs-wrap"><div class="nav-tabs" id="fiscal-year-tabs"></div></div>
           <button type="button" class="btn-ghost" data-action="export-fiscal-pdf" style="font-size:12px;padding:6px 14px" title="Exportar desglose fiscal en PDF"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-file"/></svg> PDF Fiscal</button>
@@ -1699,7 +1699,7 @@
     <section class="section" id="section-ai">
       <div class="section-header">
         <div>
-          <h1>Asesor IA</h1>
+          <h2>Asesor IA</h2>
           <p class="section-sub" style="margin-top:6px;margin-bottom:0">Análisis financiero personalizado con inteligencia artificial</p>
         </div>
         <button type="button" class="btn-secondary" data-action="ai-clear">Limpiar conversación</button>
@@ -1758,7 +1758,7 @@
     <!-- ═══════════════════════════════ ADMIN ═══════════════════ -->
     <section class="section" id="section-admin">
       <div class="section-header">
-        <h1><svg class="icon icon-lg" aria-hidden="true"><use href="#icon-crown"/></svg> Panel de administrador</h1>
+        <h2><svg class="icon icon-lg" aria-hidden="true"><use href="#icon-crown"/></svg> Panel de administrador</h2>
       </div>
 
       <!-- Dev Info (solo visible con devMode activo) -->
@@ -1860,7 +1860,7 @@
 
     <section class="section" id="section-settings">
       <div class="section-header">
-        <h1>Ajustes</h1>
+        <h2>Ajustes</h2>
       </div>
       <p class="section-sub">Activa o desactiva secciones y personaliza tu experiencia</p>
 

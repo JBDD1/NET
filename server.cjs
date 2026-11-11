@@ -4164,6 +4164,23 @@ const _finovaServer = http.createServer((req, res) => {
     return res.end();
   }
 
+  // ── Forzar HTTPS en producción ────────────────────────────────
+  // Si el proxy del hosting indica que la petición original llegó por HTTP
+  // (x-forwarded-proto: http), se redirige a https. En Vercel/Railway el edge
+  // ya termina TLS y reenvía x-forwarded-proto: https, así que esto SOLO actúa
+  // ante tráfico HTTP directo. No hay bucle: el destino https lo sirve el mismo
+  // edge. Se limita a GET/HEAD: un POST por http directo no ocurre tras el proxy
+  // que ya hace el upgrade, y redirigir un POST perdería el cuerpo.
+  if (
+    _IS_PROD &&
+    (req.method === 'GET' || req.method === 'HEAD') &&
+    req.headers['x-forwarded-proto'] === 'http' &&
+    req.headers.host
+  ) {
+    res.writeHead(301, { 'Location': `https://${req.headers.host}${req.url}`, ..._SEC });
+    return res.end();
+  }
+
   // ── Hardening global ──────────────────────────────────────────
   _sanitizeResHeaders(res);
 
