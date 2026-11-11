@@ -2537,3 +2537,32 @@ vía sentry-bundler, jest, firebase-admin) — ninguna llega al navegador. 992
     diferentes, y los dos se publican. Ahora ambos describen el borrado de
     cuenta, pero conviene quedarse con uno solo: mantener dos políticas
     legales en paralelo acaba en contradicciones.
+
+---
+
+## FASE 26 — Fusión de rediseno-ui → main · EN CURSO
+
+**Fecha:** 11 de noviembre de 2026
+
+### Paso 1 — Diagnóstico previo (antes de tocar nada)
+
+`git fetch --all` hecho. Los tres diffs:
+
+```
+git log origin/main..origin/rediseno-ui      -> 120 commits  (rediseno por delante de main)
+git log origin/rediseno-ui..origin/main      ->   0 commits  (main NO tiene nada propio)
+git log origin/rediseno-ui..origin/develop   ->   0 commits  (develop NO tiene nada propio)
+git log origin/develop..origin/rediseno-ui   -> 119 commits  (rediseno por delante de develop)
+```
+
+**Conclusión:** ni `main` ni `develop` tienen ningún commit que `rediseno-ui`
+no tenga ya. Ambas son **ancestros** de `rediseno-ui` (verificado con
+`git merge-base --is-ancestor`), así que **no hay nada que rescatar** y la
+fusión será **sin conflictos**.
+
+- `origin/main`   = `d84fcc9` (2026-08-11) "feat: RLS + Firebase Admin + seguridad completa" (congelada).
+- `origin/develop` = `4bc0bdb` (2026-08-11) "chore: setup git workflow profesional" — su único commit sobre main YA está en rediseno-ui.
+- `origin/rediseno-ui` = `5983861` (2026-11-11) — HEAD con todo el trabajo.
+
+Se usará `--no-ff` para dejar constancia de la fusión. Sin force push. No se
+borra ni toca `rediseno-ui` ni `develop`.
