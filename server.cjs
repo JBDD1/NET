@@ -561,50 +561,19 @@ const _SEC = {
   'Cross-Origin-Opener-Policy':   'same-origin-allow-popups',
 };
 
-// ─── Dominios de monitorización permitidos en la CSP ──────────
+// ─── Content Security Policy ──────────────────────────────────
+// FUENTE ÚNICA: csp.config.cjs. La misma config alimenta vercel.json (vía
+// scripts/generate-vercel-csp.cjs) y la vigila tests/csp-sync.test.cjs. NO
+// escribas la lista de orígenes a mano aquí: edítala en csp.config.cjs.
 //
-// Sentry: el host de ingesta depende de la REGIÓN del proyecto
-// (oXXXX.ingest.sentry.io para EE. UU., oXXXX.ingest.de.sentry.io para la UE),
-// y el número de organización solo se conoce al crear el proyecto. En vez de
-// adivinarlo, se permiten los dos comodines: son hosts controlados por Sentry,
-// así que sigue siendo mucho más estrecho que abrir https: entero.
-//
-// Cuando sepas tu DSN, puedes apretarlo con SENTRY_INGEST_ORIGIN y dejar solo
-// el tuyo exacto. Ver MONITORING_SETUP.md.
-const _SENTRY_CSP = process.env.SENTRY_INGEST_ORIGIN
-  ? process.env.SENTRY_INGEST_ORIGIN
-  : 'https://*.ingest.sentry.io https://*.ingest.de.sentry.io';
-
-// Analítica: el host depende de la herramienta y de si la autoalojas. Vacío =
-// no se permite nada, que es lo correcto mientras no haya analítica.
-const _ANALYTICS_CSP = process.env.ANALYTICS_ORIGIN || '';
-
-// Content Security Policy — aplicado a respuestas HTML
-const _CSP = [
-  "default-src 'none'",
-  ("script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com https://apis.google.com" +
-    (_ANALYTICS_CSP ? ' ' + _ANALYTICS_CSP : '')),
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com data:",
-  "img-src 'self' data: blob: https://lh3.googleusercontent.com https://jbdd1.github.io",
-  "connect-src 'self' " +
-    "https://query1.finance.yahoo.com https://query2.finance.yahoo.com " +
-    "https://open.er-api.com https://api.anthropic.com https://api.openai.com " +
-    "https://generativelanguage.googleapis.com https://api.groq.com " +
-    "https://identitytoolkit.googleapis.com https://securetoken.googleapis.com " +
-    "https://www.googleapis.com https://*.firebaseapp.com https://*.firebase.com https://*.firebaseio.com " +
-    // Sentry envía los informes de error por POST a su host de ingesta.
-    _SENTRY_CSP +
-    (_ANALYTICS_CSP ? ' ' + _ANALYTICS_CSP : ''),
-  "frame-src https://*.firebaseapp.com https://accounts.google.com",
-  "manifest-src 'self'",
-  "worker-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "upgrade-insecure-requests",
-].join('; ');
+// Las dos opciones son hardening/extensión OPCIONALES por entorno; sin ellas
+// el resultado es exactamente la CSP canónica (la unión), idéntica a la de
+// vercel.json. SENTRY_INGEST_ORIGIN aprieta los comodines de Sentry al host
+// exacto; ANALYTICS_ORIGIN añade una analítica autoalojada. Ver MONITORING_SETUP.md.
+const _CSP = require('./csp.config.cjs').buildCSP({
+  sentryIngestOrigin: process.env.SENTRY_INGEST_ORIGIN,
+  analyticsOrigin:    process.env.ANALYTICS_ORIGIN,
+});
 
 // Headers base para todas las respuestas JSON de la API
 // reqOrExtra: pass req (IncomingMessage) for dynamic origin reflection,

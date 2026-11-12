@@ -2639,3 +2639,57 @@ claro. `npm run test:security` → **117/117** (115 + 2 nuevos). `node --check
 server.cjs` OK. (jest/`npm test` sigue roto por `jsdom` ausente — daño del
 entorno de la Fase 26, disco lleno; ajeno a este cambio, que corre por node
 --test.)
+
+---
+
+## FASE 28 — Unificar la CSP en una fuente única · ✅ COMPLETA
+
+**Fecha:** 11 de noviembre de 2026
+
+### Paso 1 — Tabla de diferencias (server.cjs `_CSP` vs vercel.json, antes)
+
+| Directiva | server.cjs | vercel.json | Diferencia |
+|---|---|---|---|
+| default-src | `'none'` | `'none'` | iguales |
+| script-src | self, cdn.jsdelivr, cdnjs, gstatic, apis.google | …+ **cloud.umami.is** | **vercel tenía Umami; server no** |
+| style-src | self, unsafe-inline, fonts.googleapis | igual | iguales |
+| font-src | self, fonts.gstatic, data: | igual | iguales |
+| img-src | self, data:, blob:, lh3.googleusercontent, jbdd1.github.io | igual | iguales |
+| connect-src | self, **query1/query2.finance.yahoo**, **open.er-api.com**, anthropic, openai, gemini, groq, firebase\*, identitytoolkit, securetoken, googleapis, sentry×2 | self, anthropic, openai, gemini, groq, firebase\*, identitytoolkit, securetoken, googleapis, sentry×2, **cloud.umami.is** | **server tenía Yahoo+er-api; vercel tenía Umami** |
+| frame-src | *.firebaseapp, accounts.google | igual | iguales |
+| manifest/worker/object/base-uri/form-action/frame-ancestors/upgrade-insecure | iguales | iguales | iguales |
+
+**Divergencias reales:** (1) `cloud.umami.is` solo en vercel.json (script-src y
+connect-src); (2) `query1/query2.finance.yahoo.com` y `open.er-api.com` solo en
+server.cjs (connect-src). Sentry estaba en ambas.
+
+### Paso 2-3 — Fuente única + mecanismo
+
+- **`csp.config.cjs`** (raíz): objeto `DIRECTIVES` con cada directiva como array
+  comentado = **la UNIÓN completa** (Umami + Yahoo + er-api + Sentry + todo). Y
+  `buildCSP(opts)` que arma el string. Nada se quita.
+- **server.cjs**: el array `_CSP` a mano se sustituye por
+  `require('./csp.config.cjs').buildCSP({ sentryIngestOrigin, analyticsOrigin })`.
+  Las dos opciones de entorno (hardening de Sentry, analítica autoalojada) se
+  conservan; sin ellas el resultado es la CSP canónica.
+- **Mecanismo elegido:** generador **+** test, no auto-generación en el build.
+  Motivo: Vercel lee el `headers` del vercel.json **ya commiteado** al desplegar;
+  un prebuild que lo modifique durante el build es frágil (no garantiza que
+  Vercel lo relea). `scripts/generate-vercel-csp.cjs` escribe el valor desde
+  `buildCSP()` (reemplazo de TEXTO dirigido: solo cambia esa línea, no reformatea
+  el resto del JSON), y `tests/csp-sync.test.cjs` falla en CI si vercel.json o la
+  cabecera servida dejan de coincidir con la config. Así la divergencia se
+  detecta antes de desplegar.
+
+### Paso 4-5 — Tests y verificación
+
+- `tests/csp-sync.test.cjs` (en `test:security`): compara `buildCSP()` con
+  vercel.json **y con la cabecera CSP real servida por server.cjs** (arranca el
+  servidor y la lee). 3/3.
+- `node --check` server.cjs / csp.config.cjs / generador: OK.
+- `npm run test:security` → **120/120**. `npm run build` → «dist/ es desplegable».
+  `npm test` (jest) → **992 pass** (reparado antes el node_modules dañado de la
+  Fase 26, ya con disco libre).
+- La cabecera servida incluye la unión: Umami, Sentry, Firebase, IA, Yahoo, er-api.
+
+**La CSP final es la unión completa de ambas, sin perder ninguna directiva.**
