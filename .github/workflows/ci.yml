@@ -25,6 +25,12 @@ jobs:
       - name: Verificar que el build funciona
         run: npm run build
 
+      - name: Ejecutar tests
+        run: npm test
+
+      - name: Ejecutar tests de seguridad
+        run: npm run test:security
+
       - name: Verificar que no hay secrets en el código fuente
         run: |
           # Buscar patrones de API keys accidentales en src/
