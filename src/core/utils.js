@@ -343,35 +343,38 @@ async function refreshAllPrices(silent = false) {
     if (Object.keys(direct).length > 0) fetchError = '';
   }
 
-  let updated = 0, failed = 0;
+  let updated = 0, failed = 0, staleCount = 0;
   const updatedPortfolioIds = new Set();
   const reachedAlerts = [];
 
   for (const t of targets) {
     const q   = quotes[t.ticker];
     const idx = APP[t.arr].findIndex(a => a.id === t.id);
-    if (q && q.price > 0 && idx >= 0) {
-      APP[t.arr][idx].currentPrice   = q.price;
-      APP[t.arr][idx].previousClose  = q.previousClose  || 0;
-      APP[t.arr][idx].dailyChange    = q.change         || 0;
-      APP[t.arr][idx].dailyChangePct = q.changePct      || 0;
-      APP[t.arr][idx].priceDate      = Date.now();
+    if (idx < 0) { failed++; continue; }
+    const asset   = APP[t.arr][idx];
+    // _applyQuoteToAsset (portfolio.js) decide si la cotización es fresca o es
+    // una copia antigua marcada `stale` por el servidor. Una cotización stale NO
+    // cuenta como actualizada: solo se registra histórico y se evalúan alertas
+    // con datos FRESCOS, nunca sobre un precio que el proveedor no pudo refrescar.
+    const outcome = typeof _applyQuoteToAsset === 'function'
+      ? _applyQuoteToAsset(asset, q)
+      : (q && q.price > 0 ? (asset.currentPrice = q.price, asset.priceDate = Date.now(), 'updated') : 'failed');
+    if (outcome === 'updated') {
       if (t.arr === 'portfolio') {
-        recordAssetPriceHistory(APP.portfolio[idx]);
+        recordAssetPriceHistory(asset);
         updatedPortfolioIds.add(t.id);
       }
-      if (t.arr === 'watchlist') {
-        const w = APP[t.arr][idx];
-        if (_checkWatchlistTargetAlert(w)) reachedAlerts.push(w);
-      }
+      if (t.arr === 'watchlist' && _checkWatchlistTargetAlert(asset)) reachedAlerts.push(asset);
       updated++;
+    } else if (outcome === 'stale') {
+      staleCount++;
     } else {
       failed++;
     }
   }
 
   APP.lastPriceRefresh = Date.now();
-  if (updated > 0) saveData();
+  if (updated > 0 || staleCount > 0) saveData();
 
   if      (APP.activeSection === SECTIONS.PORTFOLIO) renderPortfolio();
   else if (APP.activeSection === SECTIONS.WATCHLIST) renderWatchlist();
@@ -397,14 +400,21 @@ async function refreshAllPrices(silent = false) {
   });
 
   if (!silent) {
-    if (fetchError && updated === 0) {
-      showToast('No se pudo obtener precios — usando últimos datos disponibles.', 'error');
-    } else if (updated === 0) {
-      showToast('Sin precios disponibles. Verifica los tickers o la conexión.', 'error');
-    } else if (failed > 0) {
-      showToast(`${updated} precio${updated !== 1 ? 's' : ''} actualizados, ${failed} sin datos`, 'error');
+    const p = n => `${n} precio${n !== 1 ? 's' : ''}`;
+    if (updated === 0 && staleCount === 0) {
+      showToast(fetchError
+        ? 'No se pudo obtener precios — se muestran los últimos datos, marcados como no actualizados.'
+        : 'Sin precios disponibles. Verifica los tickers o la conexión.', 'error');
+    } else if (staleCount > 0 || failed > 0) {
+      // Honesto: distingue lo que de verdad se actualizó de lo que el proveedor
+      // no pudo refrescar (stale) o no devolvió (sin datos).
+      const extra = [
+        staleCount > 0 ? `${staleCount} sin actualizar` : '',
+        failed > 0 ? `${failed} sin datos` : '',
+      ].filter(Boolean).join(', ');
+      showToast(`${p(updated)} actualizado${updated !== 1 ? 's' : ''}${extra ? ` · ${extra}` : ''}`, 'error');
     } else {
-      showToast(`${updated} precio${updated !== 1 ? 's' : ''} actualizados ✓`, 'success');
+      showToast(`${p(updated)} actualizado${updated !== 1 ? 's' : ''} ✓`, 'success');
     }
   }
 }

@@ -124,8 +124,34 @@ let _portfolioSort = { col: null, dir: 1 };
 const _PRICE_STALE_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 function _isPriceStale(asset) {
+  // El servidor marca una cotización como `stale` cuando NO pudo refrescarla y
+  // devuelve su última copia guardada: aunque la acabemos de recibir, no es un
+  // dato actual y debe mostrarse como desactualizado (no como "actualizado").
+  if (asset.priceStale) return true;
   if (!asset.priceDate) return true;
   return (Date.now() - asset.priceDate) > _PRICE_STALE_MS;
+}
+
+// Aplica a `asset` una cotización `q` recibida del servidor y devuelve cómo se
+// ha tratado. Función pura (sin DOM): la usa refreshAllPrices y es testeable.
+//   'updated' → precio fresco: se sella priceDate con el momento actual.
+//   'stale'   → el servidor devolvió su ÚLTIMA copia (q.stale): se actualiza el
+//               valor pero se marca priceStale y NO se sella priceDate, para que
+//               _isPriceStale lo detecte y la UI lo muestre como desactualizado.
+//   'failed'  → no hay precio utilizable; el activo se deja intacto.
+function _applyQuoteToAsset(asset, q) {
+  if (!asset || !q || !(q.price > 0)) return 'failed';
+  asset.currentPrice   = q.price;
+  asset.previousClose  = q.previousClose  || 0;
+  asset.dailyChange    = q.change         || 0;
+  asset.dailyChangePct = q.changePct      || 0;
+  if (q.stale) {
+    asset.priceStale = true;
+    return 'stale';
+  }
+  asset.priceStale = false;
+  asset.priceDate  = Date.now();
+  return 'updated';
 }
 
 const _PORTFOLIO_SORT_FNS = {
@@ -399,7 +425,7 @@ function renderPortfolioTable() {
             ${a.currency && a.currency !== 'EUR' ? `<span class="currency-badge">${escapeHtml(a.currency)}</span>` : ''}
           </div>
           ${a.dailyChangePct != null && a.dailyChangePct !== 0 ? `<div class="price-daily-change ${a.dailyChangePct >= 0 ? 'positive' : 'negative'}">${a.dailyChangePct >= 0 ? '+' : ''}${a.dailyChangePct.toFixed(2)}% hoy</div>` : ''}
-          ${_isPriceStale(a) ? `<div class="price-stale" title="Precio desactualizado — pulsa ⟳ para refrescar">${a.priceDate ? _relativeTime(a.priceDate) : 'sin fecha'}</div>` : ''}
+          ${_isPriceStale(a) ? `<div class="price-stale" title="Precio no actualizado — pulsa ⟳ para intentar refrescar">⚠ no actualizado${a.priceDate ? ` · ${_relativeTime(a.priceDate)}` : ''}</div>` : ''}
         </td>
         <td class="text-right pvt">${a.quantity}</td>
         <td class="text-right pvt">${formatCurrency(cost)}</td>
@@ -900,6 +926,10 @@ function updateAssetPrice(id, newPrice) {
   const asset = APP.portfolio.find(a => a.id === id);
   if (!asset) return;
   asset.currentPrice = parseFloat(newPrice) || 0;
+  // Un precio puesto a mano es un dato actual que el usuario asume: deja de
+  // estar "no actualizado" y se sella con la fecha de ahora.
+  asset.priceStale = false;
+  asset.priceDate  = Date.now();
   recordAssetPriceHistory(asset);
   updateNetworthHistory();
   saveData();
@@ -1392,7 +1422,7 @@ function renderWatchlist() {
           </div>
         </div>
         ${w.dailyChangePct != null && w.dailyChangePct !== 0 ? `<div class="watchlist-daily-change ${w.dailyChangePct >= 0 ? 'positive' : 'negative'}">${w.dailyChangePct >= 0 ? '▲ +' : '▼ '}${Math.abs(w.dailyChangePct).toFixed(2)}% hoy</div>` : ''}
-        ${w.priceDate ? `<div class="watchlist-price-age">actualizado ${_relativeTime(w.priceDate)}</div>` : ''}
+        ${_isPriceStale(w) ? `<div class="price-stale" title="Precio no actualizado — pulsa ⟳ para intentar refrescar">⚠ no actualizado${w.priceDate ? ` · ${_relativeTime(w.priceDate)}` : ''}</div>` : (w.priceDate ? `<div class="watchlist-price-age">actualizado ${_relativeTime(w.priceDate)}</div>` : '')}
         ${hasTarget ? `
           <div class="watchlist-target">
             Alerta ${dirLabel}: ${formatCurrency(w.targetPrice)}
@@ -1494,6 +1524,8 @@ function updateWatchlistPrice(id, newPrice) {
   const item = APP.watchlist.find(w => w.id === id);
   if (!item) return;
   item.currentPrice = parseFloat(newPrice) || 0;
+  item.priceStale = false;
+  item.priceDate  = Date.now();
   saveData();
   showToast('Precio guardado ✓', 'success');
   renderWatchlist();
