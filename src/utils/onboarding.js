@@ -527,7 +527,7 @@ var OB_TOUR_STEPS = [
     contentSel: '#section-ai .section-header',
     icon:       '✦',
     title:      'Asesor con Inteligencia Artificial',
-    desc:       'Haz preguntas sobre tu cartera, pide un análisis de tus hábitos de gasto o busca estrategias de inversión. Compatible con Claude (Anthropic), GPT-4 (OpenAI) y Gemini (Google). Tus datos financieros nunca salen de tu navegador.',
+    desc:       'Haz preguntas sobre tu cartera, pide un análisis de tus hábitos de gasto o busca estrategias de inversión. Compatible con Claude (Anthropic), GPT-4 (OpenAI) y Gemini (Google). Solo se envía a la IA un resumen de tus finanzas cuando tú lo autorizas, y puedes usar el modo anónimo para no enviar ninguna cifra.',
   },
   {
     section:    'settings',
@@ -535,7 +535,7 @@ var OB_TOUR_STEPS = [
     contentSel: '#section-settings .section-header',
     icon:       '⚙',
     title:      'Ajustes y personalización',
-    desc:       'Configura Finova a tu gusto: reordena y oculta secciones del menú lateral, edita los bloques del Dashboard, gestiona copias de seguridad y elige entre tema oscuro y claro. Todo se guarda localmente en tu dispositivo.',
+    desc:       'Configura Finova a tu gusto: reordena y oculta secciones del menú lateral, edita los bloques del Dashboard, gestiona copias de seguridad y elige entre tema oscuro y claro. Tus datos se guardan en tu dispositivo y, si usas una cuenta, se respalda una copia cifrada en el servidor.',
   },
 ];
 
