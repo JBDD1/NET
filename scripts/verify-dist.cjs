@@ -25,6 +25,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
@@ -127,6 +128,18 @@ for (const f of jsDist) {
   }
   if (ES_PROD && /console\s*\.\s*log\s*\(/.test(code)) {
     errores.push(`dist/${f} contiene console.log( — drop_console no se le aplicó`);
+  }
+  // Comprobación de SINTAXIS: Vite copia los scripts clásicos sin parsearlos, así
+  // que un error de sintaxis en un script de sección pasaba el build y solo
+  // saltaba al abrir la app en el navegador. Aquí se compila cada .js para
+  // cazarlo antes de publicar. Los módulos ES (import/export, p. ej. el bundle de
+  // monitoring) no se pueden compilar en modo script: su error lo delata y se
+  // omiten, porque el navegador los parsea aparte como type="module".
+  try {
+    new vm.Script(code, { filename: `dist/${f}` });
+  } catch (e) {
+    const esModule = /\b(import|export)\b/.test(e.message) || /import\.meta/.test(e.message) || /outside a module/i.test(e.message);
+    if (!esModule) errores.push(`dist/${f} tiene un error de sintaxis: ${e.message}`);
   }
 }
 
