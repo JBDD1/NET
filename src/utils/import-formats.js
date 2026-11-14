@@ -1059,21 +1059,3 @@ function ieParseText(text, filename) {
   };
 }
 
-/**
- * Convierte las hojas de un libro de Excel (ya leído con SheetJS) al IR.
- * SheetJS no se carga aquí: lo hace quien tenga el archivo, con el
- * `_XLSX_CDN` que el proyecto ya usa. Esta capa solo recibe filas.
- *
- * Se devuelven TODAS las hojas con datos, no la primera: un extracto con una
- * hoja por cuenta o un informe con posiciones y operaciones separadas son los
- * dos casos normales, y quedarse con la primera pierde el resto.
- */
-function ieFromSheets(hojas) {
-  const tablas = (hojas || [])
-    .filter(h => h && Array.isArray(h.filas) && h.filas.length >= 2)
-    .map(h => ({ nombre: h.nombre || 'Hoja', filas: ieRectangular(h.filas.map(f => f.map(c => (c == null ? '' : String(c))))), meta: { origen: 'excel' } }));
-  return {
-    format: 'excel', kind: 'tablas', tablas, registros: [], cuentas: [],
-    avisos: tablas.length ? [] : ['El libro no tiene ninguna hoja con datos.'],
-  };
-}

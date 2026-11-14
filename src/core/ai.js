@@ -428,10 +428,6 @@ function apiError(status, label) {
 
 const AI_FALLBACK_ORDER = ['claude', 'openai', 'gemini', 'groq'];
 
-function _isTemporaryError(status) {
-  return status === 429 || status === 402 || status === 529 || status >= 500;
-}
-
 function _extractStatus(err) {
   const m = (err.message || '').match(/\b([45]\d{2})\b/);
   return m ? parseInt(m[1], 10) : 0;
@@ -482,17 +478,6 @@ function _aiLocalFallback(question) {
 }
 
 // Fetch wrapper that reads Retry-After and shows a toast on 429.
-async function _fetchWithRateLimit(url, options = {}) {
-  const res = await fetch(url, options);
-  if (res.status === 429) {
-    const retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
-    let msg = `Demasiadas peticiones. Espera ${retryAfter < 120 ? retryAfter + 's' : Math.ceil(retryAfter / 60) + ' min'}.`;
-    try { const d = await res.clone().json(); if (d.error) msg = d.error; } catch {}
-    showToast(msg, 'error');
-  }
-  return res;
-}
-
 // anonMode: boolean — if true, server builds an anonymous system prompt (no financial data).
 // snapshot: object from buildFinancialSnapshot() — server validates and sanitizes every field.
 // The systemPrompt is never sent to the proxy; the server always constructs it server-side.
@@ -627,30 +612,6 @@ async function callGeminiDirect(apiKey, systemPrompt) {
     throw new Error('Gemini no devolvió respuesta. Inténtalo de nuevo.');
   }
   return text;
-}
-
-async function callClaude() {
-  const apiKey = (APP.claudeApiKey || '').trim();
-  if (!apiKey) throw new Error('No hay API Key de Claude. Configúrala arriba.');
-  return callViaProxy('claude', apiKey, !_aiSendContext, _aiSendContext ? buildFinancialSnapshot() : null);
-}
-
-async function callOpenAI() {
-  const apiKey = (APP.openaiApiKey || '').trim();
-  if (!apiKey) throw new Error('No hay API Key de ChatGPT. Configúrala arriba.');
-  return callViaProxy('openai', apiKey, !_aiSendContext, _aiSendContext ? buildFinancialSnapshot() : null);
-}
-
-async function callGemini() {
-  const apiKey = (APP.geminiApiKey || '').trim();
-  if (!apiKey) throw new Error('No hay API Key de Gemini. Configúrala en Ajustes.');
-  return callViaProxy('gemini', apiKey, !_aiSendContext, _aiSendContext ? buildFinancialSnapshot() : null);
-}
-
-async function callGroq() {
-  const apiKey = (APP.groqApiKey || '').trim();
-  if (!apiKey) throw new Error('No hay API Key de Groq. Configúrala arriba.');
-  return callViaProxy('groq', apiKey, !_aiSendContext, _aiSendContext ? buildFinancialSnapshot() : null);
 }
 
 // anonMode + snapshot → proxy path (server builds system prompt).

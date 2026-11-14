@@ -182,29 +182,6 @@ function modalConfirmClick() {
  * Confirmación destructiva segura — reemplaza confirm() nativo.
  * Usa el modal existente con botón rojo de confirmación.
  */
-function confirmAction(message, onConfirm) {
-  document.getElementById('modalTitle').textContent = 'Confirmar acción';
-  document.getElementById('modalBody').innerHTML =
-    `<p style="margin:0;font-size:14px;line-height:1.6;color:var(--text-secondary)">${escapeHtml(message)}</p>`;
-  document.getElementById('modalOverlay').classList.add('open');
-
-  const footer  = document.getElementById('modal').querySelector('.modal-footer');
-  if (footer) footer.style.display = '';
-
-  const confirmBtn = document.getElementById('modalConfirm');
-  if (confirmBtn) {
-    confirmBtn.textContent = 'Eliminar';
-    confirmBtn.className   = 'btn-danger';
-  }
-
-  _modalConfirmHandler = () => {
-    closeModal();
-    // Restaurar botón a su estilo normal para el próximo modal
-    if (confirmBtn) { confirmBtn.textContent = 'Guardar'; confirmBtn.className = 'btn-primary'; }
-    onConfirm();
-  };
-}
-
 /* ═══════════════════════════════════════════════════════════════
    16. TOASTS
 ═══════════════════════════════════════════════════════════════ */
@@ -950,8 +927,6 @@ async function init() {
   // ── Personalización de secciones
   injectCustomizerButtons();
   applySectionLayouts();
-
-  console.log('%c FINOVA iniciado ✓', 'color: #c8a96e; font-weight: bold; font-size: 14px;');
 }
 
 let _autosaveTimer = null;
@@ -3684,16 +3659,6 @@ function renderSidebarProfile() {
   updateProfileDropdown();
 }
 
-function saveUserName() {
-  const input = document.getElementById('settings-username');
-  const raw   = (input?.value || '').trim();
-  const name  = raw.replace(/<[^>]*>/g, '').slice(0, 50);
-  APP.userName = name;
-  saveData();
-  renderSidebarProfile();
-  showToast('Nombre actualizado ✓', 'success');
-}
-
 /* ─── Profile dropdown ─────────────────────────────────────── */
 function toggleProfileDropdown() {
   const dd = document.getElementById('profile-dropdown');
@@ -3861,12 +3826,6 @@ function renderSettingsCategories() {
   });
 }
 
-function toggleCategoriesSection() {
-  APP.categoriesCollapsed = !APP.categoriesCollapsed;
-  applyCategoriesCollapsed();
-  saveData();
-}
-
 function applyCategoriesCollapsed() {
   const body    = document.getElementById('settings-cat-body');
   const label   = document.getElementById('catToggleLabel');
@@ -3875,19 +3834,6 @@ function applyCategoriesCollapsed() {
   body.style.display  = APP.categoriesCollapsed ? 'none' : '';
   if (label) label.textContent = APP.categoriesCollapsed ? 'Mostrar' : 'Ocultar';
   if (icon)  icon.textContent  = APP.categoriesCollapsed ? '☰' : '✕';
-}
-
-function settingsAddCategory(type) {
-  const input = document.getElementById(`settings-new-cat-${type}`);
-  if (!input) return;
-  const name = input.value.trim();
-  if (!name) return showToast('Escribe un nombre', 'error');
-  if (APP.categories[type].includes(name)) return showToast('Ya existe esta categoría', 'error');
-  APP.categories[type].push(name);
-  saveData();
-  input.value = '';
-  renderSettingsCategories();
-  showToast('Categoría añadida ✓', 'success');
 }
 
 function settingsDeleteCategory(type, name) {
@@ -4172,12 +4118,6 @@ function renderSearchResults(q) {
       <span class="search-result-badge">${r.badge}</span>
     </div>
   `).join('');
-}
-
-let _searchResults = [];
-function searchAll_cached(q) {
-  _searchResults = searchAll(q);
-  return _searchResults;
 }
 
 function searchGoTo(idx) {

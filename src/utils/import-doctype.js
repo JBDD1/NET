@@ -69,12 +69,6 @@ const IDT_TITULOS = {
 /* ─── 2. Utilidades ───────────────────────────────────────────── */
 
 /** ¿Qué fracción de las filas tiene algo en esta columna? */
-function _idtRelleno(filas, col) {
-  if (col == null || !filas.length) return 0;
-  const n = filas.filter(f => String(f[col] == null ? '' : f[col]).trim() !== '').length;
-  return n / filas.length;
-}
-
 /** Valores de una columna, como texto, sin vacíos. */
 function _idtValores(filas, col, limite) {
   if (col == null) return [];

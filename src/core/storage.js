@@ -679,7 +679,6 @@ async function _migratePhotosToIDB() {
   }
   if (migrated > 0) {
     saveData();
-    console.log(`Migradas ${migrated} fotos a IndexedDB`);
   }
   if (failed > 0) {
     console.warn(`_migratePhotosToIDB: ${failed} foto(s) no migradas`);

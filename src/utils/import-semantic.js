@@ -132,11 +132,6 @@ function ieEsDivisa(v) {
   return false;
 }
 
-/** Tres letras mayúsculas: podría ser una divisa, con menos certeza. */
-function ieFormaDivisa(v) {
-  return /^[A-Z]{3}$/.test(String(v == null ? '' : v).trim().toUpperCase());
-}
-
 /**
  * ¿Parece un ticker? Letras mayúsculas, a veces con punto y sufijo de
  * mercado (SAN.MC, VOD.L) o con guion (BRK-B). Se excluyen las palabras

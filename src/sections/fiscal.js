@@ -230,8 +230,6 @@ function getEscalaAhorro()  { return getEscalas(getFiscalYear()).ahorro; }
 function getEscalaGeneral() { return getEscalas(getFiscalYear()).general; }
 
 /** Compatibilidad: la escala del ahorro del ejercicio activo. */
-function getIRPFTramos() { return getEscalaAhorro(); }
-
 function calcIRPF(base)        { return calcCuota(base, getEscalaAhorro()); }
 function calcIRPFGeneral(base) { return calcCuota(base, getEscalaGeneral()); }
 

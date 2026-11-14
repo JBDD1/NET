@@ -612,37 +612,6 @@ function _isDashBlockVisible(blockId) {
   return !b || b.visible !== false;
 }
 
-function loadDemo() {
-  loadDemoData();
-  saveData();
-  markDashboardDirty();
-  renderDashboard();
-  showToast('Datos de ejemplo cargados', 'success');
-}
-
-function startFresh() {
-  APP.transactions    = [];
-  APP.portfolio       = [];
-  APP.watchlist       = [];
-  APP.dividends       = [];
-  APP.cashAccounts    = [];
-  APP.alternatives    = [];
-  APP.properties      = [];
-  APP.goals           = [];
-  APP.bizums          = [];
-  APP.networthHistory = [];
-  APP.sales           = [];
-  APP.scenarios       = [];
-  APP.liabilities     = [];
-  APP.trabajo         = { salarioBruto: 0, retencionEmpresa: 0, seguridadSocial: 0, dietas: 0, sindicatos: 0, otrosGastos: 0 };
-  APP.minimos         = { edad: 0, discapacidad: 0, hijos: [], ascendientes: [], movilidadGeografica: false };
-  APP.freshStart      = true;
-  saveData();
-  markDashboardDirty();
-  renderDashboard();
-  showToast('Listo — empieza a añadir tus datos', 'success');
-}
-
 function resetAllData() {
   // Antes borraba STORAGE_KEY, que es la clave LEGACY 'finova_data_v1'. Un
   // usuario autenticado guarda en 'finova_<uid>_data_v1' (_getStorageKey()),
@@ -993,11 +962,6 @@ function renderDashboard() {
 
 function _sparkNetworthData(n) {
   return APP.networthHistory.slice(-n).map(h => h.value);
-}
-
-function _sparkHistoryField(n, field) {
-  const pts = APP.networthHistory.slice(-n).map(h => h[field] ?? null).filter(v => v !== null);
-  return pts.length >= 2 ? pts : [];
 }
 
 function _sparkPortfolioFallback(n) {

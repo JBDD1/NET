@@ -54,7 +54,6 @@ function hideOnboarding() {
 /* ── Navegación ────────────────────────────────────────────── */
 
 function obNext()  { _obSave(); _obRender(_obStep + 1, 'forward'); }
-function obPrev()  { _obSave(); _obRender(_obStep - 1, 'back'); }
 function obGoTo(n) { _obSave(); _obRender(n, n > _obStep ? 'forward' : 'back'); }
 
 function _obRender(step, dir) {
@@ -430,8 +429,6 @@ function obFinish() {
   _obRender(4, 'forward');
 }
 
-/* Legacy aliases */
-function resetOnboarding() { showOnboarding(); }
 function obWelcomeDone() {
   navigateTo('dashboard');
   // Auto-start the guided tour for users who just finished onboarding

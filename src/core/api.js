@@ -57,10 +57,6 @@ async function _apiRequest(path, opts, withAuth, quiet) {
   return res;
 }
 
-function _jsonBody(body) {
-  return { 'Content-Type': 'application/json', body: JSON.stringify(body) };
-}
-
 var api = {
   /* ── Market data (no auth — public endpoints) ── */
   yahoo:     function(ticker, range) {
