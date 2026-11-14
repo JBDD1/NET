@@ -426,16 +426,16 @@ function _rsShowReview() {
            onclick="_rsViewFull()" title="Ver completo" />
       <div>
         <div class="form-group" style="margin-bottom:10px">
-          <label class="form-label">Establecimiento ${_rsConfBadge(d.confidence.merchant)}</label>
+          <label class="form-label" for="rs-merchant">Establecimiento ${_rsConfBadge(d.confidence.merchant)}</label>
           <input type="text" id="rs-merchant" class="text-input" value="${escapeHtml(d.merchant || '')}" placeholder="Nombre del comercio" />
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Importe (€) ${_rsConfBadge(d.confidence.total)}</label>
+            <label class="form-label" for="rs-total">Importe (€) ${_rsConfBadge(d.confidence.total)}</label>
             <input type="number" id="rs-total" class="text-input" step="0.01" min="0" value="${d.total ?? ''}" placeholder="0.00" />
           </div>
           <div class="form-group">
-            <label class="form-label">Fecha ${_rsConfBadge(d.confidence.date)}</label>
+            <label class="form-label" for="rs-date">Fecha ${_rsConfBadge(d.confidence.date)}</label>
             <input type="date" id="rs-date" class="text-input" value="${d.date || ''}" max="${getTodayStr()}" />
           </div>
         </div>
@@ -443,13 +443,13 @@ function _rsShowReview() {
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Categoría ${_rsConfBadge(d.confidence.category)}</label>
+        <label class="form-label" for="rs-category">Categoría ${_rsConfBadge(d.confidence.category)}</label>
         <select id="rs-category" class="select-input">
           ${cats.map(c => `<option value="${escapeHtml(c)}"${c === (d.category || UNCLASSIFIED_CATEGORY) ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('')}
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label">Método de pago</label>
+        <label class="form-label" for="rs-payment">Método de pago</label>
         <select id="rs-payment" class="select-input">
           ${['', 'efectivo', 'tarjeta', 'bizum', 'transferencia'].map(p =>
             `<option value="${p}"${p === (d.paymentMethod || '') ? ' selected' : ''}>${p ? p[0].toUpperCase() + p.slice(1) : '(sin indicar)'}</option>`).join('')}

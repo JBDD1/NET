@@ -383,12 +383,12 @@ function openStakeModal(coinId) {
     </div>
     <div class="form-row" style="margin-top:1.2rem">
       <div class="form-group">
-        <label class="form-label">Importe (€)</label>
+        <label class="form-label" for="stk-f-amount">Importe (€)</label>
         <input type="number" id="stk-f-amount" class="text-input" placeholder="1000" min="1" step="0.01"
                oninput="_stkPreviewUpdate('${cat.id}')" />
       </div>
       <div class="form-group">
-        <label class="form-label">Fecha de inicio</label>
+        <label class="form-label" for="stk-f-date">Fecha de inicio</label>
         <input type="date" id="stk-f-date" class="text-input" value="${today}"
                oninput="_stkPreviewUpdate('${cat.id}')" />
       </div>
@@ -473,7 +473,7 @@ function openUnstakeModal(posId) {
     </div>
     ${isLocked ? `<div class="stk-disclaimer stk-disclaimer-warn">⚠ Esta posición está bloqueada hasta <strong>${unlockDate}</strong>. Si retiras ahora podrían aplicarse penalizaciones externas.</div>` : ''}
     <div class="form-group" style="margin-top:1rem">
-      <label class="form-label">Importe a retirar (€)</label>
+      <label class="form-label" for="stk-f-unstake">Importe a retirar (€)</label>
       <input type="number" id="stk-f-unstake" class="text-input" value="${pos.amountEur}" max="${pos.amountEur}" step="0.01" min="0.01" />
     </div>
   `;
@@ -510,11 +510,11 @@ function openAddRewardsModal(posId) {
   const body = `
     <p style="color:var(--text-muted);margin-bottom:1rem;font-size:13px">Registra recompensas recibidas en <strong>${escapeHtml(pos.name)}</strong>.</p>
     <div class="form-group">
-      <label class="form-label">Importe de recompensas (€)</label>
+      <label class="form-label" for="stk-f-rwrd">Importe de recompensas (€)</label>
       <input type="number" id="stk-f-rwrd" class="text-input" placeholder="12.50" min="0.01" step="0.01" />
     </div>
     <div class="form-group">
-      <label class="form-label">Fecha</label>
+      <label class="form-label" for="stk-f-rwrd-date">Fecha</label>
       <input type="date" id="stk-f-rwrd-date" class="text-input" value="${new Date().toISOString().slice(0, 10)}" />
     </div>
   `;
@@ -544,16 +544,16 @@ function openStakingCalculator() {
     <p style="color:var(--text-muted);margin-bottom:1.2rem;font-size:13px">Simula el crecimiento de tu staking con interés compuesto mensual.</p>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Capital inicial (€)</label>
+        <label class="form-label" for="stk-c-cap">Capital inicial (€)</label>
         <input type="number" id="stk-c-cap" class="text-input" placeholder="10 000" min="1" oninput="_stkCalcUpdate()" />
       </div>
       <div class="form-group">
-        <label class="form-label">APY (%)</label>
+        <label class="form-label" for="stk-c-apy">APY (%)</label>
         <input type="number" id="stk-c-apy" class="text-input" placeholder="5.0" step="0.1" min="0.1" max="100" oninput="_stkCalcUpdate()" />
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label" style="display:flex;justify-content:space-between">
+      <label class="form-label" style="display:flex;justify-content:space-between" for="stk-c-months">
         Período
         <span id="stk-c-months-lbl" style="color:var(--accent);font-weight:600">12 meses</span>
       </label>

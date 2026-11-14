@@ -274,47 +274,47 @@ function openAddGoal(prefill = null) {
   openModal(isEdit ? 'Editar objetivo' : 'Nuevo objetivo', `
     <div class="form-row">
       <div class="form-group" style="flex:0 0 64px">
-        <label class="form-label">Emoji</label>
+        <label class="form-label" for="f-g-emoji">Emoji</label>
         <input type="text" id="f-g-emoji" class="text-input" placeholder="🎯" value="${escapeHtml(g.emoji || '🎯')}" maxlength="2" style="text-align:center;font-size:22px" />
       </div>
       <div class="form-group">
-        <label class="form-label">Nombre del objetivo</label>
+        <label class="form-label" for="f-g-name">Nombre del objetivo</label>
         <input type="text" id="f-g-name" class="text-input" placeholder="Ej: Fondo de emergencia" value="${escapeHtml(g.name || '')}" />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Importe objetivo (€)</label>
+        <label class="form-label" for="f-g-target">Importe objetivo (€)</label>
         <input type="number" id="f-g-target" class="text-input" placeholder="0.00" value="${g.targetAmount || ''}" step="0.01" min="0" />
       </div>
       <div class="form-group">
-        <label class="form-label">Fecha límite (opcional)</label>
+        <label class="form-label" for="f-g-deadline">Fecha límite (opcional)</label>
         <input type="date" id="f-g-deadline" class="text-input" value="${g.deadline || ''}" />
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Descripción</label>
+      <label class="form-label" for="f-g-desc">Descripción</label>
       <input type="text" id="f-g-desc" class="text-input" placeholder="Breve descripción..." value="${escapeHtml(g.description || '')}" />
     </div>
 
     <div class="form-group" style="margin-top:8px">
-      <label class="form-label">¿Cómo medir el progreso?</label>
+      <div class="form-label">¿Cómo medir el progreso?</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);font-size:13px">
-          <input type="radio" name="g-source" value="manual" ${initSource === 'manual' ? 'checked' : ''} onchange="goalSourceChange()"> Manual
+        <label for="g-source-manual" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);font-size:13px">
+          <input type="radio" id="g-source-manual" name="g-source" value="manual" ${initSource === 'manual' ? 'checked' : ''} onchange="goalSourceChange()"> Manual
         </label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);font-size:13px">
-          <input type="radio" name="g-source" value="account" ${initSource === 'account' ? 'checked' : ''} onchange="goalSourceChange()"> Cuenta de ahorro
+        <label for="g-source-account" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);font-size:13px">
+          <input type="radio" id="g-source-account" name="g-source" value="account" ${initSource === 'account' ? 'checked' : ''} onchange="goalSourceChange()"> Cuenta de ahorro
         </label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);font-size:13px">
-          <input type="radio" name="g-source" value="category" ${initSource === 'category' ? 'checked' : ''} onchange="goalSourceChange()"> Categoría
+        <label for="g-source-category" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);font-size:13px">
+          <input type="radio" id="g-source-category" name="g-source" value="category" ${initSource === 'category' ? 'checked' : ''} onchange="goalSourceChange()"> Categoría
         </label>
       </div>
     </div>
 
     <div id="f-g-manual-wrap" style="display:${initSource === 'manual' ? 'block' : 'none'}">
       <div class="form-group">
-        <label class="form-label">Importe ahorrado (€)</label>
+        <label class="form-label" for="f-g-current">Importe ahorrado (€)</label>
         <input type="number" id="f-g-current" class="text-input" placeholder="0.00" value="${initSource === 'manual' ? (g.currentAmount || '') : ''}" step="0.01" min="0" />
       </div>
     </div>
@@ -322,14 +322,14 @@ function openAddGoal(prefill = null) {
     <div id="f-g-account-wrap" style="display:${initSource === 'account' ? 'block' : 'none'}">
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Cuenta</label>
+          <label class="form-label" for="f-g-link-acct">Cuenta</label>
           <select id="f-g-link-acct" class="select-input">
             <option value="">— Sin vincular —</option>
             ${accountOptions}
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Importe adicional (€)</label>
+          <label class="form-label" for="f-g-extra-acct">Importe adicional (€)</label>
           <input type="number" id="f-g-extra-acct" class="text-input" placeholder="0.00" value="${initSource === 'account' ? (g.currentAmount || '') : ''}" step="0.01" min="0" />
         </div>
       </div>
@@ -339,7 +339,7 @@ function openAddGoal(prefill = null) {
     <div id="f-g-category-wrap" style="display:${initSource === 'category' ? 'block' : 'none'}">
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Categoría</label>
+          <label class="form-label" for="f-g-link-cat">Categoría</label>
           <select id="f-g-link-cat" class="select-input">
             <option value="">— Sin vincular —</option>
             <optgroup label="Ingresos">${incomeCats}</optgroup>
@@ -347,7 +347,7 @@ function openAddGoal(prefill = null) {
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Tipo de transacción</label>
+          <label class="form-label" for="f-g-link-type">Tipo de transacción</label>
           <select id="f-g-link-type" class="select-input">
             <option value=""        ${!g.linkedType              ? 'selected' : ''}>Ingresos y gastos</option>
             <option value="income"  ${g.linkedType === 'income'  ? 'selected' : ''}>Solo ingresos</option>
@@ -357,11 +357,11 @@ function openAddGoal(prefill = null) {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Contabilizar desde</label>
+          <label class="form-label" for="f-g-linked-since">Contabilizar desde</label>
           <input type="date" id="f-g-linked-since" class="text-input" value="${g.linkedSince || g.createdAt || today}" />
         </div>
         <div class="form-group">
-          <label class="form-label">Importe adicional (€)</label>
+          <label class="form-label" for="f-g-extra-cat">Importe adicional (€)</label>
           <input type="number" id="f-g-extra-cat" class="text-input" placeholder="0.00" value="${initSource === 'category' ? (g.currentAmount || '') : ''}" step="0.01" min="0" />
         </div>
       </div>
@@ -458,16 +458,16 @@ function openContributions(goalId) {
       <div style="border-top:1px solid var(--border);padding-top:14px">
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Fecha</label>
+            <label class="form-label" for="f-c-date">Fecha</label>
             <input type="date" id="f-c-date" class="text-input" value="${today}" />
           </div>
           <div class="form-group">
-            <label class="form-label">Importe (€)</label>
+            <label class="form-label" for="f-c-amount">Importe (€)</label>
             <input type="number" id="f-c-amount" class="text-input" placeholder="0.00" step="0.01" min="0.01" />
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Nota (opcional)</label>
+          <label class="form-label" for="f-c-note">Nota (opcional)</label>
           <input type="text" id="f-c-note" class="text-input" placeholder="Ej: Nómina extra, transferencia..." />
         </div>
       </div>

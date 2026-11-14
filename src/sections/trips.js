@@ -162,7 +162,7 @@ function openAddTrip(prefill = null) {
   openModal(isEdit ? 'Editar viaje' : 'Nuevo viaje', `
     <div class="form-row">
       <div class="form-group" style="flex:0 0 auto">
-        <label class="form-label">Emoji</label>
+        <label class="form-label" for="f-trip-emoji">Emoji</label>
         <div class="emoji-picker-wrap" id="tripEmojiPickerWrap">
           <button type="button" class="emoji-picker-trigger" id="tripEmojiTrigger" style="height:48px"
             onclick="_toggleTripEmojiPicker()" title="Elegir emoji">${escapeHtml(initialEmoji)}</button>
@@ -173,30 +173,30 @@ function openAddTrip(prefill = null) {
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Nombre *</label>
+        <label class="form-label" for="f-trip-name">Nombre *</label>
         <input type="text" id="f-trip-name" class="text-input" placeholder="Ej: Japón 2026" value="${escapeHtml(t.name || '')}" />
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Destino</label>
+      <label class="form-label" for="f-trip-dest">Destino</label>
       <input type="text" id="f-trip-dest" class="text-input" placeholder="Ej: Tokio y Kioto" value="${escapeHtml(t.destination || '')}" />
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Fecha de inicio</label>
+        <label class="form-label" for="f-trip-start">Fecha de inicio</label>
         <input type="date" id="f-trip-start" class="text-input" value="${t.startDate || ''}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Fecha de fin</label>
+        <label class="form-label" for="f-trip-end">Fecha de fin</label>
         <input type="date" id="f-trip-end" class="text-input" value="${t.endDate || ''}" />
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Presupuesto (€) <span style="color:var(--text-muted);font-weight:400">— opcional</span></label>
+      <label class="form-label" for="f-trip-budget">Presupuesto (€) <span style="color:var(--text-muted);font-weight:400">— opcional</span></label>
       <input type="number" id="f-trip-budget" class="text-input" placeholder="0.00 = sin presupuesto" value="${t.budget || ''}" step="0.01" min="0" />
     </div>
     <div class="form-group">
-      <label class="form-label">Notas</label>
+      <label class="form-label" for="f-trip-notes">Notas</label>
       <textarea id="f-trip-notes" class="text-input" rows="2" placeholder="Detalles adicionales...">${escapeHtml(t.notes || '')}</textarea>
     </div>
   `, () => {

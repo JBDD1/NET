@@ -380,7 +380,7 @@
             <span class="profile-dd-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-download"/></svg></span>
             <span>Exportar backup</span>
           </button>
-          <label class="profile-dropdown-item" style="cursor:pointer">
+          <label class="profile-dropdown-item" style="cursor:pointer" for="restore-file-header">
             <span class="profile-dd-icon"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-upload"/></svg></span>
             <span>Importar backup</span>
             <input type="file" id="restore-file-header" accept=".json" style="display:none" aria-label="Importar backup desde archivo JSON" />
@@ -1411,19 +1411,19 @@
         <div class="card simulator-controls">
           <h3 class="card-title">Parámetros</h3>
           <div class="form-group">
-            <label class="form-label">Capital inicial (€)</label>
+            <label class="form-label" for="sim-initial">Capital inicial (€)</label>
             <input type="number" id="sim-initial" class="text-input" value="10000" min="0" />
           </div>
           <div class="form-group">
-            <label class="form-label">Aportación mensual (€)</label>
+            <label class="form-label" for="sim-monthly">Aportación mensual (€)</label>
             <input type="number" id="sim-monthly" class="text-input" value="500" min="0" />
           </div>
           <div class="form-group">
-            <label class="form-label">Rentabilidad anual esperada (%)</label>
+            <label class="form-label" for="sim-rate">Rentabilidad anual esperada (%)</label>
             <input type="number" id="sim-rate" class="text-input" value="8" min="0" max="100" step="0.1" />
           </div>
           <div class="form-group">
-            <label class="form-label">Horizonte temporal (años)</label>
+            <label class="form-label" for="sim-years">Horizonte temporal (años)</label>
             <input type="number" id="sim-years" class="text-input" value="20" min="1" max="50" />
           </div>
           <button type="button" class="btn-primary full-width mt-12" id="btnSimulate" data-action="run-simulator">Calcular</button>
@@ -1583,15 +1583,15 @@
         <div class="simulator-layout" style="grid-template-columns:280px 1fr">
           <div>
             <div class="form-group">
-              <label class="form-label">Activo de la cartera</label>
+              <label class="form-label" for="sim-fisc-asset">Activo de la cartera</label>
               <select id="sim-fisc-asset" class="select-input"></select>
             </div>
             <div class="form-group">
-              <label class="form-label">Precio de venta (€)</label>
+              <label class="form-label" for="sim-fisc-price">Precio de venta (€)</label>
               <input type="number" id="sim-fisc-price" class="text-input" placeholder="0.00" step="0.01" />
             </div>
             <div class="form-group">
-              <label class="form-label">Cantidad a vender</label>
+              <label class="form-label" for="sim-fisc-qty">Cantidad a vender</label>
               <input type="number" id="sim-fisc-qty" class="text-input" placeholder="0" step="any" />
             </div>
             <button type="button" class="btn-primary full-width" id="btnSimFisc" data-action="run-fiscal-sim">Calcular impacto</button>
@@ -1992,7 +1992,7 @@
             <div class="settings-name">Restaurar backup</div>
             <div class="settings-desc">Importa un backup guardado anteriormente</div>
           </div>
-          <label class="btn-secondary" style="cursor:pointer">
+          <label class="btn-secondary" style="cursor:pointer" for="fileRestore">
             <svg class="icon icon-xs" aria-hidden="true"><use href="#icon-upload"/></svg> Importar
             <input type="file" id="fileRestore" accept=".json" style="display:none" aria-label="Importar backup desde archivo JSON" />
           </label>
@@ -2072,7 +2072,7 @@
             <div class="settings-name">Enviar informes de errores</div>
             <div class="settings-desc">Cuando algo falla, nos envía el mensaje del error y en qué pantalla estabas, para poder arreglarlo. <strong>Nunca</strong> incluye tus importes, transacciones ni saldos: se redactan antes de salir del navegador. <a href="privacidad.html#s9" target="_blank" rel="noopener">Más detalles</a></div>
           </div>
-          <label class="toggle-switch">
+          <label class="toggle-switch" for="settings-error-reports">
             <input type="checkbox" id="settings-error-reports" />
             <span class="toggle-slider"></span>
           </label>
@@ -2082,7 +2082,7 @@
             <div class="settings-name">Estadísticas de uso anónimas</div>
             <div class="settings-desc">Cuenta visitas y qué funciones se usan, sin cookies y sin identificarte. Nos dice qué merece la pena mejorar.</div>
           </div>
-          <label class="toggle-switch">
+          <label class="toggle-switch" for="settings-analytics">
             <input type="checkbox" id="settings-analytics" />
             <span class="toggle-slider"></span>
           </label>
@@ -2217,7 +2217,7 @@
             <div class="settings-name">Tema oscuro</div>
             <div class="settings-desc">Alterna entre modo oscuro y claro</div>
           </div>
-          <label class="toggle-switch">
+          <label class="toggle-switch" for="settings-theme-toggle">
             <input type="checkbox" id="settings-theme-toggle" />
             <span class="toggle-slider"></span>
           </label>
@@ -2506,46 +2506,46 @@
   <template id="tpl-add-transaction">
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Tipo</label>
+        <label class="form-label" for="f-tx-type">Tipo</label>
         <select id="f-tx-type" class="select-input">
           <option value="expense">Gasto</option>
           <option value="income">Ingreso</option>
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label">Fecha</label>
+        <label class="form-label" for="f-tx-date">Fecha</label>
         <input type="date" id="f-tx-date" class="text-input" />
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Descripción</label>
+      <label class="form-label" for="f-tx-desc">Descripción</label>
       <input type="text" id="f-tx-desc" class="text-input" placeholder="Ej: Nómina enero" list="tx-desc-datalist" autocomplete="off" />
     </div>
     <div class="form-row">
       <div class="form-group">
         <div class="btn-row" style="justify-content:space-between;margin-bottom:7px">
-          <label class="form-label" style="margin-bottom:0">Categoría</label>
+          <label class="form-label" style="margin-bottom:0" for="f-tx-category">Categoría</label>
           <span id="cat-ai-badge" class="cat-ai-badge" style="display:none"></span>
         </div>
         <select id="f-tx-category" class="select-input"></select>
       </div>
       <div class="form-group">
-        <label class="form-label">Importe (€)</label>
+        <label class="form-label" for="f-tx-amount">Importe (€)</label>
         <input type="number" id="f-tx-amount" class="text-input" placeholder="0.00" min="0" step="0.01" />
       </div>
     </div>
     <div class="form-group" id="f-tx-trip-wrap">
-      <label class="form-label">Viaje</label>
+      <label class="form-label" for="f-tx-trip">Viaje</label>
       <select id="f-tx-trip" class="select-input">
         <option value="">Sin viaje</option>
       </select>
     </div>
     <div class="form-group">
-      <label class="form-label">Nota</label>
+      <label class="form-label" for="f-tx-note">Nota</label>
       <textarea id="f-tx-note" class="text-input" rows="2" placeholder="Detalles adicionales..."></textarea>
     </div>
     <div class="tx-photo-upload-row">
-      <label class="form-label">Foto / Ticket</label>
+      <div class="form-label">Foto / Ticket</div>
       <div class="tx-photo-area">
         <label for="f-tx-photo" class="tx-photo-btn">
           <span><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-camera"/></svg> Adjuntar foto</span>
@@ -2555,7 +2555,7 @@
       </div>
     </div>
     <div class="tx-fav-row">
-      <label class="tx-fav-label">
+      <label class="tx-fav-label" for="f-tx-fav">
         <input type="checkbox" id="f-tx-fav" />
         <span class="tx-fav-heart"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-heart"/></svg></span> Marcar como favorita
       </label>
@@ -2564,47 +2564,47 @@
 
   <template id="tpl-budget-row">
     <div class="budget-edit-row">
-      <label class="budget-edit-label"></label>
-      <input type="number" class="text-input budget-edit-input" placeholder="sin límite" min="0" step="1" />
+      <label class="budget-edit-label" for="budget-edit-row"></label>
+      <input type="number" id="budget-edit-row" class="text-input budget-edit-input" placeholder="sin límite" min="0" step="1" />
     </div>
   </template>
 
   <template id="tpl-add-watchlist">
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Nombre</label>
+        <label class="form-label" for="f-w-name">Nombre</label>
         <input type="text" id="f-w-name" class="text-input" placeholder="Ej: Tesla Inc." />
       </div>
       <div class="form-group">
-        <label class="form-label">Ticker <span id="f-w-ticker-badge" style="font-size:11px;color:var(--accent);display:none"></span></label>
+        <label class="form-label" for="f-w-ticker">Ticker <span id="f-w-ticker-badge" style="font-size:11px;color:var(--accent);display:none"></span></label>
         <input type="text" id="f-w-ticker" class="text-input" placeholder="TSLA" />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Precio actual (€)</label>
+        <label class="form-label" for="f-w-price">Precio actual (€)</label>
         <input type="number" id="f-w-price" class="text-input" placeholder="0.00" step="0.01" min="0" />
       </div>
       <div class="form-group">
-        <label class="form-label">Precio alerta (€) — opcional</label>
+        <label class="form-label" for="f-w-target">Precio alerta (€) — opcional</label>
         <input type="number" id="f-w-target" class="text-input" placeholder="0.00" step="0.01" min="0" />
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Dirección de la alerta</label>
+      <div class="form-label">Dirección de la alerta</div>
       <div class="watch-alert-toggle">
-        <label class="watch-alert-opt">
-          <input type="radio" name="f-w-alert-type" value="above" />
+        <label class="watch-alert-opt" for="f-w-alert-above">
+          <input type="radio" id="f-w-alert-above" name="f-w-alert-type" value="above" />
           <span><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-arrow-up-right"/></svg> Por encima del precio</span>
         </label>
-        <label class="watch-alert-opt">
-          <input type="radio" name="f-w-alert-type" value="below" />
+        <label class="watch-alert-opt" for="f-w-alert-below">
+          <input type="radio" id="f-w-alert-below" name="f-w-alert-type" value="below" />
           <span><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-arrow-down-right"/></svg> Por debajo del precio</span>
         </label>
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Notas</label>
+      <label class="form-label" for="f-w-notes">Notas</label>
       <input type="text" id="f-w-notes" class="text-input" placeholder="Motivo de seguimiento..." />
     </div>
   </template>
@@ -2612,38 +2612,38 @@
   <template id="tpl-add-asset">
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Ticker / Símbolo</label>
+        <label class="form-label" for="f-a-ticker">Ticker / Símbolo</label>
         <div class="btn-row">
           <input type="text" id="f-a-ticker" class="text-input" placeholder="Ej: AAPL" style="text-transform:uppercase;flex:1" />
           <span id="f-a-ticker-badge" style="font-size:11px;color:var(--accent);white-space:nowrap;display:none"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-check"/></svg> auto</span>
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Nombre del activo</label>
+        <label class="form-label" for="f-a-name">Nombre del activo</label>
         <input type="text" id="f-a-name" class="text-input" placeholder="Ej: Apple Inc." />
       </div>
     </div>
     <div class="form-row-3 form-row">
       <div class="form-group">
-        <label class="form-label">Precio de compra (€)</label>
+        <label class="form-label" for="f-a-buy">Precio de compra (€)</label>
         <input type="number" id="f-a-buy" class="text-input" placeholder="0.00" step="0.001" min="0" />
       </div>
       <div class="form-group">
-        <label class="form-label">Precio actual (€)</label>
+        <label class="form-label" for="f-a-current">Precio actual (€)</label>
         <input type="number" id="f-a-current" class="text-input" placeholder="0.00" step="0.001" min="0" />
       </div>
       <div class="form-group">
-        <label class="form-label">Cantidad</label>
+        <label class="form-label" for="f-a-qty">Cantidad</label>
         <input type="number" id="f-a-qty" class="text-input" placeholder="0" step="any" min="0" />
       </div>
     </div>
     <div class="form-row-3 form-row">
       <div class="form-group">
-        <label class="form-label">Fecha de compra</label>
+        <label class="form-label" for="f-a-buydate">Fecha de compra</label>
         <input type="date" id="f-a-buydate" class="text-input" />
       </div>
       <div class="form-group">
-        <label class="form-label">País / Mercado</label>
+        <label class="form-label" for="f-a-country">País / Mercado</label>
         <select id="f-a-country" class="select-input">
           <option value="">— Sin especificar —</option>
           <option value="🇺🇸 EEUU">🇺🇸 EEUU</option>
@@ -2668,7 +2668,7 @@
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label">Sector</label>
+        <label class="form-label" for="f-a-sector">Sector</label>
         <select id="f-a-sector" class="select-input">
           <option value="">— Sin especificar —</option>
           <option value="Tecnología">Tecnología</option>
@@ -2691,7 +2691,7 @@
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Divisa del activo</label>
+        <label class="form-label" for="f-a-currency">Divisa del activo</label>
         <select id="f-a-currency" class="select-input">
           <option value="EUR">EUR</option>
           <option value="USD">USD</option>
@@ -2710,7 +2710,7 @@
         </select>
       </div>
       <div class="form-group" id="f-a-exrate-group">
-        <label class="form-label" id="f-a-exrate-label">Tipo de cambio</label>
+        <label class="form-label" id="f-a-exrate-label" for="f-a-exrate">Tipo de cambio</label>
         <input type="number" id="f-a-exrate" class="text-input" placeholder="Ej: 0.92" step="0.0001" min="0.0001" />
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Usa el botón ⇄ Divisas para actualizar automáticamente</div>
       </div>

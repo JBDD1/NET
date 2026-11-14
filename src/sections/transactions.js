@@ -1291,6 +1291,11 @@ function openManageBudgets() {
     const label = row.querySelector('.budget-edit-label');
     const inp   = row.querySelector('.budget-edit-input');
     const b     = existing.find(x => x.category === cat);
+    // id único por categoría para asociar label↔input (el template trae un id
+    // placeholder que se sobrescribe aquí para no duplicarlo entre filas).
+    const rid = 'budget-edit-' + cat.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    inp.id             = rid;
+    label.htmlFor      = rid;
     label.textContent  = cat;
     inp.dataset.cat    = cat;
     inp.value          = b ? b.monthlyAmount : '';

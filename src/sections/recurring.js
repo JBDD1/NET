@@ -153,40 +153,40 @@ function openAddRecurring(prefill = null) {
 
   openModal(isEdit ? 'Editar recurrente' : 'Nueva transacción recurrente', `
     <div class="form-group">
-      <label class="form-label">Descripción *</label>
+      <label class="form-label" for="f-rec-desc">Descripción *</label>
       <input type="text" id="f-rec-desc" class="text-input" placeholder="Ej: Alquiler, Nómina, Netflix…" value="${escapeHtml(r.description || '')}" />
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group">
-        <label class="form-label">Tipo</label>
+        <label class="form-label" for="f-rec-type">Tipo</label>
         <select id="f-rec-type" class="select-input">
           <option value="expense" ${(r.type || 'expense') === 'expense' ? 'selected' : ''}>Gasto</option>
           <option value="income"  ${r.type === 'income' ? 'selected' : ''}>Ingreso</option>
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label">Importe (€) *</label>
+        <label class="form-label" for="f-rec-amount">Importe (€) *</label>
         <input type="number" id="f-rec-amount" class="text-input" placeholder="0.00" value="${r.amount || ''}" step="0.01" min="0" />
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Categoría</label>
+      <label class="form-label" for="f-rec-cat">Categoría</label>
       <select id="f-rec-cat" class="select-input">${catOptions}</select>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group">
-        <label class="form-label">Frecuencia</label>
+        <label class="form-label" for="f-rec-freq">Frecuencia</label>
         <select id="f-rec-freq" class="select-input" onchange="_recFreqChange(this.value)">
           ${Object.entries(RECURRING_FREQ_LABELS).map(([v, l]) => `<option value="${v}" ${(r.frequency || 'monthly') === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
       </div>
       <div class="form-group" id="f-rec-renewal-wrap" ${(r.frequency || 'monthly') !== 'monthly' ? 'style="display:none"' : ''}>
-        <label class="form-label">Día de renovación</label>
+        <label class="form-label" for="f-rec-renewal">Día de renovación</label>
         <input type="number" id="f-rec-renewal" class="text-input" placeholder="1 – 28" min="1" max="28" value="${r.renewalDay || ''}" oninput="_recRenewalDayInput(this.value)" />
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Próxima fecha</label>
+      <label class="form-label" for="f-rec-date">Próxima fecha</label>
       <input type="date" id="f-rec-date" class="text-input" value="${r.nextDate || getTodayStr()}" />
     </div>
   `, () => {

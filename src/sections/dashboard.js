@@ -558,8 +558,8 @@ function openDashKpiSettings() {
   if (!_dashDraftKpis) return;
   const rows = DASH_KPI_DEFS.map(k => {
     const vis = _dashDraftKpis[k.id] !== false;
-    return `<label class="dash-editor-kpi-check" style="font-size:13.5px;padding:7px 0">
-      <input type="checkbox" ${vis ? 'checked' : ''} data-dash-kpi="${escapeHtml(k.id)}" />
+    return `<label class="dash-editor-kpi-check" style="font-size:13.5px;padding:7px 0" for="dash-kpi-check-${escapeHtml(k.id)}">
+      <input type="checkbox" id="dash-kpi-check-${escapeHtml(k.id)}" ${vis ? 'checked' : ''} data-dash-kpi="${escapeHtml(k.id)}" />
       ${escapeHtml(k.label)}
     </label>`;
   }).join('<br>');
@@ -2743,8 +2743,8 @@ function _renderNotifManager() {
           <div class="notif-custom-name">${escapeHtml(ca.label || _alertTypeLabel(ca.type))}</div>
           <div class="notif-custom-params">${_fmtAlertParams(ca)}</div>
         </div>
-        <label class="notif-toggle" title="${ca.active === false ? 'Activar' : 'Desactivar'}">
-          <input type="checkbox" ${ca.active !== false ? 'checked' : ''}
+        <label class="notif-toggle" title="${ca.active === false ? 'Activar' : 'Desactivar'}" for="notif-toggle-${ca.id}">
+          <input type="checkbox" id="notif-toggle-${ca.id}" ${ca.active !== false ? 'checked' : ''}
             onchange="_toggleCustomAlert('${ca.id}', this.checked)">
           <span class="notif-toggle-track"></span>
         </label>
@@ -2780,7 +2780,7 @@ function _renderNotifManager() {
       <button class="btn-secondary notif-add-btn" id="notifAddToggle" onclick="_toggleAddAlertForm()">+ Nueva alerta</button>
       <div class="notif-add-form" id="notifAddForm">
         <div class="notif-form-row">
-          <label class="notif-form-label">Tipo de alerta</label>
+          <label class="notif-form-label" for="notifTypeSelect">Tipo de alerta</label>
           <select class="text-input" id="notifTypeSelect" onchange="_renderAlertTypeFields()">
             <option value="">— Selecciona —</option>
             <option value="price_above">Activo de cartera sube por encima de</option>
@@ -2799,11 +2799,11 @@ function _renderNotifManager() {
           data-cats="${escapeHtml(catOpts)}"
           data-goals="${escapeHtml(goalOpts)}"></div>
         <div class="notif-form-row">
-          <label class="notif-form-label">Nombre <span style="color:var(--text-muted)">(opcional)</span></label>
+          <label class="notif-form-label" for="notifAlertLabel">Nombre <span style="color:var(--text-muted)">(opcional)</span></label>
           <input type="text" class="text-input" id="notifAlertLabel" placeholder="Ej: Mi alerta MSFT" style="flex:1" />
         </div>
         <div class="notif-form-row">
-          <label class="notif-form-label">Icono emoji</label>
+          <label class="notif-form-label" for="notifAlertIcon">Icono emoji</label>
           <div class="emoji-picker-wrap" id="notifEmojiPickerWrap">
             <button type="button" class="emoji-picker-trigger" id="notifEmojiTrigger"
               onclick="_toggleEmojiPicker()" title="Seleccionar emoji">🔔</button>
@@ -2927,18 +2927,18 @@ function _renderAlertTypeFields() {
 
   let html = '';
   if (type === 'price_above' || type === 'price_below') {
-    html = `<div class="notif-form-row"><label class="notif-form-label">Activo</label><select class="text-input" id="notif-assetId" style="flex:1">${portfolioOpts || '<option value="">Sin activos en cartera</option>'}</select></div>
-            <div class="notif-form-row"><label class="notif-form-label">Precio umbral (€)</label><input type="number" class="text-input" id="notif-threshold" placeholder="0.00" min="0" step="0.01" style="width:130px"/></div>`;
+    html = `<div class="notif-form-row"><label class="notif-form-label" for="notif-assetId">Activo</label><select class="text-input" id="notif-assetId" style="flex:1">${portfolioOpts || '<option value="">Sin activos en cartera</option>'}</select></div>
+            <div class="notif-form-row"><label class="notif-form-label" for="notif-threshold">Precio umbral (€)</label><input type="number" class="text-input" id="notif-threshold" placeholder="0.00" min="0" step="0.01" style="width:130px"/></div>`;
   } else if (type === 'category_spend') {
-    html = `<div class="notif-form-row"><label class="notif-form-label">Categoría</label><select class="text-input" id="notif-category" style="flex:1">${catOpts || '<option value="">Sin categorías</option>'}</select></div>
-            <div class="notif-form-row"><label class="notif-form-label">Importe umbral (€)</label><input type="number" class="text-input" id="notif-threshold" placeholder="0.00" min="0" step="0.01" style="width:130px"/></div>`;
+    html = `<div class="notif-form-row"><label class="notif-form-label" for="notif-category">Categoría</label><select class="text-input" id="notif-category" style="flex:1">${catOpts || '<option value="">Sin categorías</option>'}</select></div>
+            <div class="notif-form-row"><label class="notif-form-label" for="notif-threshold">Importe umbral (€)</label><input type="number" class="text-input" id="notif-threshold" placeholder="0.00" min="0" step="0.01" style="width:130px"/></div>`;
   } else if (type === 'goal_pct') {
-    html = `<div class="notif-form-row"><label class="notif-form-label">Objetivo</label><select class="text-input" id="notif-goalId" style="flex:1">${goalOpts || '<option value="">Sin objetivos</option>'}</select></div>
-            <div class="notif-form-row"><label class="notif-form-label">Porcentaje alcanzado (%)</label><input type="number" class="text-input" id="notif-threshold" placeholder="50" min="1" max="100" step="1" style="width:100px"/></div>`;
+    html = `<div class="notif-form-row"><label class="notif-form-label" for="notif-goalId">Objetivo</label><select class="text-input" id="notif-goalId" style="flex:1">${goalOpts || '<option value="">Sin objetivos</option>'}</select></div>
+            <div class="notif-form-row"><label class="notif-form-label" for="notif-threshold">Porcentaje alcanzado (%)</label><input type="number" class="text-input" id="notif-threshold" placeholder="50" min="1" max="100" step="1" style="width:100px"/></div>`;
   } else if (type === 'savings_rate_below') {
-    html = `<div class="notif-form-row"><label class="notif-form-label">Tasa mínima (%)</label><input type="number" class="text-input" id="notif-threshold" placeholder="20" min="0" max="100" step="1" style="width:100px"/></div>`;
+    html = `<div class="notif-form-row"><label class="notif-form-label" for="notif-threshold">Tasa mínima (%)</label><input type="number" class="text-input" id="notif-threshold" placeholder="20" min="0" max="100" step="1" style="width:100px"/></div>`;
   } else {
-    html = `<div class="notif-form-row"><label class="notif-form-label">Importe umbral (€)</label><input type="number" class="text-input" id="notif-threshold" placeholder="0.00" min="0" step="0.01" style="width:130px"/></div>`;
+    html = `<div class="notif-form-row"><label class="notif-form-label" for="notif-threshold">Importe umbral (€)</label><input type="number" class="text-input" id="notif-threshold" placeholder="0.00" min="0" step="0.01" style="width:130px"/></div>`;
   }
   container.innerHTML = html;
 }

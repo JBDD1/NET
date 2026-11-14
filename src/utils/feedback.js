@@ -148,7 +148,7 @@ function openFeedbackModal(presetType) {
     </div>
 
     <div class="form-group">
-      <label class="fb-check">
+      <label class="fb-check" for="fb-tech">
         <input type="checkbox" id="fb-tech" ${d.tech === false ? '' : 'checked'} onchange="_fbToggleTechDetail()" />
         <span>Incluir información técnica</span>
       </label>

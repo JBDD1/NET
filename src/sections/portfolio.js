@@ -1733,23 +1733,23 @@ function openAddDividend(prefill = null) {
   openModal(isEdit ? 'Editar dividendo' : 'Registrar dividendo', `
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Nombre del activo</label>
+        <label class="form-label" for="f-d-name">Nombre del activo</label>
         <input type="text" id="f-d-name" class="text-input" placeholder="Ej: LVMH" value="${escapeHtml(d.assetName || '')}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Ticker <span id="f-d-ticker-badge" style="font-size:11px;color:var(--accent);display:none"></span></label>
+        <label class="form-label" for="f-d-ticker">Ticker <span id="f-d-ticker-badge" style="font-size:11px;color:var(--accent);display:none"></span></label>
         <input type="text" id="f-d-ticker" class="text-input" placeholder="Ej: MC" value="${escapeHtml(d.ticker || '')}"
           onblur="autoFillTicker('f-d-ticker','f-d-name',null,'f-d-ticker-badge'); autoFillDividendShares('f-d-ticker','f-d-shares')" />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Dividendo por acción <strong>en cada pago</strong> (€)</label>
+        <label class="form-label" for="f-d-div">Dividendo por acción <strong>en cada pago</strong> (€)</label>
         <input type="number" id="f-d-div" class="text-input" placeholder="0.00" value="${d.dividendPerShare || ''}" step="0.001" min="0" oninput="_divLivePreview()" />
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Importe de UN pago, no el total del año</div>
       </div>
       <div class="form-group">
-        <label class="form-label">Frecuencia de pago</label>
+        <label class="form-label" for="f-d-freq">Frecuencia de pago</label>
         <select id="f-d-freq" class="select-input" onchange="_divLivePreview()">
           <option value="annual"     ${d.frequency === 'annual'     ? 'selected' : ''}>Anual</option>
           <option value="semiannual" ${d.frequency === 'semiannual' ? 'selected' : ''}>Semestral</option>
@@ -1760,22 +1760,22 @@ function openAddDividend(prefill = null) {
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Número de acciones / participaciones</label>
+        <label class="form-label" for="f-d-shares">Número de acciones / participaciones</label>
         <input type="number" id="f-d-shares" class="text-input" placeholder="0" value="${d.shares || ''}" step="any" min="0" oninput="_divLivePreview()" />
       </div>
       <div class="form-group">
-        <label class="form-label">Retención en origen (%)</label>
+        <label class="form-label" for="f-d-retention">Retención en origen (%)</label>
         <input type="number" id="f-d-retention" class="text-input" placeholder="19" value="${d.retentionRate ?? 19}" step="0.1" min="0" max="100" />
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">España: 19% · EEUU: 15% · Sin W-8BEN: 30%</div>
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Divisa del dividendo <span style="color:var(--text-muted);font-weight:400">(vacío = misma que el activo)</span></label>
+        <label class="form-label" for="f-d-currency">Divisa del dividendo <span style="color:var(--text-muted);font-weight:400">(vacío = misma que el activo)</span></label>
         <input type="text" id="f-d-currency" class="text-input" placeholder="EUR, USD, GBP…" value="${escapeHtml(d.currency || '')}" style="text-transform:uppercase" maxlength="3" />
       </div>
       <div class="form-group">
-        <label class="form-label">Fecha del próximo pago <span style="color:var(--text-muted);font-weight:400">(opcional)</span></label>
+        <label class="form-label" for="f-d-nextpay">Fecha del próximo pago <span style="color:var(--text-muted);font-weight:400">(opcional)</span></label>
         <input type="date" id="f-d-nextpay" class="text-input" value="${d.nextPayDate || ''}" />
       </div>
     </div>

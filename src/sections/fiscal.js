@@ -975,35 +975,35 @@ function openAddSale(prefill = null, isCrypto = false) {
   openModal(isEdit ? 'Editar venta' : (v.isCrypto ? 'Registrar venta de crypto' : 'Registrar venta'), `
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Nombre del activo</label>
+        <label class="form-label" for="f-v-name">Nombre del activo</label>
         <input type="text" id="f-v-name" class="text-input" placeholder="${v.isCrypto ? 'Ej: Bitcoin' : 'Ej: Apple Inc.'}" value="${escapeHtml(v.name || '')}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Ticker</label>
+        <label class="form-label" for="f-v-ticker">Ticker</label>
         <input type="text" id="f-v-ticker" class="text-input" placeholder="${v.isCrypto ? 'BTC' : 'AAPL'}" value="${escapeHtml(v.ticker || '')}" />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Fecha de compra</label>
+        <label class="form-label" for="f-v-buydate">Fecha de compra</label>
         <input type="date" id="f-v-buydate" class="text-input" value="${v.buyDate || ''}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Fecha de venta</label>
+        <label class="form-label" for="f-v-selldate">Fecha de venta</label>
         <input type="date" id="f-v-selldate" class="text-input" value="${v.sellDate || getTodayStr()}" />
       </div>
     </div>
     <div class="form-row-3 form-row">
       <div class="form-group">
-        <label class="form-label">Precio compra (€)</label>
+        <label class="form-label" for="f-v-buyprice">Precio compra (€)</label>
         <input type="number" id="f-v-buyprice" class="text-input" placeholder="0.00" value="${v.buyPrice || ''}" step="0.001" min="0" />
       </div>
       <div class="form-group">
-        <label class="form-label">Precio venta (€)</label>
+        <label class="form-label" for="f-v-sellprice">Precio venta (€)</label>
         <input type="number" id="f-v-sellprice" class="text-input" placeholder="0.00" value="${v.sellPrice || ''}" step="0.001" min="0" />
       </div>
       <div class="form-group">
-        <label class="form-label">Cantidad</label>
+        <label class="form-label" for="f-v-qty">Cantidad</label>
         <input type="number" id="f-v-qty" class="text-input" placeholder="0" value="${v.quantity || ''}" step="any" min="0" />
       </div>
     </div>
@@ -1226,31 +1226,31 @@ function openEditTrabajo() {
     </p>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Salario bruto anual (€)</label>
+        <label class="form-label" for="f-t-bruto">Salario bruto anual (€)</label>
         <input type="number" id="f-t-bruto" class="text-input" placeholder="0" value="${t.salarioBruto || ''}" step="0.01" min="0" />
       </div>
       <div class="form-group">
-        <label class="form-label">Retención IRPF empresa (€)</label>
+        <label class="form-label" for="f-t-retencion">Retención IRPF empresa (€)</label>
         <input type="number" id="f-t-retencion" class="text-input" placeholder="0" value="${t.retencionEmpresa || ''}" step="0.01" min="0" />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Cotiz. Seg. Social trabajador (€)</label>
+        <label class="form-label" for="f-t-ss">Cotiz. Seg. Social trabajador (€)</label>
         <input type="number" id="f-t-ss" class="text-input" placeholder="0" value="${t.seguridadSocial || ''}" step="0.01" min="0" />
       </div>
       <div class="form-group">
-        <label class="form-label">Dietas y gastos de locomoción (€)</label>
+        <label class="form-label" for="f-t-dietas">Dietas y gastos de locomoción (€)</label>
         <input type="number" id="f-t-dietas" class="text-input" placeholder="0" value="${t.dietas || ''}" step="0.01" min="0" />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Cuotas sindicales / colegiales (€)</label>
+        <label class="form-label" for="f-t-sind">Cuotas sindicales / colegiales (€)</label>
         <input type="number" id="f-t-sind" class="text-input" placeholder="0" value="${t.sindicatos || ''}" step="0.01" min="0" />
       </div>
       <div class="form-group">
-        <label class="form-label">Otros gastos deducibles (€)</label>
+        <label class="form-label" for="f-t-otros">Otros gastos deducibles (€)</label>
         <input type="number" id="f-t-otros" class="text-input" placeholder="0" value="${t.otrosGastos || ''}" step="0.01" min="0" />
       </div>
     </div>
@@ -1370,11 +1370,11 @@ function openEditMinimos() {
     </p>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Tu edad</label>
+        <label class="form-label" for="f-m-edad">Tu edad</label>
         <input type="number" id="f-m-edad" class="text-input" placeholder="Ej: 35" value="${m.edad || ''}" min="0" max="120" />
       </div>
       <div class="form-group">
-        <label class="form-label">Discapacidad reconocida</label>
+        <label class="form-label" for="f-m-disc">Discapacidad reconocida</label>
         <select id="f-m-disc" class="select-input">
           <option value="0"  ${!m.discapacidad || m.discapacidad == 0  ? 'selected' : ''}>Sin discapacidad</option>
           <option value="33" ${m.discapacidad == 33 ? 'selected' : ''}>≥ 33% — Discapacidad</option>
@@ -1384,7 +1384,7 @@ function openEditMinimos() {
     </div>
 
     <div class="form-group">
-      <label class="form-label">Número de hijos a cargo (menores 25 años o discapacitados)</label>
+      <label class="form-label" for="f-m-nhijos">Número de hijos a cargo (menores 25 años o discapacitados)</label>
       <select id="f-m-nhijos" class="select-input" onchange="updateHijosFields()">
         ${[0,1,2,3,4,5].map(n => `<option value="${n}" ${hijos.length === n ? 'selected' : ''}>${n} hijo${n !== 1 ? 's' : ''}</option>`).join('')}
       </select>
@@ -1394,12 +1394,12 @@ function openEditMinimos() {
       ${hijos.map((h, i) => `
         <div class="form-row" style="margin-bottom:8px">
           <div class="form-group">
-            <label class="form-label">Edad hijo ${i+1}</label>
-            <input type="number" class="text-input f-hijo-edad" placeholder="Edad" value="${h.edad || ''}" min="0" max="25" />
+            <label class="form-label" for="f-hijo-edad-${i}">Edad hijo ${i+1}</label>
+            <input type="number" id="f-hijo-edad-${i}" class="text-input f-hijo-edad" placeholder="Edad" value="${h.edad || ''}" min="0" max="25" />
           </div>
           <div class="form-group">
-            <label class="form-label">Discapacidad hijo ${i+1}</label>
-            <select class="select-input f-hijo-disc">
+            <label class="form-label" for="f-hijo-disc-${i}">Discapacidad hijo ${i+1}</label>
+            <select id="f-hijo-disc-${i}" class="select-input f-hijo-disc">
               <option value="0"  ${!h.discapacidad || h.discapacidad == 0  ? 'selected' : ''}>Sin discapacidad</option>
               <option value="33" ${h.discapacidad == 33 ? 'selected' : ''}>≥ 33%</option>
               <option value="65" ${h.discapacidad == 65 ? 'selected' : ''}>≥ 65%</option>
@@ -1410,7 +1410,7 @@ function openEditMinimos() {
     </div>
 
     <div class="form-group" style="margin-top:8px">
-      <label class="form-label">Ascendientes mayores a cargo (padres, abuelos ≥65a)</label>
+      <label class="form-label" for="f-m-nascend">Ascendientes mayores a cargo (padres, abuelos ≥65a)</label>
       <select id="f-m-nascend" class="select-input">
         ${[0,1,2,3].map(n => `<option value="${n}" ${(m.ascendientes||[]).length === n ? 'selected' : ''}>${n}</option>`).join('')}
       </select>
@@ -1444,12 +1444,12 @@ function updateHijosFields() {
   el.innerHTML = Array.from({ length: n }, (_, i) => `
     <div class="form-row" style="margin-bottom:8px">
       <div class="form-group">
-        <label class="form-label">Edad hijo ${i+1}</label>
-        <input type="number" class="text-input f-hijo-edad" placeholder="Edad" min="0" max="25" />
+        <label class="form-label" for="f-hijo-edad-${i}">Edad hijo ${i+1}</label>
+        <input type="number" id="f-hijo-edad-${i}" class="text-input f-hijo-edad" placeholder="Edad" min="0" max="25" />
       </div>
       <div class="form-group">
-        <label class="form-label">Discapacidad hijo ${i+1}</label>
-        <select class="select-input f-hijo-disc">
+        <label class="form-label" for="f-hijo-disc-${i}">Discapacidad hijo ${i+1}</label>
+        <select id="f-hijo-disc-${i}" class="select-input f-hijo-disc">
           <option value="0">Sin discapacidad</option>
           <option value="33">≥ 33%</option>
           <option value="65">≥ 65%</option>

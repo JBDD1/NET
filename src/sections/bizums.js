@@ -148,33 +148,33 @@ function openAddBizum(prefill = null) {
   openModal(isEdit ? 'Editar bizum' : 'Nuevo bizum', `
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Persona</label>
+        <label class="form-label" for="f-biz-person">Persona</label>
         <input type="text" id="f-biz-person" class="text-input" placeholder="Nombre o apellido" value="${escapeHtml(b.person || '')}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Fecha</label>
+        <label class="form-label" for="f-biz-date">Fecha</label>
         <input type="date" id="f-biz-date" class="text-input" value="${b.date || getTodayStr()}" />
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Concepto</label>
+      <label class="form-label" for="f-biz-concept">Concepto</label>
       <input type="text" id="f-biz-concept" class="text-input" placeholder="Ej: Cena del viernes" value="${escapeHtml(b.concept || '')}" />
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Dirección</label>
+        <label class="form-label" for="f-biz-dir">Dirección</label>
         <select id="f-biz-dir" class="select-input">
           <option value="in"  ${b.direction === 'in'  ? 'selected' : ''}>↓ Me deben (positivo)</option>
           <option value="out" ${b.direction === 'out' ? 'selected' : ''}>↑ Debo yo (negativo)</option>
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label">Importe (€)</label>
+        <label class="form-label" for="f-biz-amount">Importe (€)</label>
         <input type="number" id="f-biz-amount" class="text-input" placeholder="0.00" value="${b.amount || ''}" step="0.01" min="0" />
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Estado</label>
+      <label class="form-label" for="f-biz-status">Estado</label>
       <select id="f-biz-status" class="select-input">
         <option value="pending" ${b.status === 'pending' ? 'selected' : ''}>Pendiente</option>
         <option value="done"    ${b.status === 'done'    ? 'selected' : ''}>Cobrado / Pagado</option>

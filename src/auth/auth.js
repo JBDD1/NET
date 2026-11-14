@@ -901,7 +901,7 @@ function _openPhotoModal() {
           <div class="photo-preview-ring">
             <div class="photo-preview-avatar" id="photo-preview-avatar"></div>
           </div>
-          <label class="photo-drop-zone" id="photo-drop-zone"
+          <label class="photo-drop-zone" id="photo-drop-zone" for="photo-drop-input"
             ondragover="event.preventDefault();this.classList.add('drag-over')"
             ondragleave="this.classList.remove('drag-over')"
             ondrop="_onPhotoDrop(event)">
@@ -910,7 +910,7 @@ function _openPhotoModal() {
             <span class="photo-drop-or">o</span>
             <span class="photo-drop-btn">Seleccionar archivo</span>
             <span class="photo-drop-hint">JPG, PNG, WEBP — máx. 10 MB</span>
-            <input type="file" accept="image/*" style="display:none"
+            <input type="file" id="photo-drop-input" accept="image/*" style="display:none"
               onchange="_onPhotoFileSelected(this.files[0]);this.value=''" />
           </label>
         </div>

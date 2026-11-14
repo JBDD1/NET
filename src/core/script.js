@@ -127,7 +127,7 @@ function createFormModal(title, fields, onSave) {
       ].filter(Boolean).join(' ');
       control = `<input ${attrs} />`;
     }
-    return `<div class="form-group"><label class="form-label">${lbl}</label>${control}${hint}</div>`;
+    return `<div class="form-group"><label class="form-label" for="${f.id}">${lbl}</label>${control}${hint}</div>`;
   }).join('');
 
   openModal(title, html, () => {
@@ -2476,7 +2476,7 @@ function _showImportReviewModal() {
     const r = rows[i];
     const reasonsHtml = r.reviewReasons.map(x => `<li>${escapeHtml(x)}</li>`).join('');
     const dupControl = r.importStatus === 'possible_duplicate'
-      ? `<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px">
+      ? `<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px" for="review-includedup-${i}">
            <input type="checkbox" id="review-includedup-${i}" />
            Importar igualmente — no es un duplicado
          </label>`
@@ -2491,20 +2491,20 @@ function _showImportReviewModal() {
       <ul style="margin:0 0 10px;padding-left:18px;font-size:12px;color:var(--down)">${reasonsHtml}</ul>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
         <div>
-          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Comercio</label>
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px" for="review-merchant-${i}">Comercio</label>
           <input type="text" class="text-input" id="review-merchant-${i}" value="${escapeHtml(r.merchant || '')}" placeholder="Sin identificar" />
         </div>
         <div>
-          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Categoría</label>
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px" for="review-cat-${i}">Categoría</label>
           <select class="select-input" id="review-cat-${i}">${catOptionsFor(r.type, r.category)}</select>
         </div>
         <div>
-          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Tipo</label>
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px" for="review-type-${i}">Tipo</label>
           <select class="select-input" id="review-type-${i}">${typeOptionsFor(r.transactionType || r.type)}</select>
         </div>
       </div>
       ${dupControl}
-      <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px" for="review-remember-${i}">
         <input type="checkbox" id="review-remember-${i}" />
         Recordar esta elección para operaciones similares
       </label>
@@ -3627,8 +3627,8 @@ function renderSectionVisibility() {
           <div class="settings-name">${escapeHtml(meta.label)}</div>
           <div class="settings-desc">${escapeHtml(meta.desc)}</div>
         </div>
-        <label class="toggle-switch">
-          <input type="checkbox" data-section-toggle="${key}" ${hidden ? '' : 'checked'} />
+        <label class="toggle-switch" for="section-toggle-${key}">
+          <input type="checkbox" id="section-toggle-${key}" data-section-toggle="${key}" ${hidden ? '' : 'checked'} />
           <span class="toggle-slider"></span>
         </label>
       </div>`;
@@ -4952,17 +4952,17 @@ function openSectionCustomizer(sectionId) {
 
   const rows = widgets.map(w => {
     const isVisible = secCfg[w.id] !== false;
-    return `<label class="cust-widget-row${isVisible ? '' : ' cust-widget-hidden'}">
+    return `<div class="cust-widget-row${isVisible ? '' : ' cust-widget-hidden'}">
       <div class="cust-widget-left">
         <span class="cust-widget-icon">${w.icon}</span>
         <span class="cust-widget-label">${w.label}</span>
       </div>
-      <label class="notif-toggle">
-        <input type="checkbox" ${isVisible ? 'checked' : ''}
+      <label class="notif-toggle" for="cust-widget-${sectionId}-${w.id}">
+        <input type="checkbox" id="cust-widget-${sectionId}-${w.id}" ${isVisible ? 'checked' : ''}
           onchange="toggleSectionWidget('${sectionId}','${w.id}',this.checked);this.closest('.cust-widget-row').classList.toggle('cust-widget-hidden',!this.checked)">
         <span class="notif-toggle-track"></span>
       </label>
-    </label>`;
+    </div>`;
   }).join('');
 
   const hiddenCount = widgets.filter(w => secCfg[w.id] === false).length;

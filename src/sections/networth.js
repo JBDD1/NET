@@ -230,11 +230,11 @@ function openAddCashAccount(prefill = null) {
   const acc = prefill || {};
   openModal(isEdit ? 'Editar cuenta' : 'Añadir cuenta', `
     <div class="form-group">
-      <label class="form-label">Nombre de la cuenta</label>
+      <label class="form-label" for="f-cash-name">Nombre de la cuenta</label>
       <input type="text" id="f-cash-name" class="text-input" placeholder="Ej: Cuenta corriente BBVA" value="${escapeHtml(acc.name || '')}" />
     </div>
     <div class="form-group">
-      <label class="form-label">Saldo actual (€)</label>
+      <label class="form-label" for="f-cash-amount">Saldo actual (€)</label>
       <input type="number" id="f-cash-amount" class="text-input" placeholder="0.00" value="${acc.amount || ''}" step="0.01" />
     </div>
   `, () => {
@@ -388,39 +388,39 @@ function openAddProperty(prefill = null) {
 
   openModal(isEdit ? 'Editar inmueble' : 'Añadir inmueble', `
     <div class="form-group">
-      <label class="form-label">Nombre del inmueble *</label>
+      <label class="form-label" for="f-prop-name">Nombre del inmueble *</label>
       <input type="text" id="f-prop-name" class="text-input" placeholder="Ej: Piso Madrid Centro" value="${escapeHtml(p.name || '')}" />
     </div>
     <div class="form-group">
-      <label class="form-label">Tipo de inmueble</label>
+      <label class="form-label" for="f-prop-type">Tipo de inmueble</label>
       <select id="f-prop-type" class="select-input">${typeOptions}</select>
     </div>
     <div class="form-group">
-      <label class="form-label">Dirección (opcional)</label>
+      <label class="form-label" for="f-prop-address">Dirección (opcional)</label>
       <input type="text" id="f-prop-address" class="text-input" placeholder="Calle, número, ciudad" value="${escapeHtml(p.address || '')}" />
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group">
-        <label class="form-label">Precio de compra (€) *</label>
+        <label class="form-label" for="f-prop-purchase">Precio de compra (€) *</label>
         <input type="text" inputmode="decimal" id="f-prop-purchase" class="text-input" placeholder="Ej: 200000" value="${fv(p.purchasePrice)}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Valor actual estimado (€) *</label>
+        <label class="form-label" for="f-prop-current">Valor actual estimado (€) *</label>
         <input type="text" inputmode="decimal" id="f-prop-current" class="text-input" placeholder="Ej: 250000" value="${fv(p.currentValue)}" />
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group">
-        <label class="form-label">Renta mensual (€, si aplica)</label>
+        <label class="form-label" for="f-prop-rent">Renta mensual (€, si aplica)</label>
         <input type="text" inputmode="decimal" id="f-prop-rent" class="text-input" placeholder="Ej: 800" value="${fv(p.monthlyRent)}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Fecha de compra</label>
+        <label class="form-label" for="f-prop-date">Fecha de compra</label>
         <input type="date" id="f-prop-date" class="text-input" value="${p.purchaseDate || ''}" />
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Notas (opcional)</label>
+      <label class="form-label" for="f-prop-notes">Notas (opcional)</label>
       <textarea id="f-prop-notes" class="text-input" style="resize:vertical;min-height:60px" placeholder="Hipoteca pendiente, estado, etc.">${escapeHtml(p.notes || '')}</textarea>
     </div>
   `, () => {
@@ -661,11 +661,11 @@ function openAddAlternative(prefill = null) {
   openModal(isEdit ? 'Editar activo alternativo' : 'Nuevo activo alternativo', `
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Nombre del activo</label>
+        <label class="form-label" for="f-alt-name">Nombre del activo</label>
         <input type="text" id="f-alt-name" class="text-input" placeholder="Ej: Rolex Submariner" value="${escapeHtml(a.name || '')}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Categoría</label>
+        <label class="form-label" for="f-alt-category">Categoría</label>
         <select id="f-alt-category" class="select-input">
           ${['Relojería', 'Arte', 'Inmueble', 'Joyería', 'Vehículo', 'Coleccionismo', 'Criptomonedas', 'Vino', 'Otro']
             .map(c => `<option value="${c}" ${a.category === c ? 'selected' : ''}>${c}</option>`).join('')}
@@ -674,31 +674,31 @@ function openAddAlternative(prefill = null) {
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Precio de compra (€)</label>
+        <label class="form-label" for="f-alt-buy">Precio de compra (€)</label>
         <input type="number" id="f-alt-buy" class="text-input" placeholder="0.00" value="${a.buyPrice || ''}" step="0.01" min="0" />
       </div>
       <div class="form-group">
-        <label class="form-label">Precio actual (€)</label>
+        <label class="form-label" for="f-alt-current">Precio actual (€)</label>
         <input type="number" id="f-alt-current" class="text-input" placeholder="0.00" value="${a.currentPrice || ''}" step="0.01" min="0" />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Fecha de compra</label>
+        <label class="form-label" for="f-alt-date">Fecha de compra</label>
         <input type="date" id="f-alt-date" class="text-input" value="${a.purchaseDate || ''}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Depreciación anual (%, opcional)</label>
+        <label class="form-label" for="f-alt-dep">Depreciación anual (%, opcional)</label>
         <input type="number" id="f-alt-dep" class="text-input" placeholder="Ej: 15 para vehículo" value="${a.depreciationPct || ''}" step="0.1" min="0" max="100" />
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Si se indica, el valor actual se calcula automáticamente</div>
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Notas</label>
+      <label class="form-label" for="f-alt-notes">Notas</label>
       <input type="text" id="f-alt-notes" class="text-input" placeholder="Referencias, condición..." value="${escapeHtml(a.notes || '')}" />
     </div>
     <div class="form-group">
-      <label class="form-label">Foto (opcional)</label>
+      <div class="form-label">Foto (opcional)</div>
       <label for="f-alt-photo" class="tx-photo-btn">📷 ${a.photoId ? 'Cambiar foto' : 'Añadir foto'}</label>
       <input type="file" id="f-alt-photo" accept="image/*" style="display:none" onchange="onAltPhotoChange(this)" />
       <div id="alt-photo-preview" class="tx-photo-preview"></div>
@@ -903,11 +903,11 @@ function openAddLiability(prefill = null) {
   openModal(isEdit ? 'Editar pasivo' : 'Añadir deuda', `
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Nombre</label>
+        <label class="form-label" for="f-l-name">Nombre</label>
         <input type="text" id="f-l-name" class="text-input" placeholder="Ej: Hipoteca vivienda" value="${escapeHtml(l.name || '')}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Tipo</label>
+        <label class="form-label" for="f-l-type">Tipo</label>
         <select id="f-l-type" class="select-input">
           <option value="hipoteca" ${(l.type||'hipoteca')==='hipoteca' ? 'selected' : ''}>Hipoteca</option>
           <option value="prestamo" ${l.type==='prestamo' ? 'selected' : ''}>Préstamo</option>
@@ -918,31 +918,31 @@ function openAddLiability(prefill = null) {
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Importe original (€)</label>
+        <label class="form-label" for="f-l-original">Importe original (€)</label>
         <input type="number" id="f-l-original" class="text-input" placeholder="0.00" value="${l.originalAmount || ''}" step="0.01" min="0" />
       </div>
       <div class="form-group">
-        <label class="form-label">Saldo pendiente (€)</label>
+        <label class="form-label" for="f-l-remaining">Saldo pendiente (€)</label>
         <input type="number" id="f-l-remaining" class="text-input" placeholder="0.00" value="${l.remainingAmount || ''}" step="0.01" min="0" />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Cuota mensual (€)</label>
+        <label class="form-label" for="f-l-monthly">Cuota mensual (€)</label>
         <input type="number" id="f-l-monthly" class="text-input" placeholder="0.00" value="${l.monthlyPayment || ''}" step="0.01" min="0" />
       </div>
       <div class="form-group">
-        <label class="form-label">Tipo de interés anual (%)</label>
+        <label class="form-label" for="f-l-rate">Tipo de interés anual (%)</label>
         <input type="number" id="f-l-rate" class="text-input" placeholder="Ej: 3.5" value="${l.interestRate || ''}" step="0.01" min="0" />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Día de cobro (opcional)</label>
+        <label class="form-label" for="f-l-day">Día de cobro (opcional)</label>
         <input type="number" id="f-l-day" class="text-input" placeholder="Ej: 5" value="${l.paymentDay || ''}" step="1" min="1" max="31" />
       </div>
       <div class="form-group">
-        <label class="form-label">Frecuencia</label>
+        <label class="form-label" for="f-l-freq">Frecuencia</label>
         <select id="f-l-freq" class="select-input">
           <option value="monthly"    ${(l.frequency||'monthly')==='monthly'    ? 'selected' : ''}>Mensual</option>
           <option value="bimonthly"  ${l.frequency==='bimonthly'  ? 'selected' : ''}>Bimensual</option>
@@ -953,7 +953,7 @@ function openAddLiability(prefill = null) {
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Notas (opcional)</label>
+      <label class="form-label" for="f-l-notes">Notas (opcional)</label>
       <input type="text" id="f-l-notes" class="text-input" placeholder="Banco, referencia..." value="${escapeHtml(l.notes || '')}" />
     </div>
   `, () => {
