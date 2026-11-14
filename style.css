@@ -1371,6 +1371,9 @@ ul  { list-style: none; }
    SECCIONES
 ───────────────────────────────────────────────────────────── */
 .section { display: none; padding: var(--sp-10) var(--sp-8) var(--sp-16); max-width: 100%; }
+/* En pantallas muy grandes (>=1600px) el contenido se estiraba a todo el ancho,
+   dejando líneas de texto y tarjetas demasiado anchas. Se capa y se centra. */
+@media (min-width: 1600px) { .section { max-width: 1400px; margin-inline: auto; } }
 .section.active { display: block; animation: sectionIn .18s ease both; }
 .hidden { display: none !important; }
 
@@ -1662,6 +1665,14 @@ ul  { list-style: none; }
    TABLAS
 ───────────────────────────────────────────────────────────── */
 .table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+/* Misma política de scroll horizontal contenido que .table-wrapper, también a
+   anchos grandes (la tabla de pasivos usa .table-container): evita que una tabla
+   ancha desborde la página en vez de hacer scroll dentro de su contenedor. */
+.table-container {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   width: 100%;
@@ -4379,6 +4390,20 @@ th.sort-active .sort-arrow { opacity: 1; }
     letter-spacing: .06em;
     white-space: nowrap;
   }
+}
+
+/* Mismos mínimos táctiles de 44px en cualquier dispositivo SIN hover fino
+   (tablets táctiles anchas, p. ej. iPad apaisado >768px), que de otro modo se
+   quedaban con los iconos pequeños de escritorio. */
+@media (hover: none) {
+  .btn-icon, .btn-icon-xs, .btn-icon-sm, .mobile-menu-close,
+  .btn-back-to-top, .month-nav-btn, .ai-key-help-btn, .ai-send-btn {
+    min-width: 44px;
+  }
+  button, .btn-primary, .btn-secondary, .nav-item, .toggle-switch {
+    min-height: 44px;
+  }
+  .toggle-switch { min-height: unset; }
 }
 
 /* Touch targets mínimos de 44px (antes decía 44 en el comentario pero
