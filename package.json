@@ -40,5 +40,8 @@
     "jest-environment-jsdom": "^29.7.0",
     "terser": "^5.31.0",
     "vite": "^6.4.3"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

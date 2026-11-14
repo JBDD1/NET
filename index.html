@@ -818,12 +818,12 @@
             <caption class="sr-only">Lista de transacciones: fecha, descripción, categoría, tipo e importe</caption>
             <thead>
               <tr>
-                <th class="sortable-th" data-sort="date" title="Ordenar por fecha">Fecha <span class="sort-arrow"></span></th>
-                <th class="sortable-th" data-sort="description" title="Ordenar por descripción">Descripción <span class="sort-arrow"></span></th>
-                <th class="sortable-th" data-sort="category" title="Ordenar por categoría">Categoría <span class="sort-arrow"></span></th>
-                <th>Tipo</th>
-                <th class="text-right sortable-th" data-sort="amount" title="Ordenar por importe">Importe <span class="sort-arrow"></span></th>
-                <th class="text-right">Acciones</th>
+                <th scope="col" class="sortable-th" data-sort="date" title="Ordenar por fecha">Fecha <span class="sort-arrow"></span></th>
+                <th scope="col" class="sortable-th" data-sort="description" title="Ordenar por descripción">Descripción <span class="sort-arrow"></span></th>
+                <th scope="col" class="sortable-th" data-sort="category" title="Ordenar por categoría">Categoría <span class="sort-arrow"></span></th>
+                <th scope="col">Tipo</th>
+                <th scope="col" class="text-right sortable-th" data-sort="amount" title="Ordenar por importe">Importe <span class="sort-arrow"></span></th>
+                <th scope="col" class="text-right">Acciones</th>
               </tr>
             </thead>
             <tbody id="transactions-tbody"></tbody>
@@ -954,13 +954,13 @@
             <caption class="sr-only">Lista de bizums: fecha, persona, concepto, dirección, importe y estado</caption>
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Persona</th>
-                <th>Concepto</th>
-                <th>Dirección</th>
-                <th class="text-right">Importe</th>
-                <th>Estado</th>
-                <th>Acciones</th>
+                <th scope="col">Fecha</th>
+                <th scope="col">Persona</th>
+                <th scope="col">Concepto</th>
+                <th scope="col">Dirección</th>
+                <th scope="col" class="text-right">Importe</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Acciones</th>
               </tr>
             </thead>
             <tbody id="bizums-tbody"></tbody>
@@ -1040,20 +1040,20 @@
             <caption class="sr-only">Cartera de inversión: activo, ticker, país, precio de compra, precio actual, cantidad, valor, rentabilidad y CAGR</caption>
             <thead>
               <tr id="portfolio-thead-row">
-                <th class="sortable" data-col="name" data-action="portfolio-sort" tabindex="0" aria-sort="none">Activo<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable" data-col="ticker" data-action="portfolio-sort" tabindex="0" aria-sort="none">Ticker<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable" data-col="country" data-action="portfolio-sort" tabindex="0" aria-sort="none">País<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="buyPrice" data-action="portfolio-sort" tabindex="0" aria-sort="none">P. Compra<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="text-right">P. Actual</th>
-                <th class="sortable text-right" data-col="quantity" data-action="portfolio-sort" tabindex="0" aria-sort="none">Cantidad<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="cost" data-action="portfolio-sort" tabindex="0" aria-sort="none">Coste<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="value" data-action="portfolio-sort" tabindex="0" aria-sort="none">Valor actual<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="gain" data-action="portfolio-sort" tabindex="0" aria-sort="none">G/P (€)<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="gainPct" data-action="portfolio-sort" tabindex="0" aria-sort="none">G/P (%)<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="concPct" data-action="portfolio-sort" tabindex="0" aria-sort="none">% Cartera<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="sortable text-right" data-col="days" data-action="portfolio-sort" tabindex="0" aria-sort="none">Tiempo<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
-                <th class="text-right" title="Rentabilidad Anual Compuesta (CAGR)">CAGR</th>
-                <th>Acciones</th>
+                <th scope="col" class="sortable" data-col="name" data-action="portfolio-sort" tabindex="0" aria-sort="none">Activo<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th scope="col" class="sortable" data-col="ticker" data-action="portfolio-sort" tabindex="0" aria-sort="none">Ticker<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th scope="col" class="sortable" data-col="country" data-action="portfolio-sort" tabindex="0" aria-sort="none">País<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th scope="col" class="sortable text-right" data-col="buyPrice" data-action="portfolio-sort" tabindex="0" aria-sort="none">P. Compra<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th scope="col" class="text-right">P. Actual</th>
+                <th scope="col" class="sortable text-right" data-col="quantity" data-action="portfolio-sort" tabindex="0" aria-sort="none">Cantidad<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th scope="col" class="sortable text-right" data-col="cost" data-action="portfolio-sort" tabindex="0" aria-sort="none">Coste<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th scope="col" class="sortable text-right" data-col="value" data-action="portfolio-sort" tabindex="0" aria-sort="none">Valor actual<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th scope="col" class="sortable text-right" data-col="gain" data-action="portfolio-sort" tabindex="0" aria-sort="none">G/P (€)<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th scope="col" class="sortable text-right" data-col="gainPct" data-action="portfolio-sort" tabindex="0" aria-sort="none">G/P (%)<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th scope="col" class="sortable text-right" data-col="concPct" data-action="portfolio-sort" tabindex="0" aria-sort="none">% Cartera<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th scope="col" class="sortable text-right" data-col="days" data-action="portfolio-sort" tabindex="0" aria-sort="none">Tiempo<span class="sort-arrow"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></span></th>
+                <th scope="col" class="text-right" title="Rentabilidad Anual Compuesta (CAGR)">CAGR</th>
+                <th scope="col">Acciones</th>
               </tr>
             </thead>
             <tbody id="portfolio-tbody"></tbody>
@@ -1174,14 +1174,14 @@
               <caption class="sr-only">Dividendos: activo, ticker, dividendo por acción, frecuencia, número de acciones, ingreso anual estimado y yield sobre coste</caption>
               <thead>
                 <tr>
-                  <th>Activo</th>
-                  <th>Ticker</th>
-                  <th class="text-right">Div/acción (€)</th>
-                  <th class="text-right">Frecuencia</th>
-                  <th class="text-right">Nº acc.</th>
-                  <th class="text-right">Anual (€)</th>
-                  <th class="text-right" title="Yield sobre precio de compra">YoC</th>
-                  <th></th>
+                  <th scope="col">Activo</th>
+                  <th scope="col">Ticker</th>
+                  <th scope="col" class="text-right">Div/acción (€)</th>
+                  <th scope="col" class="text-right">Frecuencia</th>
+                  <th scope="col" class="text-right">Nº acc.</th>
+                  <th scope="col" class="text-right">Anual (€)</th>
+                  <th scope="col" class="text-right" title="Yield sobre precio de compra">YoC</th>
+                  <th scope="col"></th>
                 </tr>
               </thead>
               <tbody id="dividends-tbody"></tbody>
@@ -1322,14 +1322,14 @@
             <caption class="sr-only">Pasivos y deudas: nombre, tipo, importe original, saldo pendiente, cuota mensual, interés anual y porcentaje amortizado</caption>
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Tipo</th>
-                <th class="text-right">Importe original</th>
-                <th class="text-right">Saldo pendiente</th>
-                <th class="text-right">Cuota/mes</th>
-                <th class="text-right">Interés anual</th>
-                <th>Amortizado</th>
-                <th></th>
+                <th scope="col">Nombre</th>
+                <th scope="col">Tipo</th>
+                <th scope="col" class="text-right">Importe original</th>
+                <th scope="col" class="text-right">Saldo pendiente</th>
+                <th scope="col" class="text-right">Cuota/mes</th>
+                <th scope="col" class="text-right">Interés anual</th>
+                <th scope="col">Amortizado</th>
+                <th scope="col"></th>
               </tr>
             </thead>
             <tbody id="liabilities-tbody">
@@ -1538,16 +1538,16 @@
             <caption class="sr-only">Ventas realizadas: activo, ticker, fechas de compra y venta, precios, cantidad, resultado y tipo (acciones o cripto)</caption>
             <thead>
               <tr>
-                <th>Activo</th>
-                <th>Ticker</th>
-                <th class="text-right">Fecha compra</th>
-                <th class="text-right">Fecha venta</th>
-                <th class="text-right">P. Compra</th>
-                <th class="text-right">P. Venta</th>
-                <th class="text-right">Cantidad</th>
-                <th class="text-right">Resultado</th>
-                <th class="text-right">Tipo</th>
-                <th>Acciones</th>
+                <th scope="col">Activo</th>
+                <th scope="col">Ticker</th>
+                <th scope="col" class="text-right">Fecha compra</th>
+                <th scope="col" class="text-right">Fecha venta</th>
+                <th scope="col" class="text-right">P. Compra</th>
+                <th scope="col" class="text-right">P. Venta</th>
+                <th scope="col" class="text-right">Cantidad</th>
+                <th scope="col" class="text-right">Resultado</th>
+                <th scope="col" class="text-right">Tipo</th>
+                <th scope="col">Acciones</th>
               </tr>
             </thead>
             <tbody id="sales-tbody"></tbody>

@@ -149,7 +149,14 @@ function calcMonthlyBalance(month = getCurrentMonth()) {
   return { income, expense, balance: income - expense };
 }
 
-/** Media mensual de (ingresos − gastos) de los últimos N meses completos */
+/**
+ * Superávit mensual TÍPICO (mediana de ingresos − gastos) de los últimos N
+ * meses completos con datos. Devuelve la MEDIANA a propósito, no la media: es
+ * robusta frente a un mes atípico (una paga extra o un gasto grande puntual)
+ * que distorsionaría la media y daría una proyección de ritmo de ahorro poco
+ * realista. El nombre conserva "Avg" por ser la medida de tendencia central que
+ * consume goals.js como "tu ritmo ~X/mes"; la implementación es la mediana.
+ */
 function calcAvgMonthlySurplus(months = 12) {
   const now = new Date();
   const surpluses = [];
