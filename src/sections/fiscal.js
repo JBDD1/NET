@@ -968,6 +968,23 @@ function runFiscalSimulator() {
 }
 
 /* ─── CRUD Ventas ────────────────────────────────────────── */
+
+// Al teclear el ticker en el formulario de venta, rellena el precio de compra
+// con el precio medio REAL de la cartera (coste medio en EUR), para que la
+// plusvalía se calcule con el dato real y el usuario lo vea antes de guardar.
+function _saleFillFromPortfolio() {
+  const ticker = (document.getElementById('f-v-ticker')?.value || '').trim().toUpperCase();
+  const avg = (typeof assetAvgBuyPriceEUR === 'function') ? assetAvgBuyPriceEUR(ticker) : null;
+  if (avg == null) return;
+  const buyEl = document.getElementById('f-v-buyprice');
+  if (buyEl) buyEl.value = avg;
+  const nameEl = document.getElementById('f-v-name');
+  if (nameEl && !nameEl.value.trim()) {
+    const a = (APP.portfolio || []).find(x => (x.ticker || '').trim().toUpperCase() === ticker);
+    if (a && a.name) nameEl.value = a.name;
+  }
+}
+
 function openAddSale(prefill = null, isCrypto = false) {
   const isEdit = !!prefill;
   const v = prefill || { isCrypto };
@@ -980,7 +997,7 @@ function openAddSale(prefill = null, isCrypto = false) {
       </div>
       <div class="form-group">
         <label class="form-label" for="f-v-ticker">Ticker</label>
-        <input type="text" id="f-v-ticker" class="text-input" placeholder="${v.isCrypto ? 'BTC' : 'AAPL'}" value="${escapeHtml(v.ticker || '')}" />
+        <input type="text" id="f-v-ticker" class="text-input" placeholder="${v.isCrypto ? 'BTC' : 'AAPL'}" value="${escapeHtml(v.ticker || '')}" onblur="_saleFillFromPortfolio()" />
       </div>
     </div>
     <div class="form-row">
@@ -1013,9 +1030,15 @@ function openAddSale(prefill = null, isCrypto = false) {
     const ticker    = document.getElementById('f-v-ticker').value.trim().toUpperCase();
     const buyDate   = document.getElementById('f-v-buydate').value;
     const sellDate  = document.getElementById('f-v-selldate').value;
-    const buyPrice  = parseFloat(document.getElementById('f-v-buyprice').value);
+    let   buyPrice  = parseFloat(document.getElementById('f-v-buyprice').value);
     const sellPrice = parseFloat(document.getElementById('f-v-sellprice').value);
     const quantity  = parseFloat(document.getElementById('f-v-qty').value);
+
+    // Conectar la venta con la cartera: si el activo está en la cartera, la
+    // plusvalía se calcula con su precio medio de compra REAL (coste medio en
+    // EUR) y no con un dato tecleado o inventado que podría no coincidir.
+    const _avgBuy = (typeof assetAvgBuyPriceEUR === 'function') ? assetAvgBuyPriceEUR(ticker) : null;
+    if (_avgBuy != null) buyPrice = _avgBuy;
 
     if (!name)    return showToast('El nombre es obligatorio', 'error');
     if (!ticker)  return showToast('El ticker es obligatorio', 'error');

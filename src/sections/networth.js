@@ -117,8 +117,9 @@ function renderNetworth() {
   const investments  = calcPortfolioValue();
   const alternatives = calcAlternativesTotal();
   const properties   = calcPropertiesTotal();
+  const staking      = calcStakingTotal();
   const liabilities  = calcLiabilitiesTotal();
-  const totalAssets  = cash + investments + alternatives + properties;
+  const totalAssets  = cash + investments + alternatives + properties + staking;
   const total        = totalAssets - liabilities;
 
   _animNum(document.getElementById('nw-total'),        total,       formatCurrency, 600);
@@ -160,7 +161,7 @@ function renderNetworth() {
 
   renderCashAccounts();
   renderPropertiesList();
-  renderBreakdownBars(totalAssets, cash, investments, alternatives, properties, liabilities);
+  renderBreakdownBars(totalAssets, cash, investments, alternatives, properties, liabilities, staking);
 
   requestAnimationFrame(() => {
     const hist  = APP.networthHistory || [];
@@ -279,7 +280,7 @@ function deleteCashAccount(id) {
 
 /* ─── Distribución del patrimonio ───────────────────────────── */
 
-function renderBreakdownBars(total, cash, investments, alternatives, properties, liabilities = 0) {
+function renderBreakdownBars(total, cash, investments, alternatives, properties, liabilities = 0, staking = 0) {
   const el = document.getElementById('nw-breakdown-bars');
   if (!el || total === 0) {
     if (el) el.innerHTML = '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px">Añade activos para ver la distribución</div>';
@@ -290,6 +291,7 @@ function renderBreakdownBars(total, cash, investments, alternatives, properties,
     { label: '📈 Inversiones',          value: investments,  color: '#5b6aff' },
     { label: '🏠 Inmuebles',            value: properties,   color: '#26a0b5' },
     { label: '💎 Activos Alternativos', value: alternatives, color: '#3ddc84' },
+    ...(staking > 0 ? [{ label: '⬢ Staking', value: staking, color: '#9b7ad4' }] : []),
     ...(liabilities > 0 ? [{ label: '⊖ Pasivos & Deudas', value: -liabilities, color: '#ff6b6b' }] : []),
   ];
   el.innerHTML = items.filter(item => item.value !== 0).map(item => {
@@ -843,7 +845,7 @@ function renderPasivos() {
   const liabilities  = APP.liabilities || [];
   const total        = calcLiabilitiesTotal();
   const totalMonthly = liabilities.reduce((s, l) => s + (parseFloat(l.monthlyPayment) || 0), 0);
-  const totalAssets  = calcCashTotal() + calcPortfolioValue() + calcAlternativesTotal() + calcPropertiesTotal();
+  const totalAssets  = calcCashTotal() + calcPortfolioValue() + calcAlternativesTotal() + calcPropertiesTotal() + calcStakingTotal();
   const ratio        = totalAssets > 0 ? (total / totalAssets) * 100 : 0;
 
   setText('liab-total',   formatCurrency(total));

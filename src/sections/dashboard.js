@@ -537,7 +537,7 @@ function _dashRenderWidgetContent(id) {
         break;
       }
       case 'dash-block-chart-networth': renderChartNetworthHistory(); break;
-      case 'dash-block-chart-dist':     renderChartDistribution(calcCashTotal(), calcPortfolioValue(), calcAlternativesTotal(), calcPropertiesTotal()); break;
+      case 'dash-block-chart-dist':     renderChartDistribution(calcCashTotal(), calcPortfolioValue(), calcAlternativesTotal(), calcPropertiesTotal(), calcStakingTotal()); break;
       case 'dash-block-investments':    renderTopInvestments(); break;
       case 'dash-block-activity':       renderRecentActivity(); break;
       case 'dash-block-goals':          renderDashGoals(); break;
@@ -722,11 +722,11 @@ function _dashCalcValues() {
   // even if _saveDataNow's debounce hasn't fired yet.
   updateNetworthHistory(networth);
   const month         = getCurrentMonth();
-  const bizumIncome   = (APP.bizums || []).filter(b => b.direction === 'in'  && b.status === 'done' && (b.date || month).startsWith(month)).reduce((s, b) => s + b.amount, 0);
-  const bizumExpense  = (APP.bizums || []).filter(b => b.direction === 'out' && b.status === 'done' && (b.date || month).startsWith(month)).reduce((s, b) => s + b.amount, 0);
-  const income        = calcMonthlyIncome() + bizumIncome;
-  const expense       = calcMonthlyExpense() + bizumExpense;
-  const balance       = income - expense;
+  // Balance mensual: definición ÚNICA en calcMonthlyBalance (calcs.js), la
+  // misma que usa la sección de Transacciones. Ya NO se suman aquí los Bizums
+  // (eran la causa de que este KPI no cuadrara con Transacciones, con el
+  // desglose por categorías ni con la regla 50/30/20).
+  const { income, expense, balance } = calcMonthlyBalance(month);
   const prevNW        = APP.networthHistory.find(h => h.date === getPreviousMonth(getCurrentMonth()))?.value || 0;
   const portfolioCost = APP.portfolio.reduce((s, a) => s + a.buyPrice * a.quantity * (a.exchangeRate > 0 ? a.exchangeRate : 1), 0);
   const annualDiv     = APP.dividends.reduce((s, d) => {
@@ -825,7 +825,7 @@ function _dashDeferredRender(cash, portfolio) {
 
   ric(() => {
     if (showNetworth) try { renderChartNetworthHistory(); } catch(e) { console.warn('chart networth:', e); }
-    if (showDist)     try { renderChartDistribution(cash, portfolio, calcAlternativesTotal(), calcPropertiesTotal()); } catch(e) { console.warn('chart dist:', e); }
+    if (showDist)     try { renderChartDistribution(cash, portfolio, calcAlternativesTotal(), calcPropertiesTotal(), calcStakingTotal()); } catch(e) { console.warn('chart dist:', e); }
     // dash-block-expcats es un gráfico Chart.js (igual que networth/dist, no una
     // lista) — mismo tratamiento de error: console.warn, sin tocar el lienzo.
     if (showExpCats)  try { renderDashExpenseCats(); } catch(e) { console.warn('dash expense cats:', e); }
@@ -928,7 +928,7 @@ function renderDashLiabilities() {
   }
   const total        = calcLiabilitiesTotal();
   const monthly      = liabilities.reduce((s, l) => s + (parseFloat(l.monthlyPayment) || 0), 0);
-  const totalAssets  = calcCashTotal() + calcPortfolioValue() + calcAlternativesTotal() + calcPropertiesTotal();
+  const totalAssets  = calcCashTotal() + calcPortfolioValue() + calcAlternativesTotal() + calcPropertiesTotal() + calcStakingTotal();
   const ratio        = totalAssets > 0 ? (total / totalAssets) * 100 : 0;
   el.innerHTML = `
     <span class="recap-item"><span class="recap-label">Deuda total</span><span class="recap-val negative">${formatCurrency(total)}</span></span>
@@ -1237,15 +1237,15 @@ function renderChartNetworthHistory() {
   }));
 }
 
-function renderChartDistribution(cash, portfolio, alternatives, properties = 0) {
+function renderChartDistribution(cash, portfolio, alternatives, properties = 0, staking = 0) {
   const ctx = document.getElementById('chart-distribution');
   if (!ctx) return;
 
   const { textColor, fontFamily } = getChartDefaults();
 
-  const allValues = [cash, portfolio, properties, alternatives];
-  const allLabels = ['Efectivo', 'Inversiones', 'Inmuebles', 'Alt. Inv.'];
-  const colors = ['#c9a84c', '#5b6aff', '#26a0b5', '#3ddc84'];
+  const allValues = [cash, portfolio, properties, alternatives, staking];
+  const allLabels = ['Efectivo', 'Inversiones', 'Inmuebles', 'Alt. Inv.', 'Staking'];
+  const colors = ['#c9a84c', '#5b6aff', '#26a0b5', '#3ddc84', '#9b7ad4'];
   const data   = allValues.filter(v => v > 0);
   const labels = allLabels.filter((_, i) => allValues[i] > 0);
   const filteredColors = colors.filter((_, i) => allValues[i] > 0);

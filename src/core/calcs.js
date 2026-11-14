@@ -53,10 +53,36 @@ function calcLiabilitiesTotal() {
   return (APP.liabilities || []).reduce((sum, l) => sum + (parseFloat(l.remainingAmount) || 0), 0);
 }
 
+// Valor total en staking: capital colocado + recompensas acumuladas de todas
+// las posiciones (APP.stakingPositions). Es patrimonio del usuario que vive en
+// su propio módulo y no se refleja en caja ni en la cartera, así que cuenta en
+// el patrimonio neto igual que el resto de activos.
+function calcStakingTotal() {
+  return (APP.stakingPositions || []).reduce((s, p) => s + _num(p.amountEur) + _num(p.rewardsEur), 0);
+}
+
 function calcNetWorth() {
   if (_cacheNetWorth !== null) return _cacheNetWorth;
-  _cacheNetWorth = calcCashTotal() + calcPortfolioValue() + calcAlternativesTotal() + calcPropertiesTotal() - calcLiabilitiesTotal();
+  _cacheNetWorth = calcCashTotal() + calcPortfolioValue() + calcAlternativesTotal()
+    + calcPropertiesTotal() + calcStakingTotal() - calcLiabilitiesTotal();
   return _cacheNetWorth;
+}
+
+/**
+ * Precio medio de compra REAL de un activo de la cartera, en EUR por unidad.
+ * Finova mantiene un único buyPrice por posición (coste medio, sin lotes FIFO),
+ * así que el coste por unidad es ese buyPrice convertido a EUR con su tipo de
+ * cambio. Lo usa el registro de ventas para calcular la plusvalía con el precio
+ * real de la cartera en vez de con un dato tecleado o inventado.
+ * Devuelve null si el ticker no está en la cartera.
+ */
+function assetAvgBuyPriceEUR(ticker) {
+  if (!ticker) return null;
+  const t = String(ticker).trim().toUpperCase();
+  const a = (APP.portfolio || []).find(x => (x.ticker || '').trim().toUpperCase() === t);
+  if (!a) return null;
+  const fx = a.exchangeRate > 0 ? a.exchangeRate : 1;
+  return _num(a.buyPrice) * fx;
 }
 
 function calcAssetCAGR(a) {
@@ -96,6 +122,31 @@ function calcMonthlyExpense(month = getCurrentMonth()) {
   return APP.transactions
     .filter(t => t.type === 'expense' && (t.date || getCurrentMonth()).startsWith(month))
     .reduce((sum, t) => sum + _num(t.amount), 0);
+}
+
+/**
+ * Balance mensual — DEFINICIÓN ÚNICA Y CANÓNICA de la app.
+ *
+ * balance = ingresos − gastos del mes, contando SOLO las transacciones
+ * (APP.transactions de tipo 'income' y 'expense'). Es la fuente única que usan
+ * tanto el Dashboard como la sección de Transacciones, para que el MISMO KPI
+ * no muestre dos cifras distintas según dónde se mire.
+ *
+ *   · SÍ se incluye: transacciones de ingreso y de gasto del mes.
+ *   · NO se incluye:
+ *       - Bizums: son un libro aparte de deudas pendientes entre personas; no
+ *         mueven cuentas de efectivo ni aparecen en el desglose por categorías
+ *         ni en la regla 50/30/20, así que contarlos solo aquí descuadraba este
+ *         KPI frente al resto de la app.
+ *       - Cartera, dividendos o staking: no son ingresos/gastos corrientes.
+ *
+ * Si alguna vez se cambia el criterio (p. ej. incluir Bizums), debe hacerse
+ * AQUÍ, en un único sitio, y se propaga a los dos consumidores a la vez.
+ */
+function calcMonthlyBalance(month = getCurrentMonth()) {
+  const income  = calcMonthlyIncome(month);
+  const expense = calcMonthlyExpense(month);
+  return { income, expense, balance: income - expense };
 }
 
 /** Media mensual de (ingresos − gastos) de los últimos N meses completos */

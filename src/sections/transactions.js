@@ -202,9 +202,9 @@ function updateTransactionSummary() {
   // Mismo filtro que antes, pero reutilizando calcs.js: una única fuente de
   // verdad con el dashboard (y ya blindadas contra importes guardados como
   // string, que aquí se concatenaban: 0 + "750" + "120" → "0750120").
-  const income  = calcMonthlyIncome(month);
-  const expense = calcMonthlyExpense(month);
-  const balance = income - expense;
+  // Balance mensual: definición ÚNICA y compartida con el Dashboard
+  // (calcMonthlyBalance en calcs.js), para que el MISMO KPI no dé dos cifras.
+  const { income, expense, balance } = calcMonthlyBalance(month);
 
   const [y, m] = month.split('-');
   const monthLabel = new Date(+y, +m - 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
