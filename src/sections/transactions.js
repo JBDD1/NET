@@ -144,6 +144,7 @@ function renderTransactions() {
     'fav-tx':     id => toggleTxFavorite(id),
     'view-photo': id => viewTransactionPhoto(id),
     'view-trip':  id => openTripDetail(id),
+    'edit-cat':   (id, cell) => _startInlineCatEdit(id, cell),
   });
   _txWireRowOpen();
   updateTransactionSummary();   // renderBudgets() is called inside here
@@ -608,7 +609,7 @@ function _buildVirtualRowHTML(t) {
   return `<tr data-id="${t.id}" class="${rowCls}" tabindex="0">
     <td>${formatDate(t.date)}</td>
     <td><span class="tx-desc-wrap"><strong>${escapeHtml(t.description)}</strong>${recurringBadge}${bankBadge}${tripBadge}${indicators ? `<span class="tx-indicators">${indicators}</span>` : ''}</span></td>
-    <td>${escapeHtml(t.category)}</td>
+    <td class="tx-cat-cell" data-action="edit-cat" title="Clic para cambiar la categoría">${t.category === UNCLASSIFIED_CATEGORY ? '<span class="tx-cat-pending">⚠ Sin clasificar</span>' : escapeHtml(t.category)}</td>
     <td><span class="badge badge-${t.type}">${t.type === 'income' ? 'Ingreso' : 'Gasto'}</span></td>
     <td class="text-right pvt ${t.type === 'income' ? 'positive' : 'negative'}">${sign}${formatCurrency(t.amount)}</td>
     <td><div class="action-buttons">
@@ -617,6 +618,151 @@ function _buildVirtualRowHTML(t) {
       <button class="btn-danger btn-icon" data-action="delete-tx" aria-label="Eliminar transacción">✕</button>
     </div></td>
   </tr>`;
+}
+
+/* ─── Edición de categoría en línea (con autocompletado de la IA) ─────
+   Clic en la celda de categoría de una fila → un pequeño editor anclado a
+   la celda con un campo de texto y una lista que se filtra a medida que se
+   escribe (autocompletado sobre las categorías existentes). Arriba se fijan
+   las sugerencias de la app para esa transacción: el patrón aprendido o la
+   palabra clave, y — si hay IA configurada — la categoría que propone la IA
+   ("IA ✦"). Solo se permite elegir categorías que ya existan para no
+   ensuciar el modelo (presupuestos y filtros dependen de esos nombres). */
+let _catEditState = null;
+
+function _startInlineCatEdit(id, cell) {
+  _closeCatEdit();
+  const t = (APP.transactions || []).find(x => x.id === id);
+  if (!t || !cell) return;
+  const type = t.type === 'income' ? 'income' : 'expense';
+  const cats = ((type === 'income' ? APP.categories.income : APP.categories.expense) || [])
+    .filter(c => c && c !== UNCLASSIFIED_CATEGORY);
+
+  // Sugerencia "inteligente" para esta transacción (misma prioridad que
+  // autoSuggestCategory: patrón aprendido antes que palabra clave).
+  const learned = APP.categoryPatterns && _patCat(APP.categoryPatterns[txPatternKey(t.description)]);
+  const keyword = learned ? null : matchLocalKeywords(t.description, type);
+  const suggestion = learned || keyword || null;
+  const suggSource = learned ? 'aprendido' : (keyword ? 'sugerido' : null);
+
+  const rect = cell.getBoundingClientRect();
+  const pop = document.createElement('div');
+  pop.className = 'tx-cat-edit-pop';
+  pop.style.left = Math.round(rect.left + window.scrollX) + 'px';
+  pop.style.top  = Math.round(rect.bottom + window.scrollY + 2) + 'px';
+  pop.style.minWidth = Math.max(220, Math.round(rect.width)) + 'px';
+  pop.innerHTML =
+    '<input type="text" class="tx-cat-edit-input" placeholder="Escribe una categoría…" aria-label="Categoría" autocomplete="off">' +
+    '<div class="tx-cat-edit-list" role="listbox"></div>';
+  document.body.appendChild(pop);
+
+  const input = pop.querySelector('.tx-cat-edit-input');
+  const list  = pop.querySelector('.tx-cat-edit-list');
+  input.value = (t.category && t.category !== UNCLASSIFIED_CATEGORY) ? t.category : '';
+
+  _catEditState = { id, tx: t, pop, input, list, cats, type, suggestion, suggSource, aiSuggestion: null, items: [], activeIdx: -1 };
+  _renderCatEditList();
+  _maybeAICatSuggest(t, type);   // autocompletado de la IA, sin bloquear
+
+  input.addEventListener('input', () => { _catEditState.activeIdx = -1; _renderCatEditList(); });
+  input.addEventListener('keydown', _catEditKeydown);
+  setTimeout(() => document.addEventListener('mousedown', _catEditOutside), 0);
+  input.focus();
+  input.select();
+}
+
+function _renderCatEditList() {
+  const s = _catEditState;
+  if (!s) return;
+  const q = _stripAccents(s.input.value.trim());
+  const matches = q ? s.cats.filter(c => _stripAccents(c).includes(q)) : s.cats.slice();
+
+  const items = [];
+  const pin = (cat, label) => {
+    if (!cat) return;
+    if (q && !_stripAccents(cat).includes(q)) return;
+    if (items.some(i => i.cat === cat)) return;
+    items.push({ cat, label });
+  };
+  pin(s.aiSuggestion, 'IA ✦');
+  pin(s.suggestion, s.suggSource);
+  matches.forEach(c => { if (!items.some(i => i.cat === c)) items.push({ cat: c, label: null }); });
+  s.items = items;
+
+  if (!items.length) {
+    s.list.innerHTML = '<div class="tx-cat-edit-empty">Sin coincidencias</div>';
+    return;
+  }
+  s.list.innerHTML = items.map((it, i) =>
+    `<button type="button" class="tx-cat-edit-opt${i === s.activeIdx ? ' is-active' : ''}" role="option" data-idx="${i}">` +
+    `<span>${escapeHtml(it.cat)}</span>${it.label ? `<span class="tx-cat-edit-tag">${escapeHtml(it.label)}</span>` : ''}</button>`
+  ).join('');
+  // mousedown (no click): commit antes de que el blur del input cierre el editor.
+  s.list.querySelectorAll('.tx-cat-edit-opt').forEach(btn => {
+    btn.addEventListener('mousedown', e => {
+      e.preventDefault();
+      const it = s.items[+btn.dataset.idx];
+      if (it) _commitCatEdit(it.cat);
+    });
+  });
+}
+
+function _catEditKeydown(e) {
+  const s = _catEditState;
+  if (!s) return;
+  const n = s.items.length;
+  if (e.key === 'ArrowDown') { e.preventDefault(); s.activeIdx = n ? (s.activeIdx + 1) % n : -1; _renderCatEditList(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); s.activeIdx = n ? (s.activeIdx - 1 + n) % n : -1; _renderCatEditList(); }
+  else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (s.activeIdx >= 0 && s.items[s.activeIdx]) { _commitCatEdit(s.items[s.activeIdx].cat); return; }
+    const typed = s.input.value.trim();
+    const exact = s.cats.find(c => _stripAccents(c) === _stripAccents(typed));
+    if (exact) _commitCatEdit(exact);
+    else if (s.items.length) _commitCatEdit(s.items[0].cat);
+    // Sin coincidencia con una categoría existente: no se inventa una nueva.
+  }
+  else if (e.key === 'Escape') { e.preventDefault(); _closeCatEdit(); }
+}
+
+function _commitCatEdit(cat) {
+  const s = _catEditState;
+  if (!s) return;
+  const t = s.tx;
+  _closeCatEdit();
+  if (!cat || cat === t.category) return;
+  const prev = t.category;
+  t.category = cat;
+  // Aprender el patrón igual que cuando se elige a mano en Quick Add.
+  if (cat !== UNCLASSIFIED_CATEGORY && t.description) _patWrite(txPatternKey(t.description), cat);
+  saveData();
+  renderTransactions();
+  if (typeof showToast === 'function') showToast('Categoría: ' + prev + ' → ' + cat + ' ✓', 'success');
+}
+
+function _closeCatEdit() {
+  document.removeEventListener('mousedown', _catEditOutside);
+  if (_catEditState && _catEditState.pop) _catEditState.pop.remove();
+  _catEditState = null;
+}
+
+function _catEditOutside(e) {
+  if (_catEditState && _catEditState.pop && !_catEditState.pop.contains(e.target)) _closeCatEdit();
+}
+
+async function _maybeAICatSuggest(t, type) {
+  const anyKey = [APP.claudeApiKey, APP.openaiApiKey, APP.geminiApiKey, APP.groqApiKey].some(k => (k || '').trim());
+  if (!anyKey && (typeof _serverAI === 'undefined' || _serverAI !== true)) return;
+  if (typeof categorizeTxWithAI !== 'function') return;
+  const available = type === 'income' ? APP.categories.income : APP.categories.expense;
+  try {
+    const sug = await categorizeTxWithAI(t.description, type, available);
+    // Aplicar solo si el editor sigue abierto para la MISMA transacción.
+    if (sug && _catEditState && _catEditState.id === t.id && sug !== _catEditState.suggestion) {
+      _catEditState.aiSuggestion = sug;
+      _renderCatEditList();
+    }
+  } catch { /* la IA es un extra: si falla, el autocompletado local ya funciona */ }
 }
 
 function _renderVirtualRow() {
