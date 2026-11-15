@@ -100,6 +100,7 @@
       <symbol id="icon-chevron-left" viewBox="0 0 24 24"><polyline points="15 4 7 12 15 20"/></symbol>
       <symbol id="icon-chevron-right" viewBox="0 0 24 24"><polyline points="9 4 17 12 9 20"/></symbol>
       <symbol id="icon-chevron-down" viewBox="0 0 24 24"><polyline points="4 9 12 17 20 9"/></symbol>
+      <symbol id="icon-chevron-up" viewBox="0 0 24 24"><polyline points="4 15 12 7 20 15"/></symbol>
       <symbol id="icon-close" viewBox="0 0 24 24"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></symbol>
       <symbol id="icon-menu" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></symbol>
       <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="15.3" y1="15.3" x2="20.5" y2="20.5"/></symbol>
@@ -315,11 +316,6 @@
     </nav>
 
     <div class="sidebar-footer">
-      <button type="button" class="nav-item" data-action="open-feedback" title="Enviar feedback">
-        <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-mail"/></svg></span>
-        <span class="nav-label">Enviar feedback</span>
-      </button>
-
       <button class="nav-item" data-section="settings" title="Ajustes">
         <span class="nav-icon"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg></span>
         <span class="nav-label">Ajustes</span>
@@ -498,6 +494,10 @@
       <div class="section-header">
         <h1 id="dash-greeting">Dashboard</h1>
         <div class="btn-row">
+          <div class="notif-bell-wrap">
+            <button type="button" id="btn-notif-bell" class="btn-ghost notif-bell-btn" style="font-size:12px;padding:6px 12px" title="Notificaciones" aria-haspopup="menu" aria-expanded="false" aria-label="Notificaciones"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-bell"/></svg><span id="notif-bell-badge" class="notif-bell-badge" hidden>0</span></button>
+            <div id="notif-bell-panel" class="notif-bell-panel" hidden role="menu" aria-label="Notificaciones"></div>
+          </div>
           <button type="button" id="btn-dashboard-editor" class="btn-ghost" style="font-size:12px;padding:6px 14px" title="Mover, añadir, ocultar y redimensionar bloques del dashboard" aria-pressed="false"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-settings"/></svg> Personalizar dashboard</button>
           <button type="button" class="btn-ghost" data-action="export-monthly-pdf" style="font-size:12px;padding:6px 14px" title="Exportar resumen del mes actual en PDF"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-file"/></svg> PDF</button>
           <button type="button" class="btn-primary" data-action="quick-add-nav" style="font-size:12px;padding:6px 14px">+ Transacción</button>
@@ -2466,7 +2466,6 @@
       <button class="mobile-menu-item" data-section="fiscalidad"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-percent"/></svg></span><span class="mmi-label">Fiscalidad</span></button>
       <button class="mobile-menu-item" data-section="ai"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-sparkles"/></svg></span><span class="mmi-label">Asesor IA</span></button>
       <button type="button" class="mobile-menu-item" data-action="open-faq"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-info"/></svg></span><span class="mmi-label">Ayuda / FAQ</span></button>
-      <button type="button" class="mobile-menu-item" data-action="open-feedback"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-mail"/></svg></span><span class="mmi-label">Enviar feedback</span></button>
       <button class="mobile-menu-item" data-section="settings"><span class="mmi-icon"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg></span><span class="mmi-label">Ajustes</span></button>
 
     </div>

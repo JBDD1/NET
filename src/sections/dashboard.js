@@ -289,8 +289,8 @@ function _dashRenderEditToolbars() {
       <span class="dash-tb-spacer"></span>
       ${def.kpis ? `<button type="button" class="dash-tb-btn" data-dash-kpi-settings title="Configurar indicadores" aria-label="Configurar indicadores visibles"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-settings"/></svg></button>` : ''}
       ${canResize ? `<button type="button" class="dash-tb-btn dash-tb-size" data-dash-size title="Tamaño: ${sizeLabel} — pulsa para cambiar" aria-label="Cambiar tamaño, actual ${sizeLabel}">${sizeLabel}</button>` : ''}
-      <button type="button" class="dash-tb-btn" data-dash-move="-1" ${isFirst ? 'disabled' : ''} title="Mover arriba" aria-label="Mover ${escapeHtml(def.label)} hacia arriba"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-right"/></svg></button>
-      <button type="button" class="dash-tb-btn" data-dash-move="1" ${isLast ? 'disabled' : ''} title="Mover abajo" aria-label="Mover ${escapeHtml(def.label)} hacia abajo"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-right"/></svg></button>
+      <button type="button" class="dash-tb-btn" data-dash-move="-1" ${isFirst ? 'disabled' : ''} title="Mover arriba" aria-label="Mover ${escapeHtml(def.label)} hacia arriba"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-up"/></svg></button>
+      <button type="button" class="dash-tb-btn" data-dash-move="1" ${isLast ? 'disabled' : ''} title="Mover abajo" aria-label="Mover ${escapeHtml(def.label)} hacia abajo"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-chevron-down"/></svg></button>
       <button type="button" class="dash-tb-btn dash-tb-hide" data-dash-hide title="Ocultar bloque" aria-label="Ocultar ${escapeHtml(def.label)}"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-eye-off"/></svg></button>
     `;
 
@@ -2210,19 +2210,91 @@ function openRule5030Settings() {
   );
 }
 
+// ─── Campana de notificaciones ───────────────────────────────────
+// Todas las notificaciones del dashboard (calcAlerts) viven en el panel de la
+// campana del encabezado. Al pulsar una, se navega a su sección.
+
+let _notifBellWired = false;
+function _ensureNotifBellWired() {
+  if (_notifBellWired) return;
+  _notifBellWired = true;
+  // Cerrar el panel al hacer clic fuera de la campana.
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.notif-bell-wrap')) _closeNotifBell();
+  });
+}
+
+function toggleNotifBell() {
+  const panel = document.getElementById('notif-bell-panel');
+  const btn   = document.getElementById('btn-notif-bell');
+  if (!panel) return;
+  const willOpen = panel.hidden;
+  panel.hidden = !willOpen;
+  if (btn) btn.setAttribute('aria-expanded', String(willOpen));
+}
+
+function _closeNotifBell() {
+  const panel = document.getElementById('notif-bell-panel');
+  if (panel && !panel.hidden) {
+    panel.hidden = true;
+    document.getElementById('btn-notif-bell')?.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function _notifNavigate(section) {
+  _closeNotifBell();
+  if (section && typeof navigateTo === 'function') navigateTo(section);
+}
+
+// Sección destino de una notificación: su action.section si lo tiene; si no, se
+// deduce del prefijo de su `key` (sin tocar calcAlerts, que fijan los tests).
+function _notifSectionFor(a) {
+  if (a.action && a.action.section) return a.action.section;
+  const k = a.key || '';
+  if (k.startsWith('goal-'))          return 'goals';
+  if (k.startsWith('concentration-')) return 'portfolio';
+  if (k.startsWith('watch-alert-'))   return 'watchlist';
+  if (k.startsWith('rec-due-'))       return 'recurring';
+  if (k.startsWith('bizum-'))         return 'bizums';
+  if (k.startsWith('tax-'))           return 'fiscalidad';
+  if (k.startsWith('div-'))           return 'dividends';
+  if (k.startsWith('budget-') || k.startsWith('neg-balance') ||
+      k.startsWith('no-income') || k.startsWith('savings-drop')) return 'transactions';
+  return 'dashboard';
+}
+
 function renderDashboardAlerts() {
+  _ensureNotifBellWired();
   const alerts = calcAlerts();
-  const el = document.getElementById('dash-alerts-container');
-  if (!el) return;
-  if (!alerts.length) { el.innerHTML = ''; return; }
-  el.innerHTML = alerts.map(a => `
-    <div class="dash-alert dash-alert-${a.type}">
-      <span class="dash-alert-icon">${a.icon}</span>
-      <span class="dash-alert-text">${a.text}</span>
-      ${a.action ? `<button class="dash-alert-action" data-action="navigate" data-section="${escapeHtml(a.action.section)}">${escapeHtml(a.action.label)}</button>` : ''}
-      <button class="dash-alert-dismiss" onclick="dismissAlert('${escapeHtml(a.key)}')" title="Descartar"><svg class="icon icon-sm" aria-hidden="true"><use href="#icon-close"></use></svg></button>
-    </div>
-  `).join('');
+
+  // El banner en línea queda vacío: las notificaciones viven ahora en la campana.
+  const inline = document.getElementById('dash-alerts-container');
+  if (inline) inline.innerHTML = '';
+
+  const badge = document.getElementById('notif-bell-badge');
+  if (badge) {
+    if (alerts.length) { badge.textContent = alerts.length > 9 ? '9+' : String(alerts.length); badge.hidden = false; }
+    else badge.hidden = true;
+  }
+
+  const panel = document.getElementById('notif-bell-panel');
+  if (!panel) return;
+  if (!alerts.length) {
+    panel.innerHTML = '<div class="notif-empty">No tienes notificaciones</div>';
+    return;
+  }
+  panel.innerHTML =
+    '<div class="notif-panel-head">Notificaciones</div>' +
+    alerts.map(a => {
+      const section = _notifSectionFor(a);
+      return `<div class="notif-item notif-item-${a.type}" role="menuitem" tabindex="0"
+        onclick="_notifNavigate('${escapeHtml(section)}')"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_notifNavigate('${escapeHtml(section)}')}">
+        <span class="notif-item-icon">${a.icon}</span>
+        <span class="notif-item-text">${a.text}</span>
+        <button type="button" class="notif-item-dismiss" onclick="event.stopPropagation(); dismissAlert('${escapeHtml(a.key)}')" title="Descartar" aria-label="Descartar notificación"><svg class="icon icon-xs" aria-hidden="true"><use href="#icon-close"></use></svg></button>
+      </div>`;
+    }).join('');
 }
 
 /* ─── Heatmap de gastos ───────────────────────────────────────── */

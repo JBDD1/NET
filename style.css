@@ -3287,6 +3287,53 @@ body.dash-dragging-active .dash-block:not(.dash-dragging) { transition: transfor
 }
 .dash-alert-action:hover { border-color: var(--accent); color: var(--accent); }
 
+/* ─── Campana de notificaciones ──────────────────────────────── */
+.notif-bell-wrap { position: relative; display: inline-flex; }
+.notif-bell-btn  { position: relative; }
+.notif-bell-badge {
+  position: absolute; top: -4px; right: -4px;
+  min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box;
+  background: var(--down); color: #fff;
+  font-size: 10px; font-weight: 700; line-height: 16px; text-align: center;
+  border-radius: 9px; box-shadow: 0 0 0 2px var(--bg-base);
+}
+.notif-bell-panel {
+  position: absolute; top: calc(100% + 6px); left: 0;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(70vh, 540px); overflow-y: auto;
+  background: var(--bg-elevated); border: 1px solid var(--border-default);
+  border-radius: var(--r-md); box-shadow: var(--shadow-lg);
+  z-index: var(--z-dropdown); padding: 6px;
+  animation: modalIn .16s ease both;
+}
+.notif-panel-head {
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-muted); padding: 6px 8px 8px;
+}
+.notif-empty { padding: 22px 12px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.notif-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px; border-radius: var(--r-sm);
+  border-left: 4px solid var(--accent); background: var(--bg-surface);
+  font-size: 13px; line-height: 1.45; cursor: pointer;
+  margin-bottom: 4px; transition: background .12s;
+}
+.notif-item:last-child   { margin-bottom: 0; }
+.notif-item:hover,
+.notif-item:focus-visible { background: var(--bg-hover); outline: none; }
+.notif-item-warning { border-left-color: #e6a817; }
+.notif-item-danger  { border-left-color: var(--down); }
+.notif-item-info    { border-left-color: var(--accent); }
+.notif-item-icon    { font-size: 16px; flex-shrink: 0; line-height: 1; display: flex; }
+.notif-item-text    { flex: 1; color: var(--text-primary); }
+.notif-item-text strong { color: inherit; }
+.notif-item-dismiss {
+  background: none; border: none; cursor: pointer; padding: 3px 5px;
+  color: var(--text-muted); border-radius: 3px; opacity: .6; flex-shrink: 0; line-height: 1;
+  transition: opacity .12s, color .12s;
+}
+.notif-item-dismiss:hover { opacity: 1; color: var(--text-primary); }
+
 /* Activity inline actions */
 .activity-actions {
   display: flex; gap: 4px; opacity: 0;

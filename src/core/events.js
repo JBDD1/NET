@@ -50,6 +50,7 @@
 
   // ── Dashboard ──────────────────────────────────────────────────
   _on('btn-dashboard-editor', 'click', toggleDashboardEditMode);
+  _on('btn-notif-bell', 'click', toggleNotifBell);
 
   // ── Transactions ───────────────────────────────────────────────
   _on('csv-import-input', 'change', function () { handleCSVImportFile(this); });
