@@ -107,7 +107,7 @@ function load() {
   };
   const ctx = vm.createContext(Object.assign({}, global, stubs));
   vm.runInContext(CALCS, ctx, { filename: 'calcs.js' });
-  vm.runInContext(extractFromScript('CATEGORY_KEYWORDS', '_stripAccents', 'matchLocalKeywords', '_patCat', 'txPatternKey', '_TX_STOPWORDS'), ctx, { filename: 'script-cat.js' });
+  vm.runInContext(extractFromScript('CATEGORY_KEYWORDS', '_stripAccents', '_txNormalizeText', '_txNormKeywordCache', '_txNormKeyword', 'matchLocalKeywords', '_patCat', 'txPatternKey', '_TX_STOPWORDS'), ctx, { filename: 'script-cat.js' });
   vm.runInContext(TX_SRC, ctx, { filename: 'transactions.js' });
   fns = vm.runInContext(`({
     parseQuickAdd, _txApplyFilters, expensesByCategory, _expCatInScale,

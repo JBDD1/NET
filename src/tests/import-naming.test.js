@@ -185,7 +185,11 @@ describe('el nombre refuerza el sistema de reglas por palabra clave existente', 
 
     expect(res.category).toBe('Alimentación');
     expect(res.source).toBe('learned');
-    expect(res.confidence).toBe('high');
+    // Con UNA sola confirmación se aplica, pero marcada como sugerencia
+    // revisable; se consolida a confianza alta al confirmarse otra vez.
+    expect(res.confidence).toBe('medium');
+    aprenderDeLaRevision(RAW_DESCONOCIDO, 'Alimentación');
+    expect(fns._classifyLocal(futura, 'expense').confidence).toBe('high');
   });
 
   test('sin la regla, ese mismo movimiento futuro habría quedado sin clasificar', () => {

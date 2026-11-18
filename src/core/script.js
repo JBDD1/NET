@@ -2362,7 +2362,11 @@ function _computeImportRowStatus(r) {
   if (r.category === UNCLASSIFIED_CATEGORY) {
     reasons.push('No hay información suficiente en la descripción para determinar la categoría con seguridad.');
   } else if (r.categoryConfidence !== 'high') {
-    reasons.push('La categoría la ha sugerido la IA, sin una regla o corrección previa que la respalde.');
+    // El motivo depende de QUIÉN puso la categoría: una regla tuya con una
+    // sola confirmación no es lo mismo que una sugerencia de la IA.
+    reasons.push(r.categorySource === 'learned'
+      ? 'Viene de una regla tuya con una sola confirmación: conviene revisarla antes de darla por buena.'
+      : 'La categoría la ha sugerido la IA, sin una regla o corrección previa que la respalde.');
   }
   if (!r.merchant) {
     reasons.push('No se ha podido identificar el comercio a partir de la descripción bancaria.');
@@ -2699,7 +2703,7 @@ function _saveImportReview(idxs) {
     // dice que sirve. Nunca con la categoría "Sin clasificar".
     const rememberEl = document.getElementById(`review-remember-${i}`);
     if ((rememberEl?.checked || clearName) && newCat && newCat !== UNCLASSIFIED_CATEGORY) {
-      _patWrite(txPatternKey(r.description), newCat);
+      _patLearn(r.description, newCat);
     }
 
     const { status, reasons } = _computeImportRowStatus(r);
@@ -4424,31 +4428,47 @@ const NAV_SECTIONS = [
 
 const CATEGORY_KEYWORDS = {
   expense: {
-    'Alimentación':  ['mercadona', 'carrefour', 'lidl', 'aldi', 'dia ', ' dia', 'alcampo', 'eroski', 'consum', 'spar', 'supermercado', 'hipercor', 'ahorra mas', 'ahorramas', 'froiz', 'supercor', 'covirán', 'masymas', 'bonarea', 'panaderia', 'fruteria', 'pescaderia', 'carniceria', 'verduleria', 'colmado', 'barbacoa'],
-    'Restaurantes':  ['restaurante', 'cafeteria', 'cafe ', 'mcdonalds', 'burger king', 'kfc', 'telepizza', 'dominos', 'pizzeria', 'sushi', 'kebab', 'taberna', 'mesón', 'glovo', 'just eat', 'deliveroo', 'uber eats', 'bar ', 'tapas', 'hamburgueseria'],
-    'Transporte':    ['gasolinera', 'gasolina', 'combustible', 'repsol', 'cepsa', 'bp ', 'shell', 'galp', 'campsa', 'dgt', 'multa', 'renfe', 'metro', 'cabify', 'uber', 'bolt', 'blablacar', 'autopista', 'peaje', 'parking', 'aparcamiento', 'itv', 'taller', 'autobus', 'avion', 'vueling', 'iberia', 'ryanair', 'easyjet', 'taxi', 'bus', 'furgoneta', 'cercanias'],
-    'Vivienda':      ['alquiler', 'hipoteca', 'comunidad', ' ibi ', 'luz ', 'electricidad', 'endesa', 'iberdrola', 'naturgy', 'agua ', 'gas nat', 'vodafone', 'movistar', 'orange ', 'jazztel', 'masmovil', 'internet', 'adsl', 'fibra', 'seguro hogar', 'ikea', 'leroy merlin', 'bricomart'],
-    'Salud':         ['farmacia', 'medico', 'dentista', 'clinica', 'hospital', 'sanitas', 'adeslas', 'asisa', 'mapfre salud', 'fisioterapia', 'optica', 'gym', 'gimnasio', 'sport', 'wellness'],
+    'Alimentación':  ['mercadona', 'carrefour', 'lidl', 'aldi', 'dia ', ' dia', 'alcampo', 'eroski', 'consum', 'spar', 'supermercado', 'hipercor', 'ahorra mas', 'ahorramas', 'froiz', 'supercor', 'covirán', 'masymas', 'bonarea', 'panaderia', 'fruteria', 'pescaderia', 'carniceria', 'verduleria', 'colmado', 'barbacoa',
+                      'bonpreu', 'bon preu', 'caprabo', 'condis', 'gadis', 'maskom', 'makro', 'charcuteria', 'herboristeria', 'ultramarinos'],
+    'Restaurantes':  ['restaurante', 'cafeteria', 'cafe ', 'mcdonalds', 'burger king', 'kfc', 'telepizza', 'dominos', 'pizzeria', 'sushi', 'kebab', 'taberna', 'mesón', 'glovo', 'just eat', 'deliveroo', 'uber eats', 'bar ', 'tapas', 'hamburgueseria',
+                      'starbucks', 'dunkin', 'subway', 'goiko', 'five guys', 'foster hollywood', 'tagliatella', 'ginos', 'rodilla', 'pans company', 'montaditos', 'vips', 'papa johns', 'cerveceria', 'asador', 'marisqueria', 'churreria', 'heladeria', 'bocateria', 'brunch'],
+    'Transporte':    ['gasolinera', 'gasolina', 'combustible', 'repsol', 'cepsa', 'bp ', 'shell', 'galp', 'campsa', 'dgt', 'multa', 'renfe', 'metro', 'cabify', 'uber', 'bolt', 'blablacar', 'autopista', 'peaje', 'parking', 'aparcamiento', 'itv', 'taller', 'autobus', 'avion', 'vueling', 'iberia', 'ryanair', 'easyjet', 'taxi', 'bus', 'furgoneta', 'cercanias',
+                      ' alsa ', 'ouigo', 'iryo', ' avlo ', 'flixbus', 'bicimad', 'bicing', 'tussam', ' emt ', ' tmb ', 'ballenoil', 'plenoil', 'petroprix', 'gasexpress', 'free now', ' emov ', ' zity ', 'wible', 'telepeaje', 'estacionamiento', ' grua '],
+    'Vivienda':      ['alquiler', 'hipoteca', 'comunidad', ' ibi ', 'luz ', 'electricidad', 'endesa', 'iberdrola', 'naturgy', 'agua ', 'gas nat', 'vodafone', 'movistar', 'orange ', 'jazztel', 'masmovil', 'internet', 'adsl', 'fibra', 'seguro hogar', 'ikea', 'leroy merlin', 'bricomart',
+                      'aqualia', 'canal isabel', 'hidralia', 'emasesa', 'holaluz', 'lucera', 'octopus energy', 'totalenergies', 'pepeenergy', 'pepephone', 'yoigo', 'finetwork', 'avatel', ' lowi ', ' digi ', 'simyo', 'bricodepot', 'brico depot', 'conforama', 'muebles'],
+    'Salud':         ['farmacia', 'medico', 'dentista', 'clinica', 'hospital', 'sanitas', 'adeslas', 'asisa', 'mapfre salud', 'fisioterapia', 'optica', 'gym', 'gimnasio', 'sport', 'wellness',
+                      'vitaldent', 'dentix', 'podologo', 'psicologo', 'psiquiatra', 'quiron', 'basic fit', 'basicfit', 'altafit', 'vivagym', 'mcfit', 'synergym', 'crossfit', 'nutricionista', 'analisis clinicos'],
     // 'tenis' se mantiene como deporte (uso peninsular) — en español
     // latinoamericano también significa "zapatillas", pero Finova está
     // orientado a fiscalidad/bancos españoles en el resto de la app.
-    'Ocio':          ['cine', 'teatro', 'concierto', 'museo', 'parque', 'viaje', 'hotel', 'airbnb', 'booking', 'expedia', 'steam', 'playstation', 'xbox', 'nintendo', 'twitch', 'futbol', 'fútbol', 'padel', 'pádel', 'tenis', 'baloncesto', 'escape room'],
-    'Suscripciones': ['netflix', 'spotify', 'hbo', 'disney', 'amazon prime', 'prime video', 'apple', 'icloud', 'dropbox', 'adobe', 'microsoft 365', 'google one', 'youtube premium', 'dazn', 'filmin'],
-    'Ropa':          ['zara', 'h&m', 'mango', 'pull&bear', 'bershka', 'stradivarius', 'massimo dutti', 'primark', 'el corte ingles', 'decathlon', 'nike', 'adidas', 'zapateria'],
-    'Educación':     ['universidad', 'academia', 'udemy', 'coursera', 'master', 'matricula', 'formacion', 'libro', 'fnac', 'casa del libro', 'colegio', 'guarderia', 'escuela infantil', 'ampa'],
-    'Seguros':       ['seguro', 'axa', 'mapfre', 'mutua madrilena', 'allianz', 'generali', 'zurich', 'helvetia'],
-    'Fiesta':        ['discoteca', 'club ', 'botellon', 'copa ', 'copas', 'chupito', 'nightclub', 'fiesta', 'fiestas', 'cumpleaños', 'cumpleanos', 'cumple', 'boda', 'barra libre'],
+    'Ocio':          ['cine', 'teatro', 'concierto', 'museo', 'parque', 'viaje', 'hotel', 'airbnb', 'booking', 'expedia', 'steam', 'playstation', 'xbox', 'nintendo', 'twitch', 'futbol', 'fútbol', 'padel', 'pádel', 'tenis', 'baloncesto', 'escape room',
+                      'yelmo', 'cinesa', 'kinepolis', 'ocine', 'ticketmaster', 'fever', 'atrapalo', 'portaventura', 'bolera', 'karting', 'paintball', 'balneario', ' spa ', ' zoo ', 'acuario'],
+    'Suscripciones': ['netflix', 'spotify', 'hbo', 'disney', 'amazon prime', 'prime video', 'apple', 'icloud', 'dropbox', 'adobe', 'microsoft 365', 'google one', 'youtube premium', 'dazn', 'filmin',
+                      'skyshowtime', 'crunchyroll', 'audible', 'kindle', 'chatgpt', 'openai', 'notion', 'canva', 'duolingo', 'strava', 'nordvpn', 'github', 'atresplayer', 'mitele', 'rakuten tv', 'mubi', 'tidal', 'deezer', 'patreon'],
+    'Ropa':          ['zara', 'h&m', 'mango', 'pull&bear', 'bershka', 'stradivarius', 'massimo dutti', 'primark', 'el corte ingles', 'decathlon', 'nike', 'adidas', 'zapateria',
+                      'shein', 'lefties', 'springfield', 'cortefiel', 'oysho', 'uniqlo', 'tezenis', 'calzedonia', 'intimissimi', 'jd sports', 'sprinter', 'forum sport', 'foot locker', 'snipes', 'kiabi', 'mayoral', 'desigual', 'scalpers', 'bimba y lola'],
+    'Educación':     ['universidad', 'academia', 'udemy', 'coursera', 'master', 'matricula', 'formacion', 'libro', 'fnac', 'casa del libro', 'colegio', 'guarderia', 'escuela infantil', 'ampa',
+                      'british council', 'cambridge', 'autoescuela', 'platzi', 'domestika', 'linkedin learning', ' uned ', ' uoc ', 'papeleria', 'material escolar', 'kumon'],
+    'Seguros':       ['seguro', 'axa', 'mapfre', 'mutua madrilena', 'allianz', 'generali', 'zurich', 'helvetia',
+                      'linea directa', 'reale', 'pelayo', 'verti', 'balumba', 'qualitas', 'ocaso', 'santalucia', ' caser ', 'fiatc', 'plus ultra'],
+    'Fiesta':        ['discoteca', 'club ', 'botellon', 'copa ', 'copas', 'chupito', 'nightclub', 'fiesta', 'fiestas', 'cumpleaños', 'cumpleanos', 'cumple', 'boda', 'barra libre',
+                      'cocteleria', 'coctel', 'verbena', 'festival', 'pub '],
+    // 'Amigos' no tenía ninguna palabra clave. Solo las formas de Bizum
+    // INEQUÍVOCAMENTE salientes: un bizum enviado es casi siempre un pago
+    // entre personas. Un 'bizum' a secas se deja fuera a propósito, porque
+    // puede ser cualquier cosa y es mejor no clasificar que clasificar mal.
+    'Amigos':        ['bizum enviado', 'bizum a ', 'envio bizum'],
   },
   income: {
-    'Salario':    ['nomina', 'salario', 'sueldo', 'haberes', 'empresa', 'trabajo', 'mensual'],
-    'Freelance':  ['freelance', 'factura', 'cliente', 'proyecto', 'honorarios', 'consulting'],
-    'Dividendos': ['dividendo', 'cupon', 'renta fija', 'interes'],
+    'Salario':    ['nomina', 'salario', 'sueldo', 'haberes', 'empresa', 'trabajo', 'mensual', 'retribucion', 'paga extra', 'anticipo nomina'],
+    'Freelance':  ['freelance', 'factura', 'cliente', 'proyecto', 'honorarios', 'consulting', 'autonomo'],
+    'Dividendos': ['dividendo', 'cupon', 'renta fija', 'interes', 'cupón', 'rendimiento'],
     'Alquiler':   ['alquiler', 'arrendamiento', 'inquilino', 'renta'],
-    'Venta':      ['venta', 'wallapop', 'ebay', 'vendido', 'segunda mano', 'vinted'],
+    'Venta':      ['venta', 'wallapop', 'ebay', 'vendido', 'segunda mano', 'vinted', 'milanuncios', 'etsy'],
     // Ingresos en efectivo (cajero, reintegro) no encajan en ninguna categoría
     // específica — antes caían sin regla y acababan en "Sin clasificar" (o,
     // con el bug ya corregido, en la primera categoría de la lista al azar).
-    'Otros ingresos': ['ingreso efectivo', 'efectivo cajero', 'cajero automatico', 'reintegro'],
+    'Otros ingresos': ['ingreso efectivo', 'efectivo cajero', 'cajero automatico', 'reintegro', 'bizum recibido', 'devolucion', 'transferencia recibida'],
   },
 };
 
@@ -4496,11 +4516,94 @@ function txPatternKey(description) {
 
 // Pattern values are { cat, hits } objects; legacy string values are supported via _patCat
 function _patCat(p) { return p && typeof p === 'object' ? p.cat : p; }
+function _patHits(p) { return (p && typeof p === 'object' && p.hits) || (p ? 1 : 0); }
 function _patWrite(key, cat) {
+  if (!key || !cat) return;
+  // "Sin clasificar" NUNCA se guarda como regla aprendida: no es una
+  // corrección del usuario, es la ausencia de clasificación. Antes el
+  // formulario de alta/edición (_txSave) llamaba aquí sin filtrarlo, así que
+  // guardar un movimiento dejándolo sin clasificar creaba una regla que luego
+  // "clasificaba" como Sin clasificar cualquier movimiento parecido.
+  if (cat === UNCLASSIFIED_CATEGORY) return;
   if (!APP.categoryPatterns) APP.categoryPatterns = {};
   const existing = APP.categoryPatterns[key];
   const hits = (existing && typeof existing === 'object' ? existing.hits : 0) + 1;
   APP.categoryPatterns[key] = { cat, hits };
+}
+
+/* Aprende de una corrección o confirmación del usuario sobre un movimiento
+   REAL (no de una palabra clave que haya escrito a mano: para eso está
+   addCategoryPattern). Guarda hasta dos claves:
+     · la canónica de txPatternKey — la de siempre, que mantiene la
+       compatibilidad con las reglas ya almacenadas, y
+     · el primer token de comercio, cuando es distinto de la anterior.
+   Lo segundo arregla los comercios de nombre corto: txPatternKey solo
+   devuelve una palabra suelta si tiene 5+ caracteres, así que "PAGO EN ZARA
+   GRAN VIA" se guardaba como "zara gran" y luego NO se reconocía en "ZARA
+   CALLAO". Con el token suelto ('zara') la regla ya se transfiere de una
+   tienda a otra. Cada clave lleva su propio contador, de modo que la más
+   confirmada es la que gana en _patBestMatch. */
+function _patLearn(description, cat) {
+  if (!description || !cat || cat === UNCLASSIFIED_CATEGORY) return;
+  const canonical = txPatternKey(description);
+  _patWrite(canonical, cat);
+  const token = _txMerchantTokens(description)[0];
+  if (token && token !== canonical) _patWrite(token, cat);
+}
+
+/* Normaliza el texto de un movimiento antes de comparar: minúsculas y sin
+   acentos (_stripAccents), cualquier signo —puntos, barras, asteriscos de un
+   número de tarjeta enmascarado— convertido en espacio, y espacios
+   colapsados. Así "BP-GASOLINERA", "MERCADONA/BILBAO" y "COMPRA TARJ.
+   4521** MERCADONA" dejan la palabra del comercio suelta y reconocible.
+   Los DÍGITOS se conservan a propósito: hay palabras clave que los llevan
+   ('microsoft 365'), y los números sin significado (tarjetas, fechas,
+   referencias) se descartan después, al extraer los tokens del comercio. */
+function _txNormalizeText(description) {
+  return _stripAccents(description).replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/* Tokens candidatos a "nombre del comercio": palabras del texto normalizado
+   sin jerga bancaria (_TX_STOPWORDS), sin números y de al menos 4 caracteres.
+   De aquí sale la coincidencia parcial: reconocer "MERCADONA" aunque cambien
+   el número de tienda, la ciudad o la fecha en el resto de la cadena.
+   La comparación posterior es por token COMPLETO y exacto, nunca por
+   fragmento: por eso "mercado" (de "Mercado Central") no puede confundirse
+   con "mercadona", que es justo el error que una coincidencia difusa
+   cometería. Se prefiere no clasificar antes que clasificar mal. */
+const _TX_MIN_TOKEN = 4;
+function _txMerchantTokens(description) {
+  return _txNormalizeText(description)
+    .split(' ')
+    .filter(w => w.length >= _TX_MIN_TOKEN && !_TX_STOPWORDS.has(w) && !/\d/.test(w));
+}
+
+/* Mejor regla aprendida para este movimiento.
+   Se prueban varias claves candidatas —la clave canónica de txPatternKey (que
+   es la que se guarda, y mantiene compatibilidad con las reglas ya
+   almacenadas) y cada token de comercio— y gana la que MÁS veces ha
+   confirmado el usuario (hits). A igualdad de confirmaciones gana la clave
+   más específica (la más larga), que es la que describe mejor el movimiento.
+   Devuelve null si ninguna regla aplica. */
+function _patBestMatch(description, available) {
+  const pats = APP.categoryPatterns;
+  if (!pats) return null;
+  const candidates = [txPatternKey(description), ..._txMerchantTokens(description)];
+  const seen = new Set();
+  let best = null;
+  candidates.forEach(key => {
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    const cat = _patCat(pats[key]);
+    // available: una regla que apunta a una categoría que el usuario ya
+    // borró, o que no corresponde al tipo del movimiento, no se aplica.
+    if (!cat || cat === UNCLASSIFIED_CATEGORY || !available.includes(cat)) return;
+    const hits = _patHits(pats[key]);
+    if (!best || hits > best.hits || (hits === best.hits && key.length > best.key.length)) {
+      best = { key, cat, hits };
+    }
+  });
+  return best;
 }
 
 function matchLocalKeywords(description, type) {
@@ -4511,16 +4614,36 @@ function matchLocalKeywords(description, type) {
   // de una sola palabra como "Agua" o "Dia" (sin nada detrás) nunca tenía el
   // espacio literal que esas keywords exigen, así que no categorizaba nunca
   // — justo el caso más natural de escribir una factura de agua a secas.
-  const norm = ' ' + _stripAccents(description) + ' ';
+  // Se normaliza con _txNormalizeText (igual que las reglas aprendidas), que
+  // además convierte la puntuación en espacio: sin eso, 'bp ' no coincidía en
+  // "BP-GASOLINERA" ni 'orange ' en "ORANGE/FIBRA". Las keywords se normalizan
+  // con el MISMO criterio (_txNormKeyword), por eso 'h&m' sigue funcionando.
+  const norm = ' ' + _txNormalizeText(description) + ' ';
 
   const map       = CATEGORY_KEYWORDS[type] || {};
   const available = type === 'income' ? APP.categories.income : APP.categories.expense;
 
   for (const [cat, keywords] of Object.entries(map)) {
     if (!available.includes(cat)) continue;
-    if (keywords.some(kw => norm.includes(kw))) return cat;
+    if (keywords.some(kw => norm.includes(_txNormKeyword(kw)))) return cat;
   }
   return null;
+}
+
+/* Normaliza una palabra clave con el mismo criterio que el texto, PERO sin
+   recortar los espacios de los extremos: ese espacio de borde ('dia ', ' dia',
+   'bp ', 'agua ') es deliberado y es lo que evita que la keyword dispare
+   dentro de otra palabra ("agua" en "paraguas", "luz" en "andaluza").
+   Se memoriza porque matchLocalKeywords se llama una vez por movimiento y la
+   lista de keywords es fija. */
+const _txNormKeywordCache = new Map();
+function _txNormKeyword(kw) {
+  let v = _txNormKeywordCache.get(kw);
+  if (v === undefined) {
+    v = _stripAccents(kw).replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ');
+    _txNormKeywordCache.set(kw, v);
+  }
+  return v;
 }
 
 // Migración única — antes de corregir parseQuickAdd(), Quick Add "aprendía"
@@ -4681,15 +4804,33 @@ function _detectTransactionType(description, type) {
 // Solo reglas locales, sin red — aprendido (prioridad 1-3 del pedido: regla
 // manual, corrección previa y regla de comercio comparten el mismo almacén
 // APP.categoryPatterns) → palabra clave (prioridad 4) → "Sin clasificar".
+// Nº de confirmaciones a partir del cual una regla aprendida se considera
+// consolidada y se aplica como asignación con confianza alta. Por debajo
+// (una sola vez) se aplica igual, pero marcada como sugerencia revisable.
+const _PAT_CONFIRMED_HITS = 2;
+
 function _classifyLocal(description, type) {
-  if (APP.categoryPatterns) {
-    const key     = txPatternKey(description);
-    const learned = _patCat(APP.categoryPatterns[key]);
-    const avail   = type === 'income' ? APP.categories.income : APP.categories.expense;
-    if (learned && avail.includes(learned)) {
-      return { category: learned, confidence: 'high', confidenceScore: 0.95, source: 'learned' };
-    }
+  const avail = type === 'income' ? APP.categories.income : APP.categories.expense;
+
+  // 1) Reglas aprendidas del propio usuario — siempre por delante de las
+  //    genéricas. _patBestMatch ya resuelve el empate entre varias reglas
+  //    posibles a favor de la más confirmada.
+  const best = _patBestMatch(description, avail);
+  if (best) {
+    // Confianza según historial: una regla puesta UNA sola vez se marca como
+    // sugerencia ('medium'), que es lo que la pantalla de importación trata
+    // como revisable, en vez de darla por buena en silencio. Desde la segunda
+    // confirmación pasa a asignación con confianza alta.
+    const confirmed = best.hits >= _PAT_CONFIRMED_HITS;
+    return {
+      category:        best.cat,
+      confidence:      confirmed ? 'high' : 'medium',
+      confidenceScore: confirmed ? 0.95 : 0.6,
+      source:          'learned',
+      hits:            best.hits,
+    };
   }
+
   const local = matchLocalKeywords(description, type);
   if (local) return { category: local, confidence: 'high', confidenceScore: 0.85, source: 'rule' };
   return { category: UNCLASSIFIED_CATEGORY, confidence: 'low', confidenceScore: 0, source: 'unknown' };

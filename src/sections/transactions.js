@@ -734,7 +734,7 @@ function _commitCatEdit(cat) {
   const prev = t.category;
   t.category = cat;
   // Aprender el patrón igual que cuando se elige a mano en Quick Add.
-  if (cat !== UNCLASSIFIED_CATEGORY && t.description) _patWrite(txPatternKey(t.description), cat);
+  _patLearn(t.description, cat);
   saveData();
   renderTransactions();
   if (typeof showToast === 'function') showToast('Categoría: ' + prev + ' → ' + cat + ' ✓', 'success');
@@ -1021,7 +1021,7 @@ async function _txSave(prefill, isEdit) {
     _txCreate({ type, date, description, category, amount, note, favorite, photoId, tripId });
   }
 
-  _patWrite(txPatternKey(description), category);
+  _patLearn(description, category);
   APP.txPhotoDraftId = null;
   _modalOnClose = null;
   saveData(); closeModal(); renderTransactions();
@@ -1655,7 +1655,7 @@ function _qaSubmit(ids) {
   // aprendido / una palabra clave (parsed.source). Nunca memorizar el
   // fallback "Sin clasificar" como si fuera una corrección confirmada.
   if (category !== UNCLASSIFIED_CATEGORY && (ov.category || parsed.source)) {
-    _patWrite(txPatternKey(parsed.description), category);
+    _patLearn(parsed.description, category);
   }
   _qaOverrides[ids.input] = {};
   saveData();

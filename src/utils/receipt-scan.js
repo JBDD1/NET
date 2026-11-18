@@ -512,7 +512,7 @@ async function _rsConfirm() {
     },
   });
 
-  if (typeof _patWrite === 'function') _patWrite(txPatternKey(merchant), category);
+  if (typeof _patLearn === 'function') _patLearn(merchant, category);
   APP.transactions.sort((a, b) => b.date.localeCompare(a.date));
   saveData();
   closeModal();
