@@ -2302,14 +2302,19 @@ function _txSignature(t) {
   // antiguas o de otras vías de import pueden tenerlo como string o ausente,
   // y esta firma no debe poder reventar la importación entera por eso.
   const amt  = Number(t.amount) || 0;
-  const desc = _txDupDesc(t.description);
+  // originalDescription tiene prioridad: si el usuario renombró el movimiento
+  // al importarlo, el texto que identifica al movimiento en el extracto sigue
+  // siendo el crudo del banco, y es con ese con el que hay que comparar si el
+  // mismo extracto se vuelve a importar.
+  const desc = _txDupDesc(t.originalDescription || t.description);
   // CRITERIO EXPLÍCITO para un origen sin descripción legible (hay extractos
   // que traen el concepto vacío): no se asume en silencio ni que es ni que no
-  // es un duplicado. Se marca la firma como "sin descripción" en vez de
-  // dejarla vacía, de modo que un movimiento sin descripción solo puede
-  // coincidir con otro TAMBIÉN sin descripción que además tenga su misma
-  // fecha y su mismo importe — nunca con uno que sí la tenga.
-  return `${t.date}|${amt.toFixed(2)}|${t.type}|${desc || ' sin-descripcion'}`;
+  // es un duplicado. Una descripción real va con el prefijo 'd:' y la ausencia
+  // de descripción con el marcador 'nodesc', que nunca puede empezar por 'd:'
+  // — así un movimiento sin descripción solo coincide con otro TAMBIÉN sin
+  // descripción que además comparta fecha e importe, y nunca con uno que sí
+  // la tenga (ni al revés), sin depender de ningún carácter especial.
+  return `${t.date}|${amt.toFixed(2)}|${t.type}|${desc ? 'd:' + desc : 'nodesc'}`;
 }
 
 // Índice de RECUENTO de los movimientos ya existentes (no un Set), para poder
@@ -2563,9 +2568,22 @@ function _showImportReviewModal() {
   const typeOptionsFor = current => Object.entries(_TX_TYPE_LABELS)
     .map(([k, label]) => `<option value="${k}" ${k === current ? 'selected' : ''}>${label}</option>`).join('');
 
+  // Filas que la categorización automática NO ha resuelto: son las únicas que
+  // reciben el campo opcional de "nombre más claro". Las que sí tienen
+  // categoría automática no cambian en nada.
+  const uncategorized = idxs.filter(i => rows[i].category === UNCLASSIFIED_CATEGORY);
+
   const cards = idxs.map(i => {
     const r = rows[i];
     const reasonsHtml = r.reviewReasons.map(x => `<li>${escapeHtml(x)}</li>`).join('');
+    // Campo OPCIONAL y vacío por defecto — nunca se rellena con un valor
+    // inventado ni se exige para poder importar.
+    const nameField = r.category === UNCLASSIFIED_CATEGORY
+      ? `<div style="margin-top:10px">
+           <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px" for="review-name-${i}">Nombre más claro (opcional)</label>
+           <input type="text" class="text-input" id="review-name-${i}" value="" placeholder="Por ejemplo: Compra semanal Mercadona" />
+         </div>`
+      : '';
     const dupControl = r.importStatus === 'possible_duplicate'
       ? `<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px" for="review-includedup-${i}">
            <input type="checkbox" id="review-includedup-${i}" />
@@ -2594,6 +2612,7 @@ function _showImportReviewModal() {
           <select class="select-input" id="review-type-${i}">${typeOptionsFor(r.transactionType || r.type)}</select>
         </div>
       </div>
+      ${nameField}
       ${dupControl}
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px" for="review-remember-${i}">
         <input type="checkbox" id="review-remember-${i}" />
@@ -2602,12 +2621,26 @@ function _showImportReviewModal() {
     </div>`;
   }).join('');
 
+  // Aviso informativo, una sola vez y con el componente que ya se usa en el
+  // resto de la app (.modal-note). Explica en qué ayuda poner un nombre claro
+  // y deja dicho que es opcional — sin insistir ni culpabilizar por omitirlo.
+  const learnNote = uncategorized.length > 0
+    ? `<div class="modal-note" style="display:flex;gap:8px;align-items:flex-start;margin:0 0 14px">
+         <svg class="icon icon-xs" aria-hidden="true" style="flex-shrink:0;margin-top:2px"><use href="#icon-info"></use></svg>
+         <span>${uncategorized.length === 1 ? 'Hay 1 movimiento' : `Hay ${uncategorized.length} movimientos`} sin categoría. Si le pones un nombre más claro que el texto del banco, la categorización automática reconocerá mejor movimientos parecidos en próximas importaciones. Es opcional: puedes dejarlo en blanco y seguir.</span>
+       </div>`
+    : '';
+
   openModal(
     `Revisar ${idxs.length} operación${idxs.length === 1 ? '' : 'es'}`,
     `<p style="font-size:13px;color:var(--text-secondary);margin:0 0 14px">
        Completa lo que falte y pulsa «Guardar». Lo que dejes en blanco se queda pendiente — Finova no inventa ningún dato.
      </p>
-     <div style="max-height:420px;overflow-y:auto">${cards}</div>`,
+     ${learnNote}
+     <div style="max-height:420px;overflow-y:auto">${cards}</div>
+     <div style="margin-top:12px;text-align:right">
+       <button type="button" class="btn-ghost-sm" onclick="_skipNamingAndImport()">Omitir y continuar</button>
+     </div>`,
     () => _saveImportReview(idxs),
     () => {
       const btn = document.getElementById('modalConfirm');
@@ -2643,11 +2676,29 @@ function _saveImportReview(idxs) {
     const newType = document.getElementById(`review-type-${i}`)?.value;
     if (newType) r.transactionType = newType;
 
-    // "Recordar esta elección" — regla absoluta 14: ninguna predicción se
-    // convierte en regla permanente sin confirmación explícita. Es literal:
-    // solo si la casilla está marcada, y solo si hay una categoría real.
+    // Nombre más claro (opcional, solo existe en las filas sin categoría).
+    // Se guarda aparte: r.description sigue siendo el texto CRUDO del banco
+    // —lo necesita la detección de duplicados y la clave de la regla— y
+    // _buildImportTx usa r.userName como descripción visible.
+    const clearName = (document.getElementById(`review-name-${i}`)?.value || '').trim();
+    if (clearName) r.userName = clearName;
+
+    // Refuerza el sistema de reglas por palabra clave que YA existe
+    // (APP.categoryPatterns + txPatternKey + _patWrite); no se introduce
+    // ningún aprendizaje nuevo. La clave se saca del texto CRUDO del banco y
+    // no del nombre que escribió el usuario, porque es el texto crudo el que
+    // traerán las próximas importaciones del mismo comercio: txPatternKey
+    // descarta la jerga bancaria vía _TX_STOPWORDS ('compra', 'tarj', 'visa'…)
+    // y se queda con el término distintivo, p.ej. "COMPRA TARJ. 4521**
+    // MERCADONA 28 MADR" → "mercadona".
+    //
+    // Regla absoluta 14 (ninguna predicción se vuelve regla permanente sin
+    // confirmación explícita): se cumple porque solo se escribe ante un acto
+    // deliberado del usuario — marcar "Recordar esta elección", o escribir un
+    // nombre claro, que es exactamente para lo que el aviso de esta pantalla
+    // dice que sirve. Nunca con la categoría "Sin clasificar".
     const rememberEl = document.getElementById(`review-remember-${i}`);
-    if (rememberEl?.checked && newCat && newCat !== UNCLASSIFIED_CATEGORY) {
+    if ((rememberEl?.checked || clearName) && newCat && newCat !== UNCLASSIFIED_CATEGORY) {
       _patWrite(txPatternKey(r.description), newCat);
     }
 
@@ -2660,24 +2711,78 @@ function _saveImportReview(idxs) {
   _renderImportSummary();
 }
 
-function _confirmOFXImport() {
-  const readyRows = _pendingOFXRows.filter(r => r.importStatus === 'ready');
-  readyRows.forEach(r => {
-    const tx = {
-      id: generateId(), date: r.date, description: r.description,
-      category: r.category, type: r.type, amount: r.amount,
-    };
-    if (r.fitid) tx.fitid = r.fitid;
-    // Metadatos de clasificación — opcionales, no rompen transacciones
-    // creadas por otras vías (manual, quick-add) que no los llevan.
-    if (r.merchant)                        tx.merchant = r.merchant;
-    if (r.merchantSource)                  tx.merchantSource = r.merchantSource;
-    if (r.transactionType)                 tx.transactionType = r.transactionType;
-    if (r.categoryConfidence)              tx.categoryConfidence = r.categoryConfidence;
-    if (typeof r.categoryConfidenceScore === 'number') tx.categoryConfidenceScore = r.categoryConfidenceScore;
-    if (r.categorySource)                  tx.categorySource = r.categorySource;
-    tx.categoryReviewed  = false;
-    tx.categoryUpdatedAt = r.categoryUpdatedAt || new Date().toISOString();
+/* «Omitir y continuar» — confirma la importación COMPLETA sin exigir ningún
+   nombre ni ninguna categoría. Todo lo que quedaba pendiente entra tal cual;
+   las filas sin categoría se guardan con la categoría genérica del proyecto
+   ("Sin clasificar"), que la tabla ya marca con su aviso para clasificarlas
+   cuando se quiera. No valida ningún campo, no pregunta nada y no llama a la
+   IA: no puede bloquear ni retrasar la importación de ningún movimiento,
+   tenga categoría o no. */
+function _skipNamingAndImport() {
+  const rows = _pendingOFXRows;
+  if (!rows.length) { closeModal(); return; }
+
+  const importedCount = _importPendingRows(rows);
+  const unclassified  = rows.filter(r => (r.category || UNCLASSIFIED_CATEGORY) === UNCLASSIFIED_CATEGORY).length;
+  // Los duplicados exactos siguen descartados: omitir se refiere al paso de
+  // poner nombres, no a importar algo que ya existe.
+  _pendingOFXRows = [];
+  _pendingDupRows = [];
+
+  saveData();
+  closeModal();
+  renderTransactions();
+
+  const extra = unclassified > 0 ? ` · ${unclassified} sin clasificar` : '';
+  showToast(`${importedCount} transacciones importadas desde ${_pendingImportSource} ✓${extra}`, 'success');
+
+  // Mismo evento y misma propiedad 'banco' (el FORMATO detectado, nunca el
+  // nombre del banco ni nada del contenido) que el camino normal.
+  if (importedCount > 0 && typeof track === 'function') {
+    track('importacion_csv_ok', { banco: _pendingImportSource });
+  }
+  if (importedCount > 0) _offerBalanceSync();
+}
+
+/* Construye la transacción definitiva de una fila de importación.
+   Está separado de _confirmOFXImport para que los DOS caminos que importan
+   —«Importar N listas» y «Omitir y continuar»— creen exactamente la misma
+   transacción y no puedan divergir, y para poder probarlo sin DOM. */
+function _buildImportTx(r) {
+  // Si el usuario escribió un nombre más claro (paso opcional de la pantalla
+  // de revisión), ese es el que se ve en la app, y el texto crudo del banco se
+  // conserva en originalDescription. Es lo que lee _txSignature, así que
+  // renombrar un movimiento NO impide reconocerlo como duplicado si más
+  // adelante se reimporta el mismo extracto con el texto original.
+  const named = !!(r.userName && String(r.userName).trim());
+  const tx = {
+    id: generateId(), date: r.date,
+    description: named ? String(r.userName).trim() : r.description,
+    // Una fila sin categoría se importa con la categoría genérica del
+    // proyecto, nunca con undefined.
+    category: r.category || UNCLASSIFIED_CATEGORY,
+    type: r.type, amount: r.amount,
+  };
+  if (named) tx.originalDescription = r.description;
+  if (r.fitid) tx.fitid = r.fitid;
+  // Metadatos de clasificación — opcionales, no rompen transacciones
+  // creadas por otras vías (manual, quick-add) que no los llevan.
+  if (r.merchant)                        tx.merchant = r.merchant;
+  if (r.merchantSource)                  tx.merchantSource = r.merchantSource;
+  if (r.transactionType)                 tx.transactionType = r.transactionType;
+  if (r.categoryConfidence)              tx.categoryConfidence = r.categoryConfidence;
+  if (typeof r.categoryConfidenceScore === 'number') tx.categoryConfidenceScore = r.categoryConfidenceScore;
+  if (r.categorySource)                  tx.categorySource = r.categorySource;
+  tx.categoryReviewed  = false;
+  tx.categoryUpdatedAt = r.categoryUpdatedAt || new Date().toISOString();
+  return tx;
+}
+
+// Añade a APP las transacciones de las filas dadas. Solo datos: los efectos de
+// interfaz (toast, cerrar modal, re-render) los pone quien llama.
+function _importPendingRows(rows) {
+  rows.forEach(r => {
+    const tx = _buildImportTx(r);
     APP.transactions.push(tx);
     // Mismo ajuste de la cuenta vinculada que en CUALQUIER otra vía de alta
     // (formulario, quick add, recurrentes). Era el único camino que creaba
@@ -2688,8 +2793,12 @@ function _confirmOFXImport() {
     if (typeof _applyTxCashImpact === 'function') _applyTxCashImpact(tx, 1);
   });
   APP.transactions.sort((a, b) => b.date.localeCompare(a.date));
+  return rows.length;
+}
 
-  const importedCount = readyRows.length;
+function _confirmOFXImport() {
+  const readyRows = _pendingOFXRows.filter(r => r.importStatus === 'ready');
+  const importedCount = _importPendingRows(readyRows);
   // Lo que queda pendiente NO se pierde ni se fuerza a importar mal
   // clasificado — se queda disponible para revisar después sin tener que
   // reimportar el archivo entero (sección 22: nunca forzar a aceptar una
