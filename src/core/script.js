@@ -2270,16 +2270,71 @@ function _parseOFXSGML(text) {
 let _pendingOFXRows = [];
 let _pendingImportSource = 'OFX/QFX';
 
-// Firma de contenido para filas sin fitid (CSV/Excel no traen un ID estable de
-// banco como OFX). No es perfecta — dos compras idénticas el mismo día por el
-// mismo importe colisionan — pero es el único fallback posible sin un ID real,
-// y el modal de previsualización deja revisar antes de confirmar.
+/* ─── Detección de duplicados al importar ──────────────────────────────
+   Un duplicado se decide SIEMPRE por el contenido real del movimiento, y
+   NUNCA por que su fecha caiga dentro de un rango ya importado: el mismo día
+   puede tener un movimiento real del banco A y otro distinto del banco B o
+   de un exchange, así que descartar por solape de fechas borraría
+   movimientos legítimos. Para considerar duplicado han de coincidir los TRES
+   campos, todos ellos exactos:
+     · misma fecha exacta (ni rango ni fecha aproximada),
+     · mismo importe exacto y mismo signo (type income/expense), sin ninguna
+       tolerancia más allá de los 2 decimales con los que el proyecto ya
+       maneja dinero — el importe nunca es flexible,
+     · misma descripción normalizada (ver _txDupDesc).
+   Esta es la ÚNICA detección de duplicados por contenido del proyecto: la
+   usan el import de OFX/CSV/Excel (_showOFXPreview) y el de la API bancaria
+   (_gcProcessImport en bank-connect.js) en vez de reimplementarla cada uno. */
+
+// Normaliza la descripción antes de comparar: _stripAccents ya pasa a
+// minúsculas y quita acentos, y aquí se colapsan los espacios, para que
+// "CAFÉ   SOL" y "cafe sol" sean reconocidos como el mismo movimiento.
+// A diferencia de la versión anterior NO se trunca a 40 caracteres: truncar
+// daba falsos positivos entre dos descripciones largas distintas que
+// compartían el principio (p.ej. dos transferencias al mismo beneficiario
+// con conceptos distintos se veían como el mismo movimiento).
+function _txDupDesc(description) {
+  return _stripAccents(description).replace(/\s+/g, ' ').trim();
+}
+
 function _txSignature(t) {
   // Number(...) en vez de asumir que t.amount ya es numérico: transacciones
   // antiguas o de otras vías de import pueden tenerlo como string o ausente,
   // y esta firma no debe poder reventar la importación entera por eso.
-  const amt = Number(t.amount) || 0;
-  return `${t.date}|${amt.toFixed(2)}|${t.type}|${(t.description || '').trim().toLowerCase().slice(0, 40)}`;
+  const amt  = Number(t.amount) || 0;
+  const desc = _txDupDesc(t.description);
+  // CRITERIO EXPLÍCITO para un origen sin descripción legible (hay extractos
+  // que traen el concepto vacío): no se asume en silencio ni que es ni que no
+  // es un duplicado. Se marca la firma como "sin descripción" en vez de
+  // dejarla vacía, de modo que un movimiento sin descripción solo puede
+  // coincidir con otro TAMBIÉN sin descripción que además tenga su misma
+  // fecha y su mismo importe — nunca con uno que sí la tenga.
+  return `${t.date}|${amt.toFixed(2)}|${t.type}|${desc || ' sin-descripcion'}`;
+}
+
+// Índice de RECUENTO de los movimientos ya existentes (no un Set), para poder
+// descartar 1:1: si la app ya tiene UN "CAFE 3,50" del día 5 y el archivo
+// nuevo trae DOS, se descarta uno como duplicado y el otro se importa, porque
+// son dos cafés reales y solo uno estaba ya. Con un Set se habrían descartado
+// los dos, perdiendo un movimiento real.
+function _txDupIndex(txs) {
+  const index = new Map();
+  (txs || []).forEach(t => {
+    const k = _txSignature(t);
+    index.set(k, (index.get(k) || 0) + 1);
+  });
+  return index;
+}
+
+// ¿Este movimiento coincide exactamente con uno ya existente? Consume la
+// coincidencia del índice para que el recuento 1:1 de arriba se cumpla a lo
+// largo de todo el lote.
+function _txIsDuplicate(row, index) {
+  const k = _txSignature(row);
+  const n = index.get(k) || 0;
+  if (n <= 0) return false;
+  index.set(k, n - 1);
+  return true;
 }
 
 // Etiquetas en español del tipo de movimiento — informativo (no sustituye a
@@ -2312,6 +2367,11 @@ function _computeImportRowStatus(r) {
 }
 
 let _pendingCertainDupCount = 0;
+// Movimientos apartados por coincidir EXACTAMENTE (fecha + importe + signo +
+// descripción normalizada) con uno que ya está en la app. No se importan,
+// pero tampoco se pierden en silencio: se cuentan en el modal de revisión y
+// el usuario puede verlos y rescatar cualquiera con "Importar igualmente".
+let _pendingDupRows = [];
 // Saldo de cierre del extracto importado (si traía columna de saldo), para
 // ofrecer cuadrar la cuenta vinculada al terminar — ver _offerBalanceSync().
 let _pendingClosingBalance = null, _pendingClosingBalanceDate = '';
@@ -2321,30 +2381,77 @@ function _showOFXPreview(allRows, source = 'OFX/QFX') {
   _pendingClosingBalance     = allRows._closingBalance ?? null;
   _pendingClosingBalanceDate = allRows._closingBalanceDate || '';
   // FITID (OFX) es un identificador único real del banco: coincidencia =
-  // duplicado seguro, se excluye directamente sin preguntar. Sin FITID
-  // (CSV/Excel) solo hay la firma de contenido (fecha+importe+tipo+inicio de
-  // descripción), que puede coincidir por azar entre dos operaciones
-  // distintas — eso es como mucho un POSIBLE duplicado, y nunca se descarta
-  // en silencio: se deja en la lista, marcado, para que el usuario decida.
-  const existingFitids     = new Set(APP.transactions.map(t => t.fitid).filter(Boolean));
-  const existingSignatures = new Set(APP.transactions.map(_txSignature));
-
+  // duplicado seguro, se excluye directamente sin preguntar.
+  const existingFitids = new Set(APP.transactions.map(t => t.fitid).filter(Boolean));
   _pendingCertainDupCount = allRows.filter(r => r.fitid && existingFitids.has(r.fitid)).length;
+  const candidates = allRows.filter(r => !(r.fitid && existingFitids.has(r.fitid)));
 
-  const rows = allRows.filter(r => !(r.fitid && existingFitids.has(r.fitid)));
+  // Sin FITID (CSV/Excel) se compara el CONTENIDO real de cada movimiento
+  // contra lo que ya hay en la app: fecha + importe + signo + descripción
+  // normalizada. Nunca se compara el rango de fechas — un movimiento que cae
+  // dentro de un periodo ya importado pero cuyo importe o descripción no
+  // coinciden con ninguno existente SÍ se importa, porque puede ser de otra
+  // cuenta, otro banco u otro exchange que simplemente opera esos mismos días.
+  const dupIndex = _txDupIndex(APP.transactions);
+  const rows = [];
+  _pendingDupRows = [];
+  candidates.forEach(r => {
+    if (!r.fitid && _txIsDuplicate(r, dupIndex)) { _pendingDupRows.push(r); return; }
+    rows.push(r);
+  });
+
   if (!rows.length) {
-    showToast(`Todas las transacciones ya existen en Finova (${_pendingCertainDupCount} duplicadas omitidas)`, 'info');
+    const omitted = _pendingCertainDupCount + _pendingDupRows.length;
+    showToast(`Todas las transacciones ya existen en Finova (${omitted} duplicadas omitidas)`, 'info');
     return;
   }
 
   rows.forEach(r => {
-    r.isPossibleDuplicate = !r.fitid && existingSignatures.has(_txSignature(r));
     const { status, reasons } = _computeImportRowStatus(r);
     r.importStatus  = status;
     r.reviewReasons = reasons;
   });
 
   _pendingOFXRows = rows;
+  _renderImportSummary();
+}
+
+/* Lista de los movimientos descartados por duplicado exacto — transparencia:
+   el usuario ve exactamente QUÉ se ha descartado y puede rescatar cualquiera
+   si en realidad era un movimiento distinto (dos compras idénticas el mismo
+   día en el mismo comercio son posibles). */
+function _showDuplicatesModal() {
+  if (!_pendingDupRows.length) { _renderImportSummary(); return; }
+  const cards = _pendingDupRows.map((r, i) => `
+    <div class="card" style="padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;color:var(--text-muted)">${escapeHtml(r.date)}</div>
+        <div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(r.description)}"><strong>${escapeHtml(r.description || '(sin descripción)')}</strong></div>
+      </div>
+      <div class="${r.type === 'income' ? 'positive' : 'negative'}" style="font-size:13px;white-space:nowrap">${r.type === 'income' ? '+' : '-'}${formatCurrency(r.amount)}</div>
+      <button type="button" class="btn-secondary" style="font-size:11.5px;padding:5px 10px;white-space:nowrap" onclick="_rescueDuplicate(${i})">Importar igualmente</button>
+    </div>`).join('');
+  openModal(
+    `${_pendingDupRows.length} descartado${_pendingDupRows.length === 1 ? '' : 's'} por duplicado exacto`,
+    `<p class="modal-help-text">Estos movimientos coinciden exactamente en fecha, importe y descripción con otros que ya tienes, así que no se importarán. Si alguno es en realidad un movimiento distinto, puedes importarlo de todas formas.</p>
+     <div style="max-height:360px;overflow-y:auto">${cards}</div>`,
+    null
+  );
+  document.getElementById('modal')?.querySelector('.modal-footer')?.style.setProperty('display', 'none');
+}
+
+// El usuario confirma que ese movimiento NO era un duplicado: vuelve al lote
+// a importar, pasando por el cálculo de estado normal.
+function _rescueDuplicate(i) {
+  const r = _pendingDupRows[i];
+  if (!r) return;
+  _pendingDupRows.splice(i, 1);
+  const { status, reasons } = _computeImportRowStatus(r);
+  r.importStatus  = status;
+  r.reviewReasons = reasons;
+  _pendingOFXRows.push(r);
+  _pendingOFXRows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  closeModal();
   _renderImportSummary();
 }
 
@@ -2372,8 +2479,15 @@ function _renderImportSummary() {
     .map(([k, n]) => `<div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--text-secondary)">${_TX_TYPE_LABELS[k] || k}</span><strong>${n}</strong></div>`)
     .join('');
 
-  const dupNote = _pendingCertainDupCount > 0
-    ? `<span style="color:var(--text-muted)"> · ${_pendingCertainDupCount} duplicadas (mismo ID bancario) omitidas</span>`
+  // Transparencia (lo que se importa vs. lo que se descarta): se separa el
+  // duplicado por ID bancario —certeza total— del duplicado por contenido
+  // exacto, que es el que el usuario puede querer revisar y rescatar.
+  const discardedCount = _pendingCertainDupCount + _pendingDupRows.length;
+  const dupParts = [];
+  if (_pendingCertainDupCount > 0) dupParts.push(`${_pendingCertainDupCount} con el mismo ID bancario`);
+  if (_pendingDupRows.length > 0)  dupParts.push(`${_pendingDupRows.length} por coincidir fecha, importe y descripción`);
+  const dupNote = dupParts.length
+    ? `<span style="color:var(--text-muted)"> · ${discardedCount} descartada${discardedCount === 1 ? '' : 's'} por duplicado (${dupParts.join(' y ')})</span>`
     : '';
 
   const tableRows = rows.map(r => {
@@ -2407,6 +2521,7 @@ function _renderImportSummary() {
          <div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--text-secondary)">Categorías identificadas</span><strong>${categoriesFound}</strong></div>
          <div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--text-secondary)">Categorías pendientes</span><strong>${rows.length - categoriesFound}</strong></div>
          ${possibleDupCount > 0 ? `<div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--text-secondary)">Posibles duplicados</span><strong>${possibleDupCount}</strong></div>` : ''}
+         ${discardedCount > 0 ? `<div style="display:flex;justify-content:space-between;padding:3px 0"><span style="color:var(--text-secondary)">Descartados por duplicado</span><strong>${discardedCount}</strong></div>` : ''}
        </div>
      </div>
      <div style="max-height:300px;overflow-y:auto">
@@ -2415,8 +2530,9 @@ function _renderImportSummary() {
          <tbody>${tableRows}</tbody>
        </table>
      </div>
-     ${pendingCount > 0 ? `<div style="margin-top:14px;text-align:right">
-       <button type="button" class="btn-secondary" onclick="_showImportReviewModal()">Revisar ${pendingCount} pendiente${pendingCount === 1 ? '' : 's'}</button>
+     ${pendingCount > 0 || _pendingDupRows.length > 0 ? `<div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+       ${_pendingDupRows.length > 0 ? `<button type="button" class="btn-ghost-sm" onclick="_showDuplicatesModal()">Ver ${_pendingDupRows.length} descartado${_pendingDupRows.length === 1 ? '' : 's'}</button>` : ''}
+       ${pendingCount > 0 ? `<button type="button" class="btn-secondary" onclick="_showImportReviewModal()">Revisar ${pendingCount} pendiente${pendingCount === 1 ? '' : 's'}</button>` : ''}
      </div>` : ''}`,
     readyCount > 0 ? () => _confirmOFXImport() : null,
     () => {

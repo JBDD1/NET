@@ -329,6 +329,14 @@ async function _gcFinishConnect() {
 function _gcProcessImport(data, connIdx) {
   const accounts    = [];
   const existingIds = new Set(APP.transactions.filter(t => t.bankTxId).map(t => t.bankTxId));
+  // Respaldo por CONTENIDO para los movimientos que el proveedor manda sin
+  // transactionId: hasta ahora esos no pasaban ninguna comprobación y
+  // reimportar la misma ventana de fechas los duplicaba todos. Se reutiliza
+  // la misma detección que el import de OFX/CSV/Excel (_txDupIndex /
+  // _txIsDuplicate en script.js) en vez de reimplementar otra aquí, así que
+  // el criterio es idéntico: fecha + importe + signo + descripción
+  // normalizada, nunca el rango de fechas.
+  const dupIndex = typeof _txDupIndex === 'function' ? _txDupIndex(APP.transactions) : null;
   let added = 0, skipped = 0;
 
   (data.accounts || []).forEach(acc => {
@@ -357,7 +365,24 @@ function _gcProcessImport(data, connIdx) {
 
     (acc.transactions || []).forEach(t => {
       const txId = t.transactionId || null;
+      // 1) El transactionId del proveedor es un identificador único real:
+      //    si coincide, es un duplicado seguro.
       if (txId && existingIds.has(txId)) { skipped++; return; }
+
+      const amount      = Math.abs(t.amount || 0);
+      const type        = (t.amount || 0) >= 0 ? 'income' : 'expense';
+      const date        = t.date || new Date().toISOString().slice(0, 10);
+      const description = (t.description || 'Transacción').trim();
+
+      // 2) Sin transactionId no hay ID que comparar, así que se compara el
+      //    contenido real del movimiento con el mismo criterio que el resto
+      //    de importaciones. Solo cuando NO hay ID: si el proveedor manda un
+      //    ID nuevo, es un movimiento nuevo y se respeta tal cual.
+      if (!txId && dupIndex && _txIsDuplicate({ date, amount, type, description }, dupIndex)) {
+        skipped++;
+        return;
+      }
+
       let category = '';
       if (APP.categoryPatterns) {
         const descUp = (t.description || '').toUpperCase();
@@ -365,13 +390,10 @@ function _gcProcessImport(data, connIdx) {
           if (descUp.includes(kw.toUpperCase())) { category = (v && typeof v === 'object') ? (v.cat || '') : v; break; }
         }
       }
-      const amount = Math.abs(t.amount || 0);
-      const type   = (t.amount || 0) >= 0 ? 'income' : 'expense';
       if (!category) category = type === 'income' ? 'Otros ingresos' : 'Otros gastos';
       APP.transactions.push({
         id:           generateId(),
-        date:         t.date || new Date().toISOString().slice(0, 10),
-        description:  (t.description || 'Transacción').trim(),
+        date, description,
         category, type, amount,
         bankTxId:     txId,
         bankImported: true,
