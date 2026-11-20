@@ -80,6 +80,13 @@
       "replace": "[importe]"
     },
     {
+      "name": "oob-code",
+      "why": "El oobCode de los enlaces de Firebase (restablecer contrasena, verificar correo) es una credencial de un solo uso: con el se puede cambiar la contrasena de esa cuenta. En las URLs ya lo tapa queryKeysSensibles; este patron cubre cuando aparece dentro del TEXTO de un error o de una miga. Va ANTES de uid-firebase porque el patron de 28 alfanumericos puede morder un trozo del codigo y dejar el resto visible. Se conserva el nombre de la clave a proposito: saber que habia un oobCode ayuda a depurar, su valor no",
+      "pattern": "(oobCode|oob_code)[\"']?\\s*[=:]\\s*[\"']?[A-Za-z0-9_-]{10,}",
+      "flags": "gi",
+      "replace": "$1=[token]"
+    },
+    {
       "name": "uid-firebase",
       "why": "Los uid de Firebase son 28 caracteres alfanuméricos",
       "pattern": "\\b[A-Za-z0-9]{28}\\b",

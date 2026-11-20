@@ -150,22 +150,36 @@ describe('No se revela si una cuenta existe', () => {
   });
 });
 
-describe('Política de contraseñas — una sola, de 8', () => {
+describe('Política de contraseñas — una sola, de 10', () => {
   let ctx;
   beforeEach(() => { ctx = loadShared(); });
 
-  test('el mínimo es 8', () => {
-    expect(call(ctx, 'FV_PASSWORD_MIN')).toBe(8);
+  test('el mínimo es 10', () => {
+    expect(call(ctx, 'FV_PASSWORD_MIN')).toBe(10);
   });
 
-  test('7 caracteres se rechazan, 8 se aceptan', () => {
-    expect(call(ctx, "fvPasswordProblem('1234567')")).toMatch(/8 caracteres/);
-    expect(call(ctx, "fvPasswordProblem('12345678')")).toBe(null);
+  test('9 caracteres se rechazan, 10 se aceptan', () => {
+    expect(call(ctx, "fvPasswordProblem('123456789')")).toMatch(/10 caracteres/);
+    expect(call(ctx, "fvPasswordProblem('1234567890')")).toBe(null);
+  });
+
+  test('una contraseña que antes valía (8) ahora se rechaza', () => {
+    // El mínimo subió de 8 a 10: esto fija el cambio para que no se pueda
+    // revertir sin darse cuenta.
+    expect(call(ctx, "fvPasswordProblem('12345678')")).toMatch(/10 caracteres/);
+  });
+
+  test('el mensaje de weak-password de Firebase dice el mismo número', () => {
+    // Si los dos números se separan, el usuario lee dos políticas distintas.
+    expect(call(ctx, "fvAuthErrMsg('auth/weak-password')")).toMatch(/10 caracteres/);
   });
 
   test('vacía, solo espacios y excesivamente larga se rechazan', () => {
     expect(call(ctx, "fvPasswordProblem('')")).toMatch(/Introduce/);
-    expect(call(ctx, "fvPasswordProblem('        ')")).toMatch(/espacios/);
+    // 12 espacios, no 8: con el mínimo en 10 una cadena de 8 espacios la
+    // rechaza antes la regla de longitud, y lo que se quiere comprobar aquí
+    // es la regla de "solo espacios".
+    expect(call(ctx, "fvPasswordProblem('            ')")).toMatch(/espacios/);
     expect(call(ctx, `fvPasswordProblem('a'.repeat(5000))`)).toMatch(/larga/);
   });
 

@@ -25,7 +25,7 @@ el DNS del dominio. El código ya está preparado para todo lo de abajo.
 | 1 | Pegar las 2 plantillas de correo en español | Consola Firebase | **Sí** |
 | 2 | Poner remitente «Finova» y responder-a `MyFinova1@gmail.com` | Consola Firebase | **Sí** |
 | 3 | Añadir el dominio a dominios autorizados | Consola Firebase | **Sí** (al desplegar) |
-| 4 | Subir la política de contraseñas a 8 caracteres | Consola Firebase | Sí (coherencia) |
+| 4 | Subir la política de contraseñas a 10 caracteres | Consola Firebase | Sí (coherencia) |
 | 5 | Revisar la protección contra enumeración de correos | Consola Firebase | Sí |
 | 6 | Fijar `VITE_APP_URL` cuando haya dominio propio | Vercel | Cuando lo compres |
 | 7 | Decidir cómo enviar los correos (ver apartado 6) | — | Para que no caigan en spam |
@@ -157,10 +157,16 @@ Tiene que estar:
 
 **Ruta:** Authentication → **Settings** → **Password policy**.
 
-El cliente ya exige **8 caracteres** (`FV_PASSWORD_MIN` en
+El cliente ya exige **10 caracteres** (`FV_PASSWORD_MIN` en
 `src/auth/auth-shared.js`), pero el mínimo de Firebase por defecto es **6**.
 Ahora mismo el cliente es más estricto que el servidor: es seguro, pero
-incoherente. Súbelo a 8 en la consola para que coincidan.
+incoherente. Súbelo a 10 en la consola (el rango admitido es 6–30) para que
+coincidan; mientras no lo hagas, una contraseña de 6 seguiría siendo válida
+para Firebase si alguien se salta la pantalla del cliente.
+
+Subir el mínimo **no invalida las contraseñas ya existentes**: el inicio de
+sesión no aplica esta política a propósito, para no dejar fuera a una cuenta
+antigua creada con menos caracteres.
 
 Si además activas requisitos de mayúsculas, números o símbolos, **dímelo**: hay
 que reflejarlos en `fvPasswordProblem()`, o Firebase rechazará contraseñas que
@@ -428,3 +434,116 @@ REQUIRE_EMAIL_VERIFIED=false
 
 Solo la cadena exacta `false` lo desactiva: una variable vacía o mal escrita
 deja el bloqueo activo, que es la dirección segura del fallo.
+
+---
+
+## 9. PENDIENTE — Pantalla propia de restablecimiento de contraseña
+
+**Estado:** no implementado. Hoy el enlace del correo abre **la página alojada
+de Firebase**, que funciona correctamente. Esta tarea solo cambia *dónde*
+ocurre el paso de "escribe tu contraseña nueva".
+
+**Requiere dominio propio comprado** y la URL de acción apuntando a él, así que
+está aparcado hasta entonces. Todo lo investigado queda aquí para no repetirlo.
+
+### Qué se gana y qué se paga
+
+A favor: la estética de Finova, indicador de fortaleza, icono de ojo para
+mostrar/ocultar, mensajes de error nuestros y botón de "pedir otro enlace"
+cuando el código ha caducado.
+
+En contra, y hay que tenerlo presente: **el `oobCode` pasaría a estar en una URL
+de nuestro dominio**, cuando hoy solo existe en el dominio de Google. Eso abre
+una vía de fuga (historial, `Referer`, Sentry, analítica) que ahora no existe.
+No es un cambio gratis.
+
+### Mecanismo correcto (ojo, esto es lo que se investigó mal al principio)
+
+`handleCodeInApp: true` **NO** es el mecanismo. Eso sirve para el inicio de
+sesión por enlace y para apps móviles. Para alojar la pantalla propia:
+
+1. **Consola:** Authentication → Templates → *Restablecer contraseña* →
+   **personalizar la URL de acción** y apuntarla a `https://TU-DOMINIO/reset-password`.
+2. Firebase enviará el enlace a esa URL con
+   `?mode=resetPassword&oobCode=...&apiKey=...&lang=es`.
+3. La página lee `oobCode` y usa dos métodos del SDK que ya están disponibles:
+   - `firebase.auth().verifyPasswordResetCode(oobCode)` → valida el código y
+     devuelve el correo (sirve para mostrarlo y para detectar caducado/usado).
+   - `firebase.auth().confirmPasswordReset(oobCode, nuevaPass)` → aplica el
+     cambio.
+4. Errores a tratar: `auth/expired-action-code` y `auth/invalid-action-code`
+   (ya están traducidos en `_FV_AUTH_ERRORS`, en `src/auth/auth-shared.js`).
+
+### Código a escribir
+
+- Pantalla nueva en `src/auth/auth.js`, al lado de `_renderResetForm()`, que ya
+  existe y es la que pide el correo. Reutilizar `fvPasswordProblem()` y
+  `fvPasswordStrength()` de `auth-shared.js`: no duplicar la política.
+- Interceptar `?mode=resetPassword` **antes** de pintar el login: el usuario no
+  está autenticado cuando abre el enlace.
+- **Servirla en una ruta real `/reset-password`**, no solo como estado interno
+  de `index.html`. Es lo que permite aplicarle cabeceras propias (ver abajo).
+- Al terminar: `signOut()` local y volver al login.
+
+### Higiene del `oobCode` (obligatorio si se hace esto)
+
+- **Limpiarlo de la URL** en cuanto se lee: `history.replaceState()`, para que
+  no quede en el historial ni se reenvíe en una navegación posterior.
+- **Sentry:** ya está cubierto. `oobCode` está en `queryKeysSensibles` (tapa el
+  parámetro en las URLs) y hay un patrón `oob-code` en
+  `src/core/redact-patterns.json` que lo tapa dentro del texto de un error o de
+  una miga. Hay tests en `src/tests/monitoring.test.js`. **No hace falta tocar
+  nada de esto**, solo no romperlo.
+- **`Referrer-Policy: no-referrer`:** se dejó **sin aplicar** a propósito, y
+  conviene entender por qué antes de cambiarlo:
+  - Hoy no aporta nada: el token no está en ninguna URL nuestra.
+  - La política actual, `strict-origin-when-cross-origin`, ya **no envía la ruta
+    ni la query** a terceros, así que el token no se filtraría por `Referer`
+    ni siquiera con la pantalla propia. `no-referrer` es un cinturón extra.
+  - Ponerlo **global** es arriesgado: si la API key web de Firebase está
+    restringida por *HTTP referrer* (una práctica habitual), `no-referrer`
+    **rompería el login**, porque la petición dejaría de enviar origen. Y se
+    pierde la atribución de origen en la analítica.
+  - **Por tanto:** aplicarlo **solo a la ruta `/reset-password`**, añadiendo una
+    regla en `vercel.json` (hay precedente de reglas por ruta para
+    `Cache-Control`) y en `_SEC` de `server.cjs`. Verificar en el primer
+    despliegue que Vercel no acaba mandando la cabecera duplicada.
+
+### Lo que NO hay que hacer
+
+Montar una tabla de tokens propia con `bcrypt`/`argon2` y endpoints
+`POST /auth/forgot-password`. Finova **no almacena contraseñas** (cero
+dependencias de hashing; las credenciales son de Firebase), así que eso sería un
+segundo sistema de credenciales en paralelo: dos fuentes de verdad y un agujero
+de seguridad, no una mejora.
+
+### Dos cosas que la consola NO permite
+
+- **Caducidad del enlace a 30 minutos:** no se puede. El `oobCode` de
+  restablecimiento caduca a la **1 hora** y la consola no lo expone (solo deja
+  cambiar asunto, cuerpo, remitente, reply-to y la URL de acción). Comprobarlo
+  de nuevo si Google añade el ajuste. Comprobar los 30 min en nuestra pantalla
+  **sería un control falso**: el código sigue siendo válido contra la API de
+  Firebase la hora completa, así que se puede saltar llamando a Firebase
+  directamente. Un plazo real exigiría emitir tokens propios, que es justo lo
+  que no hay que hacer.
+- **Correo de aviso "tu contraseña ha cambiado":** no existe esa plantilla.
+  Firebase avisa del cambio de *dirección de correo*, no del de contraseña, y el
+  proyecto no tiene envío de correo propio. Además **no hay disparador de Auth
+  para "contraseña cambiada"** (`functions.auth.user()` solo tiene `onCreate` y
+  `onDelete`), así que haría falta un endpoint HTTPS que llame nuestra pantalla
+  — y en ese momento el usuario no está autenticado, por lo que recibiría un
+  correo sin credencial: endpoint abierto para mandar correo a direcciones
+  arbitrarias. Para hacerlo bien, la función tendría que verificar ella misma el
+  `oobCode` (antes de consumirlo) para averiguar el correo. Decisión tomada:
+  **omitido por ahora**, porque el correo de *solicitud* de restablecimiento que
+  Firebase ya envía cubre el momento útil para reaccionar.
+
+### Cerrar sesión en los demás dispositivos: ya resuelto
+
+No hay nada que hacer. Firebase revoca los *refresh tokens* al cambiar la
+contraseña, y `/api/user-data` (GET y POST) pasa desde noviembre de 2026 por
+`_requireAuth`, que usa `verifyIdToken(token, true)` y por tanto **rechaza
+tokens revocados**. Antes usaba `_verifyFirebaseToken`, que solo valida la
+firma: un dispositivo del que acababas de cerrar sesión podía seguir leyendo y
+escribiendo datos hasta una hora.

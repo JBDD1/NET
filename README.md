@@ -79,3 +79,13 @@ Ver [`docs/SETUP.md`](docs/SETUP.md) para la configuración paso a paso de GitHu
 ## Seguridad
 
 Ver [`SECURITY.md`](SECURITY.md) para el resumen de medidas implementadas (autenticación, control de acceso, cifrado en reposo, rate limiting, CORS/CSP, etc.) y cómo reportar una vulnerabilidad.
+
+## Tareas pendientes
+
+- **Pantalla propia de restablecimiento de contraseña** — requiere dominio propio
+  comprado. El flujo actual funciona (el enlace abre la página alojada de
+  Firebase); esta tarea solo movería el paso de "escribe tu contraseña nueva" a
+  Finova, para darle nuestra estética, indicador de fortaleza e icono de ojo.
+  Los pasos exactos (código + configuración en la consola de Firebase, qué no se
+  puede configurar y qué **no** hay que hacer) están en el apartado 9 de
+  [`AUTH_EMAIL_SETUP.md`](AUTH_EMAIL_SETUP.md).

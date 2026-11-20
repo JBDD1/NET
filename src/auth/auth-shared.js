@@ -73,7 +73,7 @@ const _FV_AUTH_ERRORS = {
 
   // ── Registro ──
   'auth/email-already-in-use':       'Ya existe una cuenta con ese correo. Inicia sesión o recupera tu contraseña.',
-  'auth/weak-password':              'La contraseña es demasiado débil. Usa al menos 8 caracteres, con letras y números.',
+  'auth/weak-password':              'La contraseña es demasiado débil. Usa al menos 10 caracteres, con letras y números.',
 
   // ── Cuenta ──
   'auth/user-disabled':              'Esta cuenta está desactivada. Escríbenos a MyFinova1@gmail.com si crees que es un error.',
@@ -120,11 +120,16 @@ function fvAuthErrMsg(code) {
 
 /* ─── Política de contraseñas ─────────────────────────────────── */
 
-// 8 caracteres. Firebase permite 6 por defecto, así que el cliente es MÁS
+// 10 caracteres. Firebase permite 6 por defecto, así que el cliente es MÁS
 // estricto que el servidor: eso es seguro, pero conviene subir también el
-// mínimo en la consola para que las dos políticas coincidan. Ver
-// AUTH_EMAIL_SETUP.md.
-const FV_PASSWORD_MIN = 8;
+// mínimo en la consola (Authentication → Settings → Password policy, que
+// admite 6-30) para que las dos políticas coincidan y no se pueda crear una
+// contraseña de 6 saltándose esta pantalla. Ver AUTH_EMAIL_SETUP.md.
+//
+// Subir el mínimo NO invalida las contraseñas ya existentes: el login no
+// aplica esta política a propósito (ver _submitLogin en auth.js), para no
+// dejar fuera a una cuenta antigua creada con menos caracteres.
+const FV_PASSWORD_MIN = 10;
 
 /**
  * Devuelve el motivo por el que una contraseña no vale, o null si vale.

@@ -127,18 +127,24 @@ describe('Registro desde la app — el nombre no se pierde', () => {
   test('una contraseña corta se rechaza ANTES de crear la cuenta', async () => {
     const fns = load();
     await fns.signUpEmail('nuevo@test.com', '123', 'Carlos');
-    expect(calls.msgs[0]).toMatch(/8 caracteres/);
+    expect(calls.msgs[0]).toMatch(/10 caracteres/);
     expect(APP.uid).toBeUndefined();     // no se llegó a crear nada
     expect(APP.userName).toBe('');       // ni se tocó el nombre
   });
 
-  test('7 caracteres tampoco valen: la politica es 8', async () => {
+  test('9 caracteres tampoco valen: la politica es 10', async () => {
     // El limite estaba en 6 dentro de signUpEmail y en 8 en _submitLogin:
     // llamar a signUpEmail directamente se saltaba la politica nueva.
     const fns = load();
-    await fns.signUpEmail('nuevo@test.com', '1234567', 'Carlos');
-    expect(calls.msgs[0]).toMatch(/8 caracteres/);
+    await fns.signUpEmail('nuevo@test.com', '123456789', 'Carlos');
+    expect(calls.msgs[0]).toMatch(/10 caracteres/);
     expect(APP.uid).toBeUndefined();
+  });
+
+  test('una contraseña de 10 ya pasa la validación y llega a crear la cuenta', async () => {
+    const fns = load();
+    await fns.signUpEmail('nuevo@test.com', '1234567890', 'Carlos');
+    expect(APP.uid).toBeDefined();
   });
 
   test('si el registro FALLA, el nombre no se queda pegado en APP', async () => {

@@ -115,6 +115,31 @@ describe('Redacción — nada del usuario llega a Sentry', () => {
     expect(redact('usuario ' + uid + ' sin datos')).toBe('usuario [uid] sin datos');
   });
 
+  test('oobCode de los enlaces de Firebase (es una credencial de un solo uso)', () => {
+    // Con un oobCode se puede cambiar la contraseña de esa cuenta: no puede
+    // llegar a Sentry ni en el texto de un error ni en una miga.
+    const code = 'AbC123_xyz-9876543210QWERTYuiop';
+    for (const msg of [
+      'Error al confirmar: oobCode=' + code,
+      'fallo con oobCode: "' + code + '" al verificar',
+      '{"oobCode":"' + code + '"}',
+      'oob_code=' + code,
+    ]) {
+      const out = redact(msg);
+      expect(out).not.toContain(code);
+      expect(out).toContain('[token]');
+    }
+  });
+
+  test('el oobCode se redacta ANTES que el patrón de uid, no a medias', () => {
+    // El patrón de 28 alfanuméricos puede morder un trozo del código y dejar
+    // el resto a la vista: el orden en redact-patterns.json importa.
+    const code = 'aBcD1234eFgH5678iJkL9012mNoPqRsT';
+    const out  = redact('oobCode=' + code);
+    expect(out).toBe('oobCode=[token]');
+    expect(out).not.toContain('[uid]');
+  });
+
   test('un mensaje con VARIOS datos a la vez se limpia entero', () => {
     const sucio = 'Error: usuario carlos@test.com con saldo 1.234,56 € en ' +
                   'ES9121000418450200051332 y token eyJhbGciOiJIUzI1NiJ9.eyJhIjoxfQ.xyz123abc';
