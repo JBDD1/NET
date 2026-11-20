@@ -2403,18 +2403,23 @@ async function handleUserDataGet(req, res) {
   // never trusted from the query string.
   let uid;
   if (_AUTH_ENABLED) {
-    try {
-      const _pl = await _verifyFirebaseToken(req.headers['authorization'], req, true);
-      uid = _pl.sub;
-      req.emailVerified = _pl.email_verified === true;
-    } catch (e) {
-      res.writeHead(401, _apiHeaders(req));
-      return res.end(JSON.stringify({ error: 'Token inválido.' }));
-    }
+    // _requireAuth en vez del _verifyFirebaseToken de antes: comprueba
+    // REVOCACIÓN con el Admin SDK (verifyIdToken(token, true)), mientras que
+    // _verifyFirebaseToken solo valida la firma contra las JWKS de Google.
+    // Sin esa comprobación, cambiar la contraseña NO expulsaba de verdad a los
+    // demás dispositivos: Firebase revoca sus refresh tokens, pero su ID token
+    // seguía siendo aceptado AQUÍ —la ruta de los datos del usuario— hasta una
+    // hora. _requireAuth añade además el bloqueo por IP y el rechazo de
+    // cuentas suspendidas, que este handler hacía a mano más abajo.
+    uid = await _requireAuth(req, res);
+    if (!uid) return;   // ya ha respondido (401/429/403): no escribir dos veces
   } else {
+    // Sin autenticación (solo FINOVA_DISABLE_AUTH=true, en local) se sigue
+    // leyendo el uid de la query: es lo que permite probar varios usuarios de
+    // prueba en desarrollo. _requireAuth devolvería siempre 'dev-uid'.
     uid = new URL(req.url, 'http://localhost').searchParams.get('uid') || '';
+    req.uid = uid;
   }
-  req.uid = uid;
 
   if (!_UID_RE.test(uid)) {
     res.writeHead(400, _apiHeaders(req));
@@ -2464,15 +2469,13 @@ async function handleUserDataPost(req, res) {
   // Verify token before streaming body — Node.js buffers request data during the await.
   let verifiedUid = null;
   if (_AUTH_ENABLED) {
-    try {
-      const _pl = await _verifyFirebaseToken(req.headers['authorization'], req, true);
-      verifiedUid = _pl.sub;
-      req.uid = verifiedUid;
-      req.emailVerified = _pl.email_verified === true;
-    } catch (e) {
-      res.writeHead(401, _apiHeaders(req));
-      return res.end(JSON.stringify({ error: 'Token inválido.' }));
-    }
+    // Mismo motivo que en handleUserDataGet: _requireAuth comprueba REVOCACIÓN
+    // (verifyIdToken(token, true)) y _verifyFirebaseToken no. Aquí importa
+    // todavía más, porque es la ruta por la que se ESCRIBE el blob: un
+    // dispositivo del que acabas de cerrar sesión cambiando la contraseña
+    // podía seguir subiendo datos hasta una hora.
+    verifiedUid = await _requireAuth(req, res);
+    if (!verifiedUid) return;   // ya ha respondido (401/429/403)
   }
 
   // Este endpoint es por donde sube el blob de datos del usuario
