@@ -54,7 +54,11 @@ const DIRECTIVES = {
     'data:',                          // imágenes embebidas (iconos, data: URIs)
     'blob:',                          // imágenes generadas en cliente (IndexedDB)
     'https://lh3.googleusercontent.com', // foto de perfil de Google
-    'https://jbdd1.github.io',        // iconos/og:image en el dominio provisional
+    // Dominio de producción, para imágenes absolutas. Es REDUNDANTE con 'self'
+    // (los iconos se sirven del propio sitio), así que se deja un placeholder
+    // MUY visible; buildCSP({ domain }) lo sustituye por FINOVA_DOMAIN cuando
+    // server.cjs lo lee en runtime. Ya no hay ningún jbdd1.github.io a mano.
+    'https://[COMPLETAR-TU-DOMINIO-REAL]',
   ],
 
   'connect-src': [
@@ -108,15 +112,26 @@ const DIRECTIVES = {
  *     host exacto en connect-src (apretar la CSP, nunca ampliarla).
  *   - analyticsOrigin: si se da, AÑADE ese origen a script-src y connect-src
  *     (p. ej. una instancia de Umami autoalojada en otro dominio).
+ *   - domain: dominio de producción (FINOVA_DOMAIN). Si se da, SUSTITUYE el
+ *     placeholder del dominio en img-src por ese valor. server.cjs lo pasa
+ *     desde process.env en runtime; vercel.json y el test usan la versión sin
+ *     opciones, que deja el placeholder visible.
  *
- * Sin opciones, el resultado es exactamente la unión de las dos CSP antiguas.
+ * Sin opciones, el resultado deja el placeholder del dominio visible.
  */
 function buildCSP(opts = {}) {
-  const { sentryIngestOrigin, analyticsOrigin } = opts;
+  const { sentryIngestOrigin, analyticsOrigin, domain } = opts;
 
   // Copia profunda para no mutar DIRECTIVES.
   const d = {};
   for (const [k, v] of Object.entries(DIRECTIVES)) d[k] = v.slice();
+
+  if (domain) {
+    // El dominio de producción sale de FINOVA_DOMAIN (una sola fuente). Solo
+    // sustituye el placeholder; nunca añade orígenes nuevos.
+    d['img-src'] = d['img-src'].map(o =>
+      o === 'https://[COMPLETAR-TU-DOMINIO-REAL]' ? String(domain) : o);
+  }
 
   if (sentryIngestOrigin) {
     const exact = String(sentryIngestOrigin).split(/\s+/).filter(Boolean);

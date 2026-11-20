@@ -174,17 +174,21 @@ function buildScripts(outDir = 'dist', mode = 'production') {
       async handler() {
       if (!fs.existsSync(outDir)) return;
 
-      // ── SEO: dominio canónico, ÚNICA fuente de verdad ─────────────────
-      // Cambia SOLO `SITE_URL` el día que se compre el dominio: el build
-      // reescribe TODAS las URLs (canonical/og/twitter de los HTML + sitemap.xml
-      // + robots.txt) a ese dominio. `BASES_ORIGEN` son las bases que aparecen
-      // en el código fuente y que el build mapea a SITE_URL:
-      //   · la provisional de GitHub Pages (en los HTML, del prompt de SEO previo)
-      //   · el placeholder TU-DOMINIO-REAL (en sitemap.xml y robots.txt)
-      // Mientras SITE_URL siga siendo el placeholder, esas URLs se quedan con el
-      // placeholder: HAY QUE SUSTITUIRLO a mano antes de desplegar (ver SEO_AUDIT.md).
-      const SITE_URL     = 'https://TU-DOMINIO-REAL';   // ← ÚNICO lugar a cambiar
-      const BASES_ORIGEN = ['https://jbdd1.github.io/NET', 'https://TU-DOMINIO-REAL'];
+      // ── Dominio de producción: ÚNICA fuente de verdad ────────────────
+      // El dominio sale de la variable de entorno FINOVA_DOMAIN, la MISMA que
+      // lee server.cjs en runtime. El build reescribe TODAS las URLs de origen
+      // (canonical/og/twitter/schema de los HTML + sitemap.xml + robots.txt) a
+      // FINOVA_DOMAIN. Ya NO hay ningún jbdd1.github.io escrito a mano.
+      //
+      // Si FINOVA_DOMAIN no está puesta, SITE_URL queda como un placeholder MUY
+      // visible ([COMPLETAR-TU-DOMINIO-REAL]) en vez de un dominio real, para
+      // que un despliegue sin configurar se note a gritos y nunca se cuele el
+      // dominio provisional viejo. Documentada en .env.example / .env.server.example.
+      const SITE_URL     = process.env.FINOVA_DOMAIN || 'https://[COMPLETAR-TU-DOMINIO-REAL]';
+      // `BASES_ORIGEN`: la base que aparece en el código fuente y que el build
+      // mapea a SITE_URL. Al ser distinta del placeholder por defecto, el
+      // reemplazo SIEMPRE se ejecuta (deja el marcador visible si no hay dominio).
+      const BASES_ORIGEN = ['https://TU-DOMINIO-REAL'];
       let urlsReescritas = 0;
       const aplicarDominio = (txt) => {
         let out = txt;

@@ -571,6 +571,9 @@ const _SEC = {
 // vercel.json. SENTRY_INGEST_ORIGIN aprieta los comodines de Sentry al host
 // exacto; ANALYTICS_ORIGIN añade una analítica autoalojada. Ver MONITORING_SETUP.md.
 const _CSP = require('./csp.config.cjs').buildCSP({
+  // Dominio de producción, leído del entorno en RUNTIME (misma variable que el
+  // build del frontend). No queda hardcodeado en server.cjs.
+  domain:             process.env.FINOVA_DOMAIN,
   sentryIngestOrigin: process.env.SENTRY_INGEST_ORIGIN,
   analyticsOrigin:    process.env.ANALYTICS_ORIGIN,
 });
