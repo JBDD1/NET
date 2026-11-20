@@ -86,16 +86,19 @@ var api = {
 
   /* ── User data ── */
   userData: {
-    get: function(uid) {
+    // quiet: para comprobaciones de fondo (la comparación de sesiones al
+    // arrancar), que deben fallar en silencio en vez de soltar el toast
+    // genérico de 401/5xx nada más entrar en la app.
+    get: function(uid, quiet) {
       var path = '/api/user-data' + (uid ? '?uid=' + encodeURIComponent(uid) : '');
-      return _apiRequest(path, {}, true);
+      return _apiRequest(path, {}, true, quiet || false);
     },
-    save: function(body) {
+    save: function(body, quiet) {
       return _apiRequest('/api/user-data', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(body),
-      }, true);
+      }, true, quiet || false);
     },
   },
 

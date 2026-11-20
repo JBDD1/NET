@@ -197,6 +197,10 @@ function _saveDataNow() {
         toSave.categoryPatterns = trimmed;
       }
     }
+    // Marca de cuándo se guardó esta copia. Viaja dentro del blob que se sube
+    // al servidor, y es lo que permite saber qué copia es más reciente cuando
+    // la misma cuenta se usa en dos sitios (el servidor no devuelve fecha).
+    toSave.lastSavedAt = new Date().toISOString();
     localStorage.setItem(_getStorageKey(), JSON.stringify(toSave));
     _saveStateToIDB(toSave);
     if (toSave.syncCode) _setSyncCodeCookie(toSave.syncCode);
@@ -421,6 +425,178 @@ const _debouncedServerSync = debounce(async () => {
     window.fvMonitor?.capture(e, 'sync-subida');
   }
 }, 3000);
+
+/* ─── Sincronización por cuenta entre sesiones ───────────────────────────
+   La subida ya era automática (_debouncedServerSync), pero la BAJADA solo
+   ocurría en un dispositivo sin datos locales (_loadUserDataFromServer en
+   auth.js). Con datos locales ya presentes, una segunda sesión no bajaba
+   nunca lo que había subido la primera y, al seguir subiendo lo suyo,
+   sobrescribía en el servidor los cambios de la otra sin avisar.
+
+   Aquí se compara la copia del servidor con la local al arrancar y, si el
+   CONTENIDO difiere, se le pregunta al usuario cuál quiere usar. Nunca se
+   decide en silencio, y antes de adoptar la del servidor se guarda una
+   instantánea local restaurable (_saveVersionSnapshot). */
+
+// Claves que cuentan como "datos del usuario" para comparar. Se dejan fuera
+// a propósito las de interfaz (tema, sección activa, orden del dashboard…):
+// que un dispositivo tenga otro tema no es un conflicto de datos y no debe
+// provocar una pregunta.
+const _SYNC_CONTENT_KEYS = [
+  'transactions', 'portfolio', 'cashAccounts', 'alternatives', 'goals', 'bizums',
+  'sales', 'liabilities', 'stakingPositions', 'stakingHistory', 'properties',
+  'recurring', 'trips', 'budgets', 'scenarios', 'customAlerts', 'networthHistory',
+  'categories', 'categoryPatterns', 'trabajo', 'minimos', 'categoryBudgetType',
+  'transactionCashAccountId',
+];
+
+// Huella de contenido (FNV-1a de 32 bits sobre las claves que importan).
+// Barata y estable: dos copias con los mismos datos dan la misma huella
+// aunque difieran en tema o en la sección abierta.
+function _syncFingerprint(obj) {
+  if (!obj || typeof obj !== 'object') return '0';
+  let src = '';
+  for (const k of _SYNC_CONTENT_KEYS) {
+    if (obj[k] !== undefined) src += k + ':' + JSON.stringify(obj[k]) + ';';
+  }
+  let h = 0x811c9dc5;
+  for (let i = 0; i < src.length; i++) {
+    h ^= src.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0;
+  }
+  return h.toString(16) + '-' + src.length;
+}
+
+// Resumen legible de una copia, para que el usuario elija con datos delante.
+function _syncSummary(obj) {
+  const n = k => Array.isArray(obj?.[k]) ? obj[k].length : 0;
+  return {
+    tx:     n('transactions'),
+    pos:    n('portfolio'),
+    goals:  n('goals'),
+    savedAt: typeof obj?.lastSavedAt === 'string' ? obj.lastSavedAt : '',
+  };
+}
+
+function _syncFmtWhen(iso) {
+  if (!iso) return 'fecha desconocida';
+  const d = new Date(iso);
+  if (isNaN(d)) return 'fecha desconocida';
+  return d.toLocaleString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+let _syncPromptShown = false;
+
+/* Comprueba la copia del servidor y pregunta si difiere. No bloquea el
+   arranque: se llama sin await cuando la app ya está en marcha, y cualquier
+   fallo de red se ignora (se sigue con los datos locales). */
+async function _syncCheckServerCopy() {
+  if (_syncPromptShown || _isDemoMode) return;
+  if (!APP.uid || APP.emailVerified === false) return;
+  if (typeof api === 'undefined' || !api.userData) return;
+
+  const rawLocal = localStorage.getItem(_getStorageKey());
+  if (!rawLocal) return;   // sin copia local no hay conflicto: ya lo cubre auth.js
+
+  let remote = null;
+  try {
+    const res  = await api.userData.get(APP.uid, true);
+    const json = await res.json();
+    if (!json || !json.ok || !json.data) return;   // el servidor no tiene copia
+    remote = JSON.parse(json.data);
+  } catch (e) {
+    return;   // sin conexión o respuesta ilegible: se sigue con lo local
+  }
+
+  let local;
+  try { local = JSON.parse(rawLocal); } catch { return; }
+
+  if (_syncFingerprint(local) === _syncFingerprint(remote)) return;  // iguales
+
+  // Una copia del servidor sin NINGÚN dato no debe poder ofrecerse frente a
+  // una local con datos: sería ofrecer borrar todo.
+  const rs = _syncSummary(remote), ls = _syncSummary(local);
+  if (rs.tx === 0 && rs.pos === 0 && (ls.tx > 0 || ls.pos > 0)) {
+    _syncUploadLocalNow();
+    return;
+  }
+
+  _syncPromptShown = true;
+  _syncShowConflictModal(remote, rs, ls);
+}
+
+let _syncPendingRemote = null;
+
+function _syncShowConflictModal(remote, rs, ls) {
+  const card = (titulo, s, nota) => `
+    <div class="card" style="padding:12px 14px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">${titulo}</div>
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.7">
+        ${s.tx} transacciones · ${s.pos} posiciones · ${s.goals} objetivos<br>
+        Guardado: ${_syncFmtWhen(s.savedAt)}
+      </div>
+      ${nota ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px">${nota}</div>` : ''}
+    </div>`;
+
+  const masNueva = (rs.savedAt && ls.savedAt)
+    ? (rs.savedAt > ls.savedAt ? 'servidor' : 'local')
+    : '';
+
+  openModal('Tus datos no coinciden entre dispositivos', `
+    <p class="modal-help-text">
+      La copia guardada en tu cuenta no es igual que la de este dispositivo.
+      Elige cuál quieres conservar. Antes de cambiar nada se guarda una
+      instantánea de los datos de este dispositivo, que puedes recuperar
+      desde <strong>Ajustes → Historial de versiones</strong>.
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      ${card('En tu cuenta (servidor)', rs, masNueva === 'servidor' ? 'La más reciente' : '')}
+      ${card('En este dispositivo', ls, masNueva === 'local' ? 'La más reciente' : '')}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+      <button type="button" class="btn-secondary" onclick="_syncKeepLocal()">Mantener los de este dispositivo</button>
+      <button type="button" class="btn-primary" onclick="_syncAdoptRemote()">Usar los de mi cuenta</button>
+    </div>`, null);
+  document.getElementById('modal')?.querySelector('.modal-footer')?.style.setProperty('display', 'none');
+  _syncPendingRemote = remote;
+}
+
+/* Adopta la copia del servidor. Se guarda primero una instantánea local
+   restaurable, para que elegir aquí nunca sea irreversible. */
+async function _syncAdoptRemote() {
+  const remote = _syncPendingRemote;
+  if (!remote) { closeModal(); return; }
+  _syncPendingRemote = null;
+  try {
+    _lastHistoryTs = 0;                 // fuerza la instantánea (ignora el límite de 1/min)
+    await _saveVersionSnapshot();
+  } catch (_) { /* si no se puede, se avisa abajo igualmente */ }
+  try {
+    localStorage.setItem(_getStorageKey(), JSON.stringify(remote));
+  } catch (e) {
+    showToast('No se pudieron guardar los datos de la cuenta en este dispositivo.', 'error');
+    return;
+  }
+  closeModal();
+  showToast('Datos de tu cuenta aplicados ✓ Recargando…', 'success');
+  setTimeout(() => location.reload(), 800);
+}
+
+/* Mantiene los datos locales y los sube YA, para que el servidor deje de
+   tener una copia distinta y no se vuelva a preguntar en cada sesión. */
+function _syncKeepLocal() {
+  _syncPendingRemote = null;
+  closeModal();
+  _syncUploadLocalNow();
+  showToast('Se mantienen los datos de este dispositivo y se suben a tu cuenta ✓', 'success');
+}
+
+// Subida inmediata (sin los 3 s de _debouncedServerSync).
+function _syncUploadLocalNow() {
+  const data = localStorage.getItem(_getStorageKey());
+  if (!data || typeof api === 'undefined' || !api.userData) return;
+  api.userData.save({ data }, true).catch(e => { window.fvMonitor?.capture(e, "sync-subida"); });
+}
 
 function loadData() {
   try {

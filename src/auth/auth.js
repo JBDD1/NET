@@ -167,6 +167,12 @@ async function _enterApp() {
   try {
     await init();
     _injectAuthUI();
+    // Con la app ya en marcha y pintada, se comprueba si la copia de la cuenta
+    // en el servidor difiere de la de este dispositivo. Deliberadamente SIN
+    // await y después de init(): no debe retrasar el arranque, y el aviso
+    // necesita la app montada para poder abrir el modal. Si falla la red se
+    // ignora y se sigue con los datos locales (ver _syncCheckServerCopy).
+    if (typeof _syncCheckServerCopy === 'function') _syncCheckServerCopy();
   } catch (err) {
     console.error('[Finova Auth] Fallo al arrancar la app:', err);
     const loading = document.getElementById('app-loading');
@@ -222,6 +228,11 @@ async function _saveUserMeta(uid, email, displayName) {
 }
 
 // ─── Carga datos del servidor al primer login ─────────────────────
+// Solo cubre el dispositivo SIN datos locales de este UID: ahí no hay nada que
+// perder, así que la copia del servidor se adopta directamente y sin preguntar.
+// Cuando YA hay datos locales, la comparación la hace _syncCheckServerCopy()
+// (storage.js) con la app arrancada, y pregunta al usuario si el contenido
+// difiere en vez de decidir por él.
 async function _loadUserDataFromServer(uid) {
   const key = `finova_${uid}_data_v1`;
   if (localStorage.getItem(key)) return; // ya hay datos locales para este UID
